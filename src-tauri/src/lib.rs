@@ -161,6 +161,12 @@ fn cancel_task() {
 /// play a track.
 #[tauri::command]
 fn reveal_in_folder(path: String) -> Result<(), String> {
+    // Only reveal paths that actually exist (no shell is involved anywhere —
+    // all arguments go through Command::arg — but this avoids handing garbage
+    // to the OS file manager).
+    if !std::path::Path::new(&path).exists() {
+        return Err("File not found.".to_string());
+    }
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("open")
@@ -191,9 +197,21 @@ fn reveal_in_folder(path: String) -> Result<(), String> {
 }
 
 /// Write the CSV report for an already-analyzed result to `dest`.
+///
+/// Defense in depth: only ever writes files with a `.csv` extension, so a
+/// compromised frontend cannot use this command to overwrite arbitrary files.
 #[tauri::command]
 async fn save_csv(dest: String, report: FolderReport) -> Result<String, String> {
-    core::report::write_csv(Path::new(&dest), &report).map_err(|e| e.to_string())?;
+    let path = Path::new(&dest);
+    let is_csv = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("csv"))
+        .unwrap_or(false);
+    if !is_csv {
+        return Err("The destination must be a .csv file.".to_string());
+    }
+    core::report::write_csv(path, &report).map_err(|e| e.to_string())?;
     Ok(dest)
 }
 

@@ -14,7 +14,7 @@ pub fn build_csv(report: &FolderReport) -> String {
     let mut out = String::new();
     out.push_str(
         "file,format,sample_rate,channels,declared_bits,real_bit_depth,duration_s,\
-         status,upscaling,upsampling,transcoding,cutoff_hz,cutoff_ratio,fake_stereo,\
+         status,upscaling,upsampling,transcoding,aac_grid,cutoff_hz,cutoff_ratio,fake_stereo,\
          clipped,clip_events,peak_dbfs,md5\n",
     );
     for f in &report.files {
@@ -35,7 +35,7 @@ pub fn build_csv(report: &FolderReport) -> String {
             TranscodeState::Detected => "detected",
         };
         out.push_str(&format!(
-            "{},{},{},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{:.2},{}\n",
+            "{},{},{},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{},{:.2},{}\n",
             csv_escape(&f.file_name),
             f.format,
             f.sample_rate,
@@ -47,6 +47,7 @@ pub fn build_csv(report: &FolderReport) -> String {
             f.detections.upscaling,
             f.detections.upsampling,
             transcoding,
+            f.requant_rate.map(|v| format!("{v:.3}")).unwrap_or_default(),
             f.cutoff_hz.map(|v| format!("{v:.0}")).unwrap_or_default(),
             f.cutoff_ratio.map(|v| format!("{v:.3}")).unwrap_or_default(),
             opt_bool(f.fake_stereo),
@@ -107,6 +108,7 @@ mod tests {
             cutoff_hz: Some(21000.0),
             cutoff_ratio: Some(0.95),
             real_bit_depth: Some(16),
+            requant_rate: None,
             fake_stereo: Some(false),
             clipping: ClippingInfo {
                 clipped_samples: 0,

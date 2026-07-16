@@ -17,7 +17,7 @@ use std::sync::Arc;
 use rustfft::{num_complex::Complex, Fft, FftPlanner};
 
 use crate::mdct::{Mdct, AAC_N};
-use crate::{bitdepth, clipping, spectrum, ClippingInfo};
+use crate::{bitdepth, clipping, requant, spectrum, ClippingInfo};
 
 /// Full-scale detection threshold (normalized). Samples with |value| at or
 /// above this are treated as clipped.
@@ -33,6 +33,10 @@ const MDCT_STRIDE: u64 = 4;
 const MDCT_MAX_FRAMES: u32 = 240;
 /// A dead zone only "exists" if the per-frame cutoff is below this fraction of N.
 const MDCT_DEAD_TOP_RATIO: f32 = 0.92;
+
+// --- Re-quantization detector segment buffers -------------------------------
+/// Preferred segment start (sample index; multiple of 1024 ≈ 8 s at 44.1 kHz).
+const REQ_MAIN_START: u64 = 344 * 1024;
 
 /// Aggregated results produced by [`StreamAnalyzer::finish`].
 #[derive(Debug, Clone)]
@@ -56,6 +60,12 @@ pub struct AnalysisSummary {
     pub mdct_dead_db: Option<f32>,
     /// Fraction of analyzed MDCT frames that showed a high-frequency dead zone.
     pub mdct_dead_fraction: Option<f32>,
+
+    // --- AAC re-quantization evidence (strongest transcode proof) ---
+    /// Hit-rate of on-grid bands at the best synchronized MDCT onset (0..1).
+    /// ≥ [`requant::DETECT_RATE`] means an AAC source. `None` when the check
+    /// did not run (unsupported rate or file too short).
+    pub requant_rate: Option<f32>,
 }
 
 /// Incremental audio analyzer.
@@ -94,6 +104,12 @@ pub struct StreamAnalyzer {
     mdct_dead_frames: u32,
     mdct_cutoff_ratio_sum: f64,
     mdct_dead_db_sum: f64,
+
+    // --- Re-quantization segment buffers (L/R as f64) ---
+    req_early_l: Vec<f64>,
+    req_early_r: Vec<f64>,
+    req_main_l: Vec<f64>,
+    req_main_r: Vec<f64>,
 }
 
 impl StreamAnalyzer {
@@ -131,6 +147,10 @@ impl StreamAnalyzer {
             mdct_dead_frames: 0,
             mdct_cutoff_ratio_sum: 0.0,
             mdct_dead_db_sum: 0.0,
+            req_early_l: Vec::with_capacity(requant::SEGMENT_LEN),
+            req_early_r: Vec::with_capacity(requant::SEGMENT_LEN),
+            req_main_l: Vec::with_capacity(requant::SEGMENT_LEN),
+            req_main_r: Vec::with_capacity(requant::SEGMENT_LEN),
         }
     }
 
@@ -138,7 +158,29 @@ impl StreamAnalyzer {
     /// optionally accompanied by the raw integer sample values for the same
     /// frame (used for effective bit-depth estimation).
     pub fn push_frame(&mut self, samples: &[f32], int_samples: Option<&[i32]>) {
+        if samples.is_empty() {
+            return;
+        }
+        let idx = self.total_frames; // sample index of this frame
         self.total_frames += 1;
+
+        // Capture the re-quantization segments (first two channels, f64).
+        // Both segment starts are multiples of 1024, preserving AAC frame
+        // alignment modulo the block length.
+        let l = samples[0] as f64;
+        let r = if samples.len() >= 2 { samples[1] as f64 } else { l };
+        if self.req_early_l.len() < requant::SEGMENT_LEN {
+            self.req_early_l.push(l);
+            if self.channels >= 2 {
+                self.req_early_r.push(r);
+            }
+        }
+        if idx >= REQ_MAIN_START && self.req_main_l.len() < requant::SEGMENT_LEN {
+            self.req_main_l.push(l);
+            if self.channels >= 2 {
+                self.req_main_r.push(r);
+            }
+        }
 
         // Clipping + peak (per channel).
         for &s in samples {
@@ -301,6 +343,24 @@ impl StreamAnalyzer {
             _ => None,
         };
 
+        // AAC re-quantization check — only meaningful at the AAC frame rates
+        // covered by the 44.1/48 kHz scale-factor band table.
+        let requant_rate = if sample_rate == 44_100 || sample_rate == 48_000 {
+            let (seg_l, seg_r) = if self.req_main_l.len() >= requant::SEGMENT_LEN {
+                (&self.req_main_l, &self.req_main_r)
+            } else {
+                (&self.req_early_l, &self.req_early_r)
+            };
+            let right = if self.channels >= 2 && seg_r.len() >= requant::SEGMENT_LEN {
+                Some(seg_r.as_slice())
+            } else {
+                None
+            };
+            requant::analyze_segment(seg_l, right).map(|r| r.rate)
+        } else {
+            None
+        };
+
         let (mdct_cutoff_ratio, mdct_dead_db, mdct_dead_fraction) = if self.mdct_frames > 0 {
             let frac = self.mdct_dead_frames as f32 / self.mdct_frames as f32;
             if self.mdct_dead_frames > 0 {
@@ -328,6 +388,7 @@ impl StreamAnalyzer {
             mdct_cutoff_ratio,
             mdct_dead_db,
             mdct_dead_fraction,
+            requant_rate,
         }
     }
 }

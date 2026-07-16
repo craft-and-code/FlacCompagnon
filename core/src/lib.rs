@@ -16,6 +16,7 @@ pub mod detections;
 pub mod flac_md5;
 pub mod mdct;
 pub mod report;
+pub mod requant;
 pub mod spectrum;
 pub mod stereo;
 
@@ -82,6 +83,8 @@ pub struct FileAnalysis {
 
     /// Estimated *effective* bit depth (integer sources only).
     pub real_bit_depth: Option<u32>,
+    /// AAC re-quantization hit-rate (0..1); high values prove an AAC source.
+    pub requant_rate: Option<f32>,
     /// `true` when a >= 2 channel file is actually dual-mono.
     pub fake_stereo: Option<bool>,
 
@@ -99,7 +102,9 @@ pub struct FileAnalysis {
 pub struct ScanOptions {
     /// Recurse into sub-folders.
     pub recursive: bool,
-    /// Verify FLAC MD5 by fully decoding (slower) vs. only reading STREAMINFO.
+    /// Compare the FLAC MD5 signature against a hash computed during the single
+    /// decode pass (near-free, since analysis decodes every sample anyway).
+    /// When false, only the signature's presence is reported.
     pub verify_flac_md5: bool,
 }
 
@@ -146,6 +151,7 @@ pub fn analyze_file(path: &Path, opts: &ScanOptions) -> FileAnalysis {
         cutoff_hz: None,
         cutoff_ratio: None,
         real_bit_depth: None,
+        requant_rate: None,
         fake_stereo: None,
         clipping: ClippingInfo {
             clipped_samples: 0,
@@ -164,8 +170,28 @@ pub fn analyze_file(path: &Path, opts: &ScanOptions) -> FileAnalysis {
         .map(|e| e.eq_ignore_ascii_case("flac"))
         .unwrap_or(false);
 
-    // Decode + streaming spectral / statistical analysis.
-    match decode::decode_and_analyze(path) {
+    // Single decode pass. FLAC files go through the fused claxon path, which
+    // feeds the analyzer AND hashes the MD5 from the same decoded samples —
+    // nothing is decoded twice. If that fast path fails (corrupt or misnamed
+    // file), fall back to symphonia so the analysis still happens; the MD5
+    // column then reports the error.
+    let mut flac_md5_status: Option<FlacMd5Status> = None;
+    let decoded = if is_flac {
+        match decode::decode_and_analyze_flac(path, opts.verify_flac_md5) {
+            Ok((outcome, md5)) => {
+                flac_md5_status = Some(md5);
+                Ok(outcome)
+            }
+            Err(e) => {
+                flac_md5_status = Some(FlacMd5Status::Error(e.to_string()));
+                decode::decode_and_analyze(path)
+            }
+        }
+    } else {
+        decode::decode_and_analyze(path)
+    };
+
+    match decoded {
         Ok(outcome) => {
             result.format = outcome.format;
             result.sample_rate = outcome.sample_rate;
@@ -179,6 +205,7 @@ pub fn analyze_file(path: &Path, opts: &ScanOptions) -> FileAnalysis {
 
             result.cutoff_hz = Some(summary.cutoff_hz);
             result.cutoff_ratio = Some(summary.cutoff_ratio);
+            result.requant_rate = summary.requant_rate;
             result.clipping = summary.clipping.clone();
 
             if outcome.channels >= 2 {
@@ -211,9 +238,9 @@ pub fn analyze_file(path: &Path, opts: &ScanOptions) -> FileAnalysis {
         }
     }
 
-    // FLAC MD5 signature (native, no external `flac` binary needed).
+    // FLAC MD5 signature, computed during the single decode pass above.
     if is_flac {
-        result.flac_md5 = Some(flac_md5::check_flac_md5(path, opts.verify_flac_md5));
+        result.flac_md5 = flac_md5_status;
     }
 
     result

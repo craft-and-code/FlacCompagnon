@@ -38,6 +38,7 @@ export interface FileAnalysis {
   cutoff_hz: number | null;
   cutoff_ratio: number | null;
   real_bit_depth: number | null;
+  requant_rate: number | null;
   fake_stereo: boolean | null;
   clipping: ClippingInfo;
   flac_md5: FlacMd5Status | null;

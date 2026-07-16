@@ -96,6 +96,12 @@ pub fn classify(
     let ratio = summary.cutoff_ratio;
     let brick = stft_brickwall(summary);
     let mdct_dead = mdct_signature(summary);
+    // The re-quantization grid is near-conclusive evidence of an AAC source
+    // (measured: genuine ≤ 0.014 over all onsets, real transcodes ≥ 0.70).
+    let requant = summary
+        .requant_rate
+        .map(|r| r >= crate::requant::DETECT_RATE)
+        .unwrap_or(false);
     let mdct_cutoff_hz = summary
         .mdct_cutoff_ratio
         .map(|r| r * (sample_rate as f64 / 2.0))
@@ -120,7 +126,10 @@ pub fn classify(
 
     // 3. Transcoding — lossy source. Per the LAC paper, transcoding detection
     //    only applies at <= 48 kHz; above that a band limit is upsampling.
-    let transcoding = if upsampling {
+    //    Evidence strength: re-quantization grid > MDCT dead zone > brick wall.
+    let transcoding = if requant && sample_rate <= HIRES_RATE {
+        TranscodeState::Detected
+    } else if upsampling {
         TranscodeState::None
     } else if sample_rate <= HIRES_RATE && mdct_dead {
         TranscodeState::Detected
@@ -149,6 +158,10 @@ pub fn classify(
         ));
     }
     match transcoding {
+        TranscodeState::Detected if requant => reasons.push(format!(
+            "Transcoding: AAC re-quantization grid found at a synchronized MDCT onset ({:.0}% of bands on-grid) — near-conclusive AAC source",
+            summary.requant_rate.unwrap_or(0.0) * 100.0
+        )),
         TranscodeState::Detected if mdct_dead => reasons.push(format!(
             "Transcoding: AAC dead zone in the MDCT domain above ~{mdct_khz:.1} kHz (lossy source)"
         )),
@@ -220,6 +233,7 @@ mod tests {
             mdct_cutoff_ratio: mcr,
             mdct_dead_db: mdb,
             mdct_dead_fraction: frac,
+            requant_rate: None,
         }
     }
 
@@ -235,6 +249,25 @@ mod tests {
     fn brickwall_is_transcoded() {
         let d = classify(&summ(16000.0, 44100, 40.0, -110.0, None), 44100, Some(16), Some(16));
         assert_eq!(d.transcoding, TranscodeState::Detected);
+    }
+
+    #[test]
+    fn requant_grid_alone_is_transcoded() {
+        // Full-band spectrum (256 kbps AAC keeps the whole band: no dead zone,
+        // no brick wall) but the re-quantization grid was found.
+        let mut s = summ(21500.0, 44100, 3.0, -70.0, None);
+        s.requant_rate = Some(0.88);
+        let d = classify(&s, 44100, Some(16), Some(16));
+        assert_eq!(d.transcoding, TranscodeState::Detected);
+        assert!(d.detail.contains("re-quantization"));
+    }
+
+    #[test]
+    fn low_requant_rate_does_not_flag() {
+        let mut s = summ(21500.0, 44100, 3.0, -70.0, None);
+        s.requant_rate = Some(0.02); // genuine files measure ≤ ~0.014
+        let d = classify(&s, 44100, Some(16), Some(16));
+        assert_eq!(d.transcoding, TranscodeState::None);
     }
 
     #[test]

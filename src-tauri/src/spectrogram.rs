@@ -76,16 +76,24 @@ fn ffmpeg_works(path: &str) -> bool {
 }
 
 /// Human-readable caption drawn on the spectrogram.
+///
+/// The result is embedded in an ffmpeg `drawtext` filter expression, and the
+/// format label is derived from the *file extension* (untrusted input), so the
+/// whole caption is restricted to a safe character set — no quotes, colons,
+/// commas or backslashes can reach the filter graph.
 fn caption(info: &BasicInfo) -> String {
     let bits = info
         .bits
         .map(|b| format!("{b}-bit"))
         .unwrap_or_else(|| "float".to_string());
     let nyquist = info.sample_rate / 2;
-    format!(
+    let raw = format!(
         "{} Hz | {} | {} ch | {} | Nyquist {} Hz",
         info.sample_rate, bits, info.channels, info.format, nyquist
-    )
+    );
+    raw.chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, ' ' | '|' | '-' | '/' | '.'))
+        .collect()
 }
 
 /// Render a spectrogram PNG for `input` into `output` using `ffmpeg`.
