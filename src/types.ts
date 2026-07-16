@@ -40,6 +40,7 @@ export interface FileAnalysis {
   real_bit_depth: number | null;
   requant_rate: number | null;
   fake_stereo: boolean | null;
+  badge: string | null;
   clipping: ClippingInfo;
   flac_md5: FlacMd5Status | null;
   error: string | null;

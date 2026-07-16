@@ -13,7 +13,7 @@ pub const CSV_FILE_NAME: &str = "FlacCompagnon.csv";
 pub fn build_csv(report: &FolderReport) -> String {
     let mut out = String::new();
     out.push_str(
-        "file,format,sample_rate,channels,declared_bits,real_bit_depth,duration_s,\
+        "file,format,badge,sample_rate,channels,declared_bits,real_bit_depth,duration_s,\
          status,upscaling,upsampling,transcoding,aac_grid,cutoff_hz,cutoff_ratio,fake_stereo,\
          clipped,clip_events,peak_dbfs,md5\n",
     );
@@ -35,9 +35,10 @@ pub fn build_csv(report: &FolderReport) -> String {
             TranscodeState::Detected => "detected",
         };
         out.push_str(&format!(
-            "{},{},{},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{},{:.2},{}\n",
+            "{},{},{},{},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{},{:.2},{}\n",
             csv_escape(&f.file_name),
             f.format,
+            f.badge.clone().unwrap_or_default(),
             f.sample_rate,
             f.channels,
             opt(f.declared_bits),
@@ -110,6 +111,7 @@ mod tests {
             real_bit_depth: Some(16),
             requant_rate: None,
             fake_stereo: Some(false),
+            badge: None,
             clipping: ClippingInfo {
                 clipped_samples: 0,
                 clip_events: 0,

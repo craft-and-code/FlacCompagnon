@@ -13,6 +13,7 @@ pub mod bitdepth;
 pub mod clipping;
 pub mod decode;
 pub mod detections;
+pub mod dsd;
 pub mod flac_md5;
 pub mod mdct;
 pub mod report;
@@ -31,7 +32,7 @@ pub use flac_md5::FlacMd5Status;
 /// Audio file extensions FlacCompagnon will attempt to analyze.
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "flac", "wav", "wave", "aif", "aiff", "aifc", "alac", "m4a", "mp4", "caf", "ogg", "oga",
-    "mp3", "aac",
+    "mp3", "aac", "dsf", "dff",
 ];
 
 /// Returns `true` if `path` has an extension FlacCompagnon knows how to decode.
@@ -87,6 +88,10 @@ pub struct FileAnalysis {
     pub requant_rate: Option<f32>,
     /// `true` when a >= 2 channel file is actually dual-mono.
     pub fake_stereo: Option<bool>,
+    /// Verified quality badge: `Some("Hi-Res")` for > 48 kHz or > 16-bit PCM,
+    /// `Some("DSD64")` etc. for DSD — granted only when no detection
+    /// invalidates the claim (no upscaling/upsampling/transcoding).
+    pub badge: Option<String>,
 
     pub clipping: ClippingInfo,
 
@@ -106,6 +111,9 @@ pub struct ScanOptions {
     /// decode pass (near-free, since analysis decodes every sample anyway).
     /// When false, only the signature's presence is reported.
     pub verify_flac_md5: bool,
+    /// Path to an `ffmpeg` binary, used to decode DSD (DSF/DFF) content.
+    /// `None` limits DSD files to exact header verification.
+    pub ffmpeg: Option<String>,
 }
 
 impl Default for ScanOptions {
@@ -113,6 +121,7 @@ impl Default for ScanOptions {
         Self {
             recursive: true,
             verify_flac_md5: true,
+            ffmpeg: None,
         }
     }
 }
@@ -153,6 +162,7 @@ pub fn analyze_file(path: &Path, opts: &ScanOptions) -> FileAnalysis {
         real_bit_depth: None,
         requant_rate: None,
         fake_stereo: None,
+        badge: None,
         clipping: ClippingInfo {
             clipped_samples: 0,
             clip_events: 0,
@@ -164,11 +174,24 @@ pub fn analyze_file(path: &Path, opts: &ScanOptions) -> FileAnalysis {
         error: None,
     };
 
-    let is_flac = path
+    let ext = path
         .extension()
         .and_then(|e| e.to_str())
-        .map(|e| e.eq_ignore_ascii_case("flac"))
-        .unwrap_or(false);
+        .map(|e| e.to_ascii_lowercase())
+        .unwrap_or_default();
+    let is_flac = ext == "flac";
+
+    // DSD files take a dedicated path: exact header verification, then (when
+    // ffmpeg is available) content analysis on the decoded PCM.
+    if ext == "dsf" || ext == "dff" {
+        analyze_dsd(path, opts, &mut result);
+        if let Some(detected) = decode::detect_container(path) {
+            if let Some(expected) = decode::ext_canonical(path) {
+                result.ext_mismatch = detected != expected;
+            }
+        }
+        return result;
+    }
 
     // Single decode pass. FLAC files go through the fused claxon path, which
     // feeds the analyzer AND hashes the MD5 from the same decoded samples —
@@ -176,6 +199,8 @@ pub fn analyze_file(path: &Path, opts: &ScanOptions) -> FileAnalysis {
     // file), fall back to symphonia so the analysis still happens; the MD5
     // column then reports the error.
     let mut flac_md5_status: Option<FlacMd5Status> = None;
+    // Sigma-delta noise heritage of a DSD master, when found in hi-res PCM.
+    let mut dsd_heritage: Option<f32> = None;
     let decoded = if is_flac {
         match decode::decode_and_analyze_flac(path, opts.verify_flac_md5) {
             Ok((outcome, md5)) => {
@@ -207,6 +232,11 @@ pub fn analyze_file(path: &Path, opts: &ScanOptions) -> FileAnalysis {
             result.cutoff_ratio = Some(summary.cutoff_ratio);
             result.requant_rate = summary.requant_rate;
             result.clipping = summary.clipping.clone();
+            dsd_heritage = dsd::dsd_heritage_check(
+                &summary.spectrum_db,
+                outcome.sample_rate,
+                summary.spectrum_db.len().saturating_sub(1) * 2,
+            );
 
             if outcome.channels >= 2 {
                 result.fake_stereo = Some(summary.fake_stereo);
@@ -243,7 +273,112 @@ pub fn analyze_file(path: &Path, opts: &ScanOptions) -> FileAnalysis {
         result.flac_md5 = flac_md5_status;
     }
 
+    // Verified Hi-Res badge: hi-res specs that no detection contradicts.
+    let hires_specs = result.sample_rate > 48_000 || result.declared_bits.map_or(false, |b| b > 16);
+    if hires_specs
+        && result.error.is_none()
+        && !result.detections.upscaling
+        && !result.detections.upsampling
+        && result.detections.transcoding != TranscodeState::Detected
+    {
+        result.badge = Some(if dsd_heritage.is_some() {
+            // Hi-res PCM carrying the sigma-delta noise signature of a DSD master.
+            "Hi-Res (DSD source)".to_string()
+        } else {
+            "Hi-Res".to_string()
+        });
+    }
+
     result
+}
+
+/// DSD analysis: exact DSF/DFF header verification plus, when ffmpeg is
+/// available, a content check on the decoded PCM (PCM-source brick wall).
+fn analyze_dsd(path: &Path, opts: &ScanOptions, result: &mut FileAnalysis) {
+    let info = match dsd::parse(path) {
+        Ok(i) => i,
+        Err(e) => {
+            result.error = Some(e.to_string());
+            return;
+        }
+    };
+    result.format = info.label();
+    result.sample_rate = info.sample_rate;
+    result.channels = info.channels;
+    result.duration_secs = info.duration_secs();
+
+    let mut flagged: Option<dsd::PcmSourceCheck> = None;
+    let mut analyzed = false;
+
+    if info.dst_compressed {
+        result.detections = Detections {
+            upscaling: false,
+            upsampling: false,
+            transcoding: TranscodeState::None,
+            detail: "DST-compressed DFF: header verified; content analysis is not supported for DST streams.".to_string(),
+            summary: "Unknown".to_string(),
+        };
+    } else if let Some(ffmpeg) = &opts.ffmpeg {
+        let decoded_rate = (info.sample_rate / 8).max(1);
+        match decode::decode_and_analyze_dsd(ffmpeg, path, info.channels, decoded_rate) {
+            Ok(outcome) => {
+                analyzed = true;
+                if result.duration_secs == 0.0 {
+                    result.duration_secs = outcome.duration_secs;
+                }
+                let summary = outcome.analyzer.finish(decoded_rate, None);
+                result.cutoff_hz = Some(summary.cutoff_hz);
+                result.cutoff_ratio = Some(summary.cutoff_ratio);
+                result.clipping = summary.clipping.clone();
+                if info.channels >= 2 {
+                    result.fake_stereo = Some(summary.fake_stereo);
+                }
+                let fft_size = summary.spectrum_db.len().saturating_sub(1) * 2;
+                flagged = dsd::pcm_source_check(&summary.spectrum_db, decoded_rate, fft_size);
+                result.detections = match flagged {
+                    Some(hit) => Detections {
+                        upscaling: false,
+                        upsampling: true,
+                        transcoding: TranscodeState::None,
+                        detail: format!(
+                            "Upsampling: PCM-sourced DSD — digital brick wall at ~{:.2} kHz ({:.0} dB drop). The 1-bit stream was converted from a {} PCM source.",
+                            hit.boundary_hz / 1000.0,
+                            hit.drop_db,
+                            if hit.boundary_hz < 23_000.0 { "44.1 kHz" } else { "48 kHz" }
+                        ),
+                        summary: "Flagged".to_string(),
+                    },
+                    None => Detections {
+                        upscaling: false,
+                        upsampling: false,
+                        transcoding: TranscodeState::None,
+                        detail: "Content blends into the sigma-delta noise shaping with no PCM brick wall — consistent with native DSD.".to_string(),
+                        summary: "Clean".to_string(),
+                    },
+                };
+            }
+            Err(e) => {
+                result.error = Some(e.to_string());
+            }
+        }
+    } else {
+        result.detections = Detections {
+            upscaling: false,
+            upsampling: false,
+            transcoding: TranscodeState::None,
+            detail: "DSD header verified. Install ffmpeg to enable the content authenticity check.".to_string(),
+            summary: "Unknown".to_string(),
+        };
+    }
+
+    // DSD badge: header authentic and content not flagged as PCM-sourced.
+    if result.error.is_none() && flagged.is_none() {
+        result.badge = Some(if analyzed {
+            info.label()
+        } else {
+            format!("{} (unverified)", info.label())
+        });
+    }
 }
 
 /// A single analyzed folder together with the files it contains.

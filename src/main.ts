@@ -1,6 +1,7 @@
 import "./styles.css";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 
 import type { FolderReport, Progress, Theme } from "./types";
@@ -167,10 +168,13 @@ function renderReport(report: FolderReport) {
   summaryEl.innerHTML = `<span class="count">${report.files.length} files</span> ${chips}`;
 
   const showMd5 = report.has_flac;
+  // Quality column only appears when at least one file earned a badge.
+  const showBadge = report.files.some((f) => f.badge != null);
   const headers = [
     "", // reveal button
     "File",
     "Format",
+    ...(showBadge ? ["Quality"] : []),
     "Rate",
     "Bits",
     "Real bits",
@@ -187,14 +191,40 @@ function renderReport(report: FolderReport) {
   thead.innerHTML = `<tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr>`;
 
   const tbody = table.tBodies[0] ?? table.createTBody();
-  tbody.innerHTML = report.files.map((f) => rowHtml(f, headers.length, showMd5)).join("");
+  tbody.innerHTML = report.files
+    .map((f) => rowHtml(f, headers.length, showMd5, showBadge))
+    .join("");
 
   resultsEl.classList.remove("hidden");
   updateControls();
 }
 
-function rowHtml(f: FolderReport["files"][number], nCols: number, showMd5: boolean): string {
+function rowHtml(
+  f: FolderReport["files"][number],
+  nCols: number,
+  showMd5: boolean,
+  showBadge: boolean,
+): string {
   const fname = `<td class="fname has-tip" title="${escapeHtml(f.path)}">${escapeHtml(f.file_name)}</td>`;
+
+  // Verified quality badge cell (custom chip — the official DSD / Hi-Res Audio
+  // logos are trademarked). Granted only when no detection contradicts it.
+  let badgeCell = "";
+  if (showBadge) {
+    if (f.badge) {
+      const unverified = f.badge.includes("unverified");
+      const dsdSource = f.badge.includes("DSD source");
+      const tip = unverified
+        ? "Container header is authentic, but the content could not be analyzed (ffmpeg not found)."
+        : dsdSource
+          ? "Hi-Res PCM carrying the sigma-delta noise signature of a DSD master — verified by analysis."
+          : "Verified by analysis: the claimed quality is not contradicted by any detection.";
+      const label = f.badge.replace(" (unverified)", "?").replace(" (DSD source)", "·DSD");
+      badgeCell = `<td><span class="qbadge${unverified ? " q-unk" : ""} has-tip" title="${tip}">${escapeHtml(label)}</span></td>`;
+    } else {
+      badgeCell = `<td class="c-muted">—</td>`;
+    }
+  }
 
   if (f.error) {
     const span = nCols - 3; // reveal + file precede, delete trails
@@ -245,6 +275,7 @@ function rowHtml(f: FolderReport["files"][number], nCols: number, showMd5: boole
     <td class="reveal">${revealBtn(f.path)}</td>
     ${fname}
     ${fmtCell}
+    ${badgeCell}
     <td>${(f.sample_rate / 1000).toFixed(1)}k</td>
     <td>${bits}</td>
     ${realCell}
@@ -380,6 +411,22 @@ try {
   /* ignore */
 }
 applyTheme(theme);
+
+// The window starts hidden (tauri.conf.json: visible=false) and is revealed
+// here: styles are imported synchronously at the top of this module and the
+// theme was just applied, so the first paint is fully styled.
+// IMPORTANT: do NOT wrap this in requestAnimationFrame — WebKit suspends
+// rendering callbacks for hidden windows, so the callback would never fire and
+// the window would stay invisible forever.
+const revealWindow = () => {
+  const w = getCurrentWindow();
+  w.show()
+    .then(() => w.setFocus())
+    .catch(() => {});
+};
+revealWindow();
+// Defensive retry: a dev-server hot reload can race the first call.
+window.setTimeout(revealWindow, 250);
 
 // --- ffmpeg availability ----------------------------------------------------
 

@@ -96,7 +96,11 @@ async fn analyze_paths(app: AppHandle, targets: Vec<String>) -> Result<FolderRep
     if targets.is_empty() {
         return Err("Nothing to analyze.".to_string());
     }
-    let opts = ScanOptions::default();
+    let opts = ScanOptions {
+        // ffmpeg (when present) enables DSD content analysis.
+        ffmpeg: spectrogram::resolve_ffmpeg(),
+        ..ScanOptions::default()
+    };
     let paths = gather_targets(&targets, opts.recursive);
     if paths.is_empty() {
         return Err("No supported audio files found.".to_string());
@@ -126,24 +130,24 @@ async fn analyze_paths(app: AppHandle, targets: Vec<String>) -> Result<FolderRep
         std::thread::scope(|s| {
             for _ in 0..workers {
                 s.spawn(|| loop {
-            if CANCEL.load(Ordering::SeqCst) {
+                    if CANCEL.load(Ordering::SeqCst) {
                         break; // stop pulling new files; in-flight ones finish
                     }
                     let i = next.fetch_add(1, Ordering::SeqCst);
                     if i >= total {
                         break;
-            }
+                    }
                     let analysis = core::analyze_file(&paths[i], &opts);
                     let _ = slots[i].set(analysis);
                     let done = completed.fetch_add(1, Ordering::SeqCst) + 1;
-            let _ = app_bg.emit(
-                "analyze://progress",
-                Progress {
+                    let _ = app_bg.emit(
+                        "analyze://progress",
+                        Progress {
                             current: done.saturating_sub(1),
-                    total,
+                            total,
                             file: file_name(&paths[i]),
-                },
-            );
+                        },
+                    );
                 });
             }
         });

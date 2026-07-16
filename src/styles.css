@@ -15,11 +15,11 @@
   --accent-2: #2f5cc0;
   --accent-contrast: #ffffff;
   --ok: #12a06a;
-  --bad: #d63a49;
+  --bad: #dc2626;
   --warn: #b7790c;
   --clean: #12a06a;
   --upsampled: #b7790c;
-  --transcoded: #d63a49;
+  --transcoded: #dc2626;
   --suspicious: #c56a1a;
   --unknown: #616a7d;
   --shadow: rgba(20, 30, 50, 0.14);
@@ -264,7 +264,10 @@ td.rowdel { width: 32px; padding: 4px 10px 4px 4px; text-align: center; }
   border-radius: 6px;
   transition: background 0.15s, color 0.15s;
 }
-.delete-btn:hover { color: var(--bad); background: var(--bg-elev2); }
+.delete-btn:hover {
+  color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 12%, transparent);
+}
 
 .verdict {
   padding: 2px 9px;
@@ -300,6 +303,29 @@ td.detections { white-space: normal; min-width: 130px; }
 
 /* Any cell/element that carries an explanatory tooltip */
 .has-tip { cursor: help; }
+
+/* Verified quality badge (Hi-Res / DSD64...) — custom chip, gold accent */
+.qbadge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: #8a6d1a;
+  background: color-mix(in srgb, #e6b93c 22%, transparent);
+  border: 1px solid color-mix(in srgb, #e6b93c 55%, transparent);
+}
+:root[data-theme="dark"] .qbadge { color: #e9c96a; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .qbadge { color: #e9c96a; }
+}
+.qbadge.q-unk {
+  color: var(--muted);
+  background: var(--bg-elev2);
+  border-color: var(--border);
+}
 
 .c-ok { color: var(--ok); font-weight: 600; }
 .c-bad { color: var(--bad); font-weight: 600; }
