@@ -8,7 +8,8 @@
 mod spectrogram;
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::OnceLock;
 
 use flaccompagnon_core::{self as core, FolderReport, ScanOptions};
 use serde::Serialize;
@@ -106,20 +107,54 @@ async fn analyze_paths(app: AppHandle, targets: Vec<String>) -> Result<FolderRep
     CANCEL.store(false, Ordering::SeqCst);
     let app_bg = app.clone();
     let report_opt = tauri::async_runtime::spawn_blocking(move || {
-        let mut files = Vec::with_capacity(total);
-        for (i, p) in paths.iter().enumerate() {
+        // Parallel analysis: files are independent and CPU-bound, so a pool of
+        // workers (one per CPU core, minus one to keep the UI responsive) pulls
+        // pending files from a shared counter. Each result lands in its own
+        // per-index slot, so the output keeps the original sorted order
+        // regardless of which worker finishes first.
+        let workers = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4)
+            .saturating_sub(1)
+            .max(1)
+            .min(total);
+        let next = AtomicUsize::new(0);
+        let completed = AtomicUsize::new(0);
+        let slots: Vec<OnceLock<core::FileAnalysis>> =
+            (0..total).map(|_| OnceLock::new()).collect();
+
+        std::thread::scope(|s| {
+            for _ in 0..workers {
+                s.spawn(|| loop {
             if CANCEL.load(Ordering::SeqCst) {
-                return None;
+                        break; // stop pulling new files; in-flight ones finish
+                    }
+                    let i = next.fetch_add(1, Ordering::SeqCst);
+                    if i >= total {
+                        break;
             }
+                    let analysis = core::analyze_file(&paths[i], &opts);
+                    let _ = slots[i].set(analysis);
+                    let done = completed.fetch_add(1, Ordering::SeqCst) + 1;
             let _ = app_bg.emit(
                 "analyze://progress",
                 Progress {
-                    current: i,
+                            current: done.saturating_sub(1),
                     total,
-                    file: file_name(p),
+                            file: file_name(&paths[i]),
                 },
             );
-            files.push(core::analyze_file(p, &opts));
+                });
+            }
+        });
+
+        if CANCEL.load(Ordering::SeqCst) {
+            return None;
+        }
+        let files: Vec<core::FileAnalysis> =
+            slots.into_iter().filter_map(|s| s.into_inner()).collect();
+        if files.len() != total {
+            return None; // defensive: incomplete set is treated as cancelled
         }
         let has_flac = files.iter().any(|f| f.flac_md5.is_some());
         Some(FolderReport {

@@ -210,6 +210,7 @@ FlacCompagnon opens every track **read-only** — it decodes samples to analyze 
 - **AAC transcode detection covers all bitrates at 44.1/48 kHz** (validated on real 128/192/256 kbps AAC→FLAC transcodes against their originals). **MP3 sources** are still only caught through the spectral brick-wall signature, so high-bitrate MP3 (320 kbps) can pass — MP3 uses a different filterbank (hybrid PQMF + 576-point MDCT) and would need its own re-quantization detector.
 - Effective bit-depth reconstruction is exact for ≤ 24-bit integer sources.
 - FLAC files are decoded **once**: a fused pass feeds the analysis and hashes the MD5 from the same raw integer samples (bit-identical to `flac -t`), so MD5 verification adds only a negligible hashing cost on top of the analysis.
+- Files are analyzed **in parallel**: a worker pool sized to the machine (one worker per CPU core, minus one to keep the UI responsive) processes independent files concurrently, so analyzing an album scales with your core count.
 
 ## Roadmap ideas
 
