@@ -1,0 +1,83 @@
+name: Release
+
+# Builds installers for macOS (Apple Silicon + Intel), Windows and Linux, and
+# publishes them as a GitHub Release. Trigger by pushing a version tag:
+#
+#   git tag v0.1.0
+#   git push origin v0.1.0
+#
+# or run it manually from the Actions tab (workflow_dispatch).
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: "--target aarch64-apple-darwin"
+          - platform: macos-latest
+            args: "--target x86_64-apple-darwin"
+          - platform: ubuntu-22.04
+            args: ""
+          - platform: windows-latest
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Linux (Tauri) dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            build-essential \
+            libgtk-3-dev \
+            libssl-dev
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Build the app and publish the release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "FlacCompagnon ${{ github.ref_name }}"
+          releaseBody: |
+            Cross-platform builds of FlacCompagnon.
+
+            Download the installer for your OS below. ffmpeg is **not** bundled —
+            install it separately if you want spectrograms
+            (macOS: `brew install ffmpeg`, Debian/Ubuntu: `sudo apt install ffmpeg`,
+            Windows: `choco install ffmpeg`).
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

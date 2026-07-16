@@ -1,0 +1,44 @@
+name: Docs
+
+# Builds the Rust API documentation (rustdoc) for the core analysis crate and
+# publishes it into the `doc/` sub-folder of the `gh-pages` branch. Keeping it in
+# a sub-folder (with keep_files) means it coexists with a static presentation
+# site served from the root of the same branch — neither overwrites the other.
+#
+# One-time setup: Settings -> Pages -> Source: "Deploy from a branch" ->
+# Branch: gh-pages / (root). The docs are then served at:
+#   https://<owner>.github.io/FlacCompagnon/doc/
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write # needed to push to the gh-pages branch
+
+jobs:
+  docs:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build rustdoc for the core crate
+        run: cargo doc --no-deps -p flaccompagnon-core
+
+      - name: Redirect the doc/ root to the crate docs
+        run: echo '<meta http-equiv="refresh" content="0;url=flaccompagnon_core/index.html">' > target/doc/index.html
+
+      - name: Publish to gh-pages/doc
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./target/doc
+          destination_dir: doc
+          keep_files: true # don't wipe the static site at the branch root

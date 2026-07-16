@@ -1,0 +1,30 @@
+[package]
+name = "flaccompagnon-core"
+description = "Lossless audio integrity analysis: upsampling/transcode detection, FLAC MD5 verification, fake-24bit / fake-stereo / clipping checks."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lib]
+name = "flaccompagnon_core"
+path = "src/lib.rs"
+
+[dependencies]
+# Multi-format audio decoding (FLAC, WAV, AIFF, ALAC/MP4, MP3, AAC, OGG/Vorbis, ...)
+symphonia = { version = "0.5", features = ["all"] }
+# FFT for spectral analysis
+rustfft = "6"
+# Native FLAC parsing for STREAMINFO MD5 read + verification
+claxon = "0.4"
+md-5 = "0.10"
+# Serialization for passing results to the Tauri frontend
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+# Recursive folder walking
+walkdir = "2"
+
+[dev-dependencies]
+hound = "3"       # write synthetic WAV files for integration tests
+rustfft = "6"     # synthesize truly band-limited test signals (inverse FFT)

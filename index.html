@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FlacCompagnon</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="logo">◈</span>
+          <div>
+            <h1>FlacCompagnon</h1>
+            <p class="tagline">Lossless audio integrity checker</p>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="pick-btn" class="btn">Choose folder…</button>
+          <button id="save-csv-btn" class="btn btn-secondary" disabled>Save CSV…</button>
+          <button id="spectro-btn" class="btn btn-secondary" disabled>Generate spectrograms</button>
+          <button id="reset-btn" class="btn btn-ghost hidden">Reset</button>
+          <button id="theme-btn" class="btn btn-ghost" title="Switch theme (Auto / Light / Dark)">◐ Auto</button>
+        </div>
+      </header>
+
+      <section id="dropzone" class="dropzone">
+        <div class="dropzone-inner">
+          <div class="drop-icon">⭳</div>
+          <p><strong>Drop a folder or audio files here</strong></p>
+          <p class="muted">Drop more anytime to add them to the list; use Reset to start over. Files are only ever read, never modified — nothing is written unless you save a CSV or generate spectrograms.</p>
+        </div>
+      </section>
+
+      <section id="results" class="results hidden">
+        <div class="results-head">
+          <div id="summary" class="summary"></div>
+          <div class="results-meta"><span id="root-path" class="muted"></span></div>
+        </div>
+        <div class="table-wrap">
+          <table id="results-table">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="progress" class="progress hidden">
+        <div class="progress-label">
+          <span id="progress-text">Working…</span>
+          <button id="cancel-btn" class="cancel-btn" title="Cancel">✕</button>
+        </div>
+        <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
+      </section>
+
+      <div id="drop-guard" class="drop-guard hidden">
+        <div class="drop-guard-box">
+          <span class="spinner"></span>
+          <p>Analysis in progress — please wait before dropping files</p>
+        </div>
+      </div>
+
+      <div id="toast" class="toast hidden"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
