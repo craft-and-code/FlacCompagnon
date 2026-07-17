@@ -1,0 +1,33 @@
+name: Site
+
+# Publishes the static landing page (site/) to the ROOT of the gh-pages branch.
+# `keep_files: true` preserves the Rust docs published under gh-pages/doc by the
+# Docs workflow — the two coexist. Both workflows share the `pages` concurrency
+# group so they never push to the branch at the same time.
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "site/**"
+      - ".github/workflows/site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish site to gh-pages root
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          keep_files: true

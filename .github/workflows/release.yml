@@ -1,6 +1,6 @@
 name: Release
 
-# Builds installers for macOS (Apple Silicon + Intel), Windows and Linux, and
+# Builds installers for macOS (Apple Silicon), Windows and Linux, and
 # publishes them as a GitHub Release. Trigger by pushing a version tag:
 #
 #   git tag v0.1.0
@@ -24,8 +24,6 @@ jobs:
         include:
           - platform: macos-latest
             args: "--target aarch64-apple-darwin"
-          - platform: macos-latest
-            args: "--target x86_64-apple-darwin"
           - platform: ubuntu-22.04
             args: ""
           - platform: windows-latest
@@ -43,7 +41,7 @@ jobs:
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2

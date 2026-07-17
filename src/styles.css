@@ -297,9 +297,15 @@ td.detections { white-space: normal; min-width: 130px; }
   background: var(--bg-elev2);
   cursor: help;
 }
-.tag.t-ok { color: var(--clean); }
-.tag.t-bad { color: var(--transcoded); }
-.tag.t-warn { color: var(--suspicious); }
+/* One distinct colour per detection, matching the landing-page badges:
+   Upscaled = red, Upsampled = amber, Transcoded = orange, Clean = green.
+   The theme-aware variables already hold those exact hues in dark mode and
+   legible equivalents in light mode. */
+.tag.t-ok  { color: var(--clean);      background: color-mix(in srgb, var(--clean) 14%, transparent);      border-color: color-mix(in srgb, var(--clean) 42%, transparent); }
+.tag.t-up  { color: var(--transcoded); background: color-mix(in srgb, var(--transcoded) 14%, transparent); border-color: color-mix(in srgb, var(--transcoded) 42%, transparent); }
+.tag.t-ups { color: var(--upsampled);  background: color-mix(in srgb, var(--upsampled) 14%, transparent);  border-color: color-mix(in srgb, var(--upsampled) 42%, transparent); }
+.tag.t-tr  { color: var(--suspicious); background: color-mix(in srgb, var(--suspicious) 14%, transparent); border-color: color-mix(in srgb, var(--suspicious) 42%, transparent); }
+.tag.t-sus { color: var(--suspicious); background: color-mix(in srgb, var(--suspicious) 9%, transparent);  border-color: color-mix(in srgb, var(--suspicious) 30%, transparent); }
 
 /* Any cell/element that carries an explanatory tooltip */
 .has-tip { cursor: help; }

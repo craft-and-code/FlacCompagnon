@@ -6,6 +6,8 @@
 
 **A cross-platform desktop tool that checks whether your "lossless" audio is actually lossless.**
 
+> **About this project.** FlacCompagnon was built with an AI assistant, as an experiment: how far can AI-assisted development go on a real, non-trivial piece of software — signal processing, a native desktop app, tests, CI, documentation? It also serves as a working case study on how to use AI effectively: every detection algorithm was validated against independently computed ground truth (reference encoders, real files, bit-exact replicas) before being trusted, and the limitations that remain are documented rather than hidden. The AAC transcoding detection notably implements the re-quantization method described in the peer-reviewed study _"Lossless Audio Checker: A Software for the Detection of Upscaling, Upsampling, and Transcoding in Lossless Musical Tracks"_ by Julien Lacroix, Yann Prime, Alexandre Remy and Olivier Derrien (AES 139th Convention, Paper 9416, 2015).
+
 FlacCompagnon is a from-scratch, open-source successor to the discontinued _Lossless Audio Checker_. Drop a folder **or a single audio file** onto the window and it runs the same three independent detections as the original — **Upscaling**, **Upsampling**, and **Transcoding** (including the **AAC re-quantization** test, which catches AAC sources at every bitrate) — verifies **FLAC MD5** signatures, flags **fake stereo** files, detects **clipping**, and can render a **spectrogram** for each track.
 
 Built with **Rust** and **Tauri v2**, it compiles to a small native app for **Linux, Windows, and macOS**.
@@ -222,8 +224,8 @@ Easy future additions (the analyzer is modular): per-channel spectral analysis, 
 
 ## References
 
-- J. Lacroix & Y. Prime, _Lossless Audio Checker: A Software for the Detection of Upscaling, Upsampling, and Transcoding in Lossless Musical Tracks_, AES Convention e-Brief (AES e-Library #17972).
-- J. Lacroix & Y. Prime, _Detection of Genuine Lossless Audio Files: Application to the MPEG-AAC Codec_.
+- J. Lacroix, Y. Prime, A. Remy & O. Derrien, _Lossless Audio Checker: A Software for the Detection of Upscaling, Upsampling, and Transcoding in Lossless Musical Tracks_, AES 139th Convention, Paper 9416, New York, 2015 (AES e-Library #17972). The re-quantization transcoding detection implemented here follows the method described in this paper.
+- O. Derrien et al., _Detection of Genuine Lossless Audio Files: Application to the MPEG-AAC Codec_, Journal of the AES, 2019.
 - Original project (discontinued): losslessaudiochecker.com; GUI source: <https://github.com/emps/Lossless-Audio-Checker-GUI> (GPL-2.0).
 
 ## License
