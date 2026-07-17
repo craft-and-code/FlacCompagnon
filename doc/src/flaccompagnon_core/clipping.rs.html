@@ -54,36 +54,39 @@
 <a href=#54 id=54 data-nosnippet>54</a>            clip_events: <span class="self">self</span>.clip_events,
 <a href=#55 id=55 data-nosnippet>55</a>            peak,
 <a href=#56 id=56 data-nosnippet>56</a>            peak_dbfs,
-<a href=#57 id=57 data-nosnippet>57</a>            clipped: <span class="self">self</span>.clip_events &gt; <span class="number">0</span>,
-<a href=#58 id=58 data-nosnippet>58</a>        }
-<a href=#59 id=59 data-nosnippet>59</a>    }
-<a href=#60 id=60 data-nosnippet>60</a>}
-<a href=#61 id=61 data-nosnippet>61</a>
-<a href=#62 id=62 data-nosnippet>62</a><span class="attr">#[cfg(test)]
-<a href=#63 id=63 data-nosnippet>63</a></span><span class="kw">mod </span>tests {
-<a href=#64 id=64 data-nosnippet>64</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
-<a href=#65 id=65 data-nosnippet>65</a>
-<a href=#66 id=66 data-nosnippet>66</a>    <span class="attr">#[test]
-<a href=#67 id=67 data-nosnippet>67</a>    </span><span class="kw">fn </span>detects_a_clip_run() {
-<a href=#68 id=68 data-nosnippet>68</a>        <span class="kw">let </span><span class="kw-2">mut </span>s = ClipState::new(<span class="number">0.9997</span>);
-<a href=#69 id=69 data-nosnippet>69</a>        <span class="kw">for _ in </span><span class="number">0</span>..<span class="number">5 </span>{
-<a href=#70 id=70 data-nosnippet>70</a>            s.push(<span class="number">1.0</span>);
-<a href=#71 id=71 data-nosnippet>71</a>        }
-<a href=#72 id=72 data-nosnippet>72</a>        <span class="kw">let </span>info = s.finish(<span class="number">1</span>, <span class="number">5</span>);
-<a href=#73 id=73 data-nosnippet>73</a>        <span class="macro">assert!</span>(info.clipped);
-<a href=#74 id=74 data-nosnippet>74</a>        <span class="macro">assert_eq!</span>(info.clip_events, <span class="number">1</span>);
-<a href=#75 id=75 data-nosnippet>75</a>        <span class="macro">assert_eq!</span>(info.clipped_samples, <span class="number">5</span>);
-<a href=#76 id=76 data-nosnippet>76</a>    }
-<a href=#77 id=77 data-nosnippet>77</a>
-<a href=#78 id=78 data-nosnippet>78</a>    <span class="attr">#[test]
-<a href=#79 id=79 data-nosnippet>79</a>    </span><span class="kw">fn </span>short_touches_are_not_events() {
-<a href=#80 id=80 data-nosnippet>80</a>        <span class="kw">let </span><span class="kw-2">mut </span>s = ClipState::new(<span class="number">0.9997</span>);
-<a href=#81 id=81 data-nosnippet>81</a>        s.push(<span class="number">1.0</span>);
-<a href=#82 id=82 data-nosnippet>82</a>        s.push(<span class="number">0.2</span>);
-<a href=#83 id=83 data-nosnippet>83</a>        s.push(<span class="number">1.0</span>);
-<a href=#84 id=84 data-nosnippet>84</a>        <span class="kw">let </span>info = s.finish(<span class="number">1</span>, <span class="number">3</span>);
-<a href=#85 id=85 data-nosnippet>85</a>        <span class="macro">assert!</span>(!info.clipped);
-<a href=#86 id=86 data-nosnippet>86</a>        <span class="macro">assert_eq!</span>(info.clip_events, <span class="number">0</span>);
-<a href=#87 id=87 data-nosnippet>87</a>    }
-<a href=#88 id=88 data-nosnippet>88</a>}
+<a href=#57 id=57 data-nosnippet>57</a>            <span class="comment">// Filled in by the analyzer, which owns the oversampling meter.
+<a href=#58 id=58 data-nosnippet>58</a>            </span>true_peak: peak,
+<a href=#59 id=59 data-nosnippet>59</a>            true_peak_dbtp: peak_dbfs,
+<a href=#60 id=60 data-nosnippet>60</a>            clipped: <span class="self">self</span>.clip_events &gt; <span class="number">0</span>,
+<a href=#61 id=61 data-nosnippet>61</a>        }
+<a href=#62 id=62 data-nosnippet>62</a>    }
+<a href=#63 id=63 data-nosnippet>63</a>}
+<a href=#64 id=64 data-nosnippet>64</a>
+<a href=#65 id=65 data-nosnippet>65</a><span class="attr">#[cfg(test)]
+<a href=#66 id=66 data-nosnippet>66</a></span><span class="kw">mod </span>tests {
+<a href=#67 id=67 data-nosnippet>67</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href=#68 id=68 data-nosnippet>68</a>
+<a href=#69 id=69 data-nosnippet>69</a>    <span class="attr">#[test]
+<a href=#70 id=70 data-nosnippet>70</a>    </span><span class="kw">fn </span>detects_a_clip_run() {
+<a href=#71 id=71 data-nosnippet>71</a>        <span class="kw">let </span><span class="kw-2">mut </span>s = ClipState::new(<span class="number">0.9997</span>);
+<a href=#72 id=72 data-nosnippet>72</a>        <span class="kw">for _ in </span><span class="number">0</span>..<span class="number">5 </span>{
+<a href=#73 id=73 data-nosnippet>73</a>            s.push(<span class="number">1.0</span>);
+<a href=#74 id=74 data-nosnippet>74</a>        }
+<a href=#75 id=75 data-nosnippet>75</a>        <span class="kw">let </span>info = s.finish(<span class="number">1</span>, <span class="number">5</span>);
+<a href=#76 id=76 data-nosnippet>76</a>        <span class="macro">assert!</span>(info.clipped);
+<a href=#77 id=77 data-nosnippet>77</a>        <span class="macro">assert_eq!</span>(info.clip_events, <span class="number">1</span>);
+<a href=#78 id=78 data-nosnippet>78</a>        <span class="macro">assert_eq!</span>(info.clipped_samples, <span class="number">5</span>);
+<a href=#79 id=79 data-nosnippet>79</a>    }
+<a href=#80 id=80 data-nosnippet>80</a>
+<a href=#81 id=81 data-nosnippet>81</a>    <span class="attr">#[test]
+<a href=#82 id=82 data-nosnippet>82</a>    </span><span class="kw">fn </span>short_touches_are_not_events() {
+<a href=#83 id=83 data-nosnippet>83</a>        <span class="kw">let </span><span class="kw-2">mut </span>s = ClipState::new(<span class="number">0.9997</span>);
+<a href=#84 id=84 data-nosnippet>84</a>        s.push(<span class="number">1.0</span>);
+<a href=#85 id=85 data-nosnippet>85</a>        s.push(<span class="number">0.2</span>);
+<a href=#86 id=86 data-nosnippet>86</a>        s.push(<span class="number">1.0</span>);
+<a href=#87 id=87 data-nosnippet>87</a>        <span class="kw">let </span>info = s.finish(<span class="number">1</span>, <span class="number">3</span>);
+<a href=#88 id=88 data-nosnippet>88</a>        <span class="macro">assert!</span>(!info.clipped);
+<a href=#89 id=89 data-nosnippet>89</a>        <span class="macro">assert_eq!</span>(info.clip_events, <span class="number">0</span>);
+<a href=#90 id=90 data-nosnippet>90</a>    }
+<a href=#91 id=91 data-nosnippet>91</a>}
 </code></pre></div></section></main></body></html>
