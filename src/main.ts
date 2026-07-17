@@ -27,7 +27,7 @@ const $ = <T extends HTMLElement>(id: string) =>
 const dropzone = $("dropzone");
 const pickBtn = $<HTMLButtonElement>("pick-btn");
 const spectroBtn = $<HTMLButtonElement>("spectro-btn");
-const saveBtn = $<HTMLButtonElement>("save-csv-btn");
+const saveBtn = $<HTMLButtonElement>("save-btn");
 const resetBtn = $<HTMLButtonElement>("reset-btn");
 const themeBtn = $<HTMLButtonElement>("theme-btn");
 const cancelBtn = $<HTMLButtonElement>("cancel-btn");
@@ -110,9 +110,10 @@ async function cancelTask() {
   }
 }
 
-// Full default path for the Save-CSV dialog: <common folder>/<name>.csv, so it
-// opens in the same location shown above the table.
-function defaultCsvPath(): string {
+// Full default path for the Save dialog: <common folder>/<name>.csv, so it
+// opens in the same location shown above the table. The chosen stem also
+// names the JSON sibling written alongside it (save always writes both).
+function defaultSavePath(): string {
   const nameSource =
     currentTargets.length === 1 ? currentTargets[0] : (lastReport?.root ?? "");
   const name = csvNameFrom(nameSource);
@@ -385,18 +386,44 @@ async function generateSpectrograms() {
   }
 }
 
-async function saveCsv() {
+async function saveReport() {
   if (busy || !lastReport) return;
   const dest = await save({
-    defaultPath: defaultCsvPath(),
-    filters: [{ name: "CSV", extensions: ["csv"] }],
+    defaultPath: defaultSavePath(),
+    // Only the file's stem is used (the backend always writes a matched
+    // ".csv" + ".json" pair from it), so either extension works as a default.
+    filters: [{ name: "Report (CSV + JSON)", extensions: ["csv", "json"] }],
   });
   if (typeof dest !== "string") return;
   try {
-    await api.saveCsv(dest, lastReport);
-    showToast("CSV saved.");
+    await api.saveReport(dest, lastReport);
+    showToast("Saved (CSV + JSON).");
   } catch (e) {
     showToast(String(e), "error");
+  }
+}
+
+// Re-import a previously-saved JSON report, dropped onto the window, without
+// re-analyzing any audio.
+async function loadReport(path: string) {
+  if (busy) return;
+  setBusy(true, "Loading report…");
+  try {
+    const report = await api.loadReport(path);
+    // Populate targets from the report's own file paths so "Generate
+    // spectrograms" and re-analysis (e.g. dropping more files afterwards)
+    // keep working, same as after a normal folder drop.
+    currentTargets = report.files.map((f) => f.path);
+    renderReport(report);
+    showToast(`Loaded ${report.files.length} ${report.files.length === 1 ? "file" : "files"} from report.`);
+  } catch (e) {
+    showToast(String(e), "error");
+  } finally {
+    setBusy(false);
+    if (!lastReport || lastReport.files.length === 0) {
+      showDropScreen();
+      updateControls();
+    }
   }
 }
 
@@ -460,7 +487,7 @@ window.setTimeout(revealWindow, 250);
 
 pickBtn.addEventListener("click", pickFolder);
 spectroBtn.addEventListener("click", generateSpectrograms);
-saveBtn.addEventListener("click", saveCsv);
+saveBtn.addEventListener("click", saveReport);
 resetBtn.addEventListener("click", reset);
 cancelBtn.addEventListener("click", cancelTask);
 themeBtn.addEventListener("click", () => {
@@ -506,7 +533,14 @@ getCurrentWebview().onDragDropEvent((event) => {
     dropzone.classList.add("drag-over");
   } else if (p.type === "drop") {
     dropzone.classList.remove("drag-over");
-    if (p.paths.length > 0) analyze(p.paths);
+    // A single previously-saved .json report reloads the table instead of
+    // being analyzed as audio (there's no dedicated button for this — just
+    // drop the file, same gesture as dropping a folder).
+    if (p.paths.length === 1 && p.paths[0].toLowerCase().endsWith(".json")) {
+      loadReport(p.paths[0]);
+    } else if (p.paths.length > 0) {
+      analyze(p.paths);
+    }
   } else {
     dropzone.classList.remove("drag-over");
   }

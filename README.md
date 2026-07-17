@@ -49,9 +49,14 @@ Click **Generate spectrograms** to render a high-resolution spectrogram image fo
 - **True peak** — a separate column reporting the **true peak in dBTP** (ITU-R BS.1770-style: the audio is 4×-oversampled through a 48-tap polyphase FIR, revealing **inter-sample peaks** — places where the waveform a DAC reconstructs overshoots full scale *between* stored samples). It is shown for every track, clipped or not: a track can read −0.6 dBTP with a perfectly clean sample-domain signal (safe headroom, no problem) or read −0.2 dBFS sample peak yet **+1 dBTP** true peak — an "inter-sample over" that the classic clipping counter never sees because no single stored sample hits full scale.
 - **Dynamics (DR)** — a DR-meter-style estimate of each track's dynamic range: the peak level against the RMS of the loudest 20% of ~3 s blocks (the crest factor of the loud passages). High values (≥ 12 dB, shown green) indicate a dynamic master such as a Full Dynamic Range edition; low values (< 8 dB, shown amber) betray a loudness-war master. Like clipping, this is independent of losslessness.
 
-### 5. CSV export (on demand)
+### 5. Save & reload (on demand)
 
-Analysis never writes anything by itself. When you want to keep the results, click **Save CSV…** and choose where to store a spreadsheet-friendly `FlacCompagnon.csv` (all columns: status, upscaling, upsampling, transcoding, cutoff, bit depth, clipping, MD5, …). You decide the name and location — nothing is dropped into your music folders unless you ask for it.
+Analysis never writes anything by itself. When you want to keep the results, click **Save…** and pick a name and location — nothing is dropped into your music folders unless you ask for it. One dialog pick writes **two files, same stem, same folder**:
+
+- a spreadsheet-friendly **`.csv`** (all columns: status, upscaling, upsampling, transcoding, cutoff, bit depth, clipping, true peak, dynamics, MD5, …);
+- a **`.json`** that round-trips the *entire* analysis — every field, including the nested per-detection detail — so it can be reloaded later.
+
+To reload a saved analysis, **drop the `.json` file onto the window**, same gesture as dropping a folder — there's no separate button for it. The table renders instantly from the file, with no audio re-decoded. This also means the export reflects exactly what's on screen: rows removed with the trash icon before saving are **not** included in either file, and won't come back on reload.
 
 ---
 
@@ -71,7 +76,7 @@ FLAC, WAV, AIFF, ALAC/MP4 (`.m4a`), CAF, OGG/Vorbis, MP3, AAC, and **DSD** (`.ds
    (results table,  │                                       ├─ clipping / fake-stereo          │
     progress, ◀──── │                                       └─ effective bit depth ─▶ 3 checks │
     spectrograms)   │  FLAC ─▶ fused decode: analysis + MD5 in one pass (claxon)              │
-                    │  CSV export (on demand)     spectrograms ─▶ system ffmpeg ─▶ spectres/   │
+                    │  save: CSV + JSON (on demand)   spectrograms ─▶ system ffmpeg ─▶ spectres/│
                     └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -200,7 +205,7 @@ On every push to the main branch the `Docs` workflow (`.github/workflows/docs.ym
 
 ## Output layout
 
-Analysis alone writes **nothing**. The only files FlacCompagnon can create are the spectrogram PNGs (when you click _Generate spectrograms_) and a CSV (when you click _Save CSV…_ and pick a location). For a dropped folder:
+Analysis alone writes **nothing**. The only files FlacCompagnon can create are the spectrogram PNGs (when you click _Generate spectrograms_) and the CSV + JSON report pair (when you click _Save…_ and pick a location). For a dropped folder:
 
 ```
 My Album/
@@ -229,7 +234,7 @@ FlacCompagnon opens every track **read-only** — it decodes samples to analyze 
 
 ## Roadmap ideas
 
-Easy future additions (the analyzer is modular): per-channel spectral analysis, joint-stereo artifact detection, ReplayGain scanning, and a re-importable JSON report.
+Easy future additions (the analyzer is modular): per-channel spectral analysis, joint-stereo artifact detection, and ReplayGain scanning.
 
 ## References
 

@@ -1,9 +1,11 @@
-//! FlacCompagnon Tauri backend: exposes analysis, CSV export and spectrogram
-//! commands to the web frontend and streams progress events.
+//! FlacCompagnon Tauri backend: exposes analysis, report export/import and
+//! spectrogram commands to the web frontend and streams progress events.
 //!
 //! Nothing here ever modifies the audio files being analyzed — they are only
 //! ever opened read-only. The only files written are the (optional, on-demand)
-//! CSV export and the spectrogram PNGs, both of which live outside the tracks.
+//! CSV + JSON reports and the spectrogram PNGs, both of which live outside the
+//! tracks. The JSON report is also re-importable: dropping one back onto the
+//! window renders the table again without re-analyzing any audio.
 
 mod spectrogram;
 
@@ -235,23 +237,49 @@ fn reveal_in_folder(path: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Write the CSV report for an already-analyzed result to `dest`.
+/// Paths written by `save_report`, returned so the frontend can confirm both
+/// in its toast message.
+#[derive(Clone, Serialize)]
+struct SavedReport {
+    csv: String,
+    json: String,
+}
+
+/// Write both the CSV and JSON reports for an already-analyzed result. Both
+/// file names are derived from `dest` (same stem, same folder), so a single
+/// Save dialog pick produces a matched pair — e.g. picking `Album.csv`
+/// also writes `Album.json` right next to it.
 ///
-/// Defense in depth: only ever writes files with a `.csv` extension, so a
-/// compromised frontend cannot use this command to overwrite arbitrary files.
+/// Defense in depth: the destination suffixes are hardcoded here (`.csv` /
+/// `.json`) rather than trusted from the frontend, so a compromised frontend
+/// cannot use this command to write a file with any other extension.
 #[tauri::command]
-async fn save_csv(dest: String, report: FolderReport) -> Result<String, String> {
+async fn save_report(dest: String, report: FolderReport) -> Result<SavedReport, String> {
     let path = Path::new(&dest);
-    let is_csv = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.eq_ignore_ascii_case("csv"))
-        .unwrap_or(false);
-    if !is_csv {
-        return Err("The destination must be a .csv file.".to_string());
-    }
-    core::report::write_csv(path, &report).map_err(|e| e.to_string())?;
-    Ok(dest)
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Invalid destination file name.".to_string())?;
+    let parent = path.parent().unwrap_or_else(|| Path::new(""));
+    let csv_path = parent.join(format!("{stem}.csv"));
+    let json_path = parent.join(format!("{stem}.json"));
+
+    core::report::write_csv(&csv_path, &report).map_err(|e| e.to_string())?;
+    core::report::write_json(&json_path, &report).map_err(|e| e.to_string())?;
+
+    Ok(SavedReport {
+        csv: csv_path.to_string_lossy().to_string(),
+        json: json_path.to_string_lossy().to_string(),
+    })
+}
+
+/// Load a previously-saved JSON report (dropped onto the window) and return it
+/// as a [`FolderReport`], ready to render without re-analyzing any audio.
+#[tauri::command]
+async fn load_report(path: String) -> Result<FolderReport, String> {
+    let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    core::report::parse_json(&text)
 }
 
 /// Render a spectrogram PNG for every audio file implied by `targets`, placing
@@ -348,7 +376,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             analyze_paths,
-            save_csv,
+            save_report,
+            load_report,
             ffmpeg_available,
             cancel_task,
             reveal_in_folder,

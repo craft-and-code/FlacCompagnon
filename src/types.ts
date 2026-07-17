@@ -55,6 +55,11 @@ export interface FolderReport {
   has_flac: boolean;
 }
 
+export interface SavedReport {
+  csv: string;
+  json: string;
+}
+
 export interface Progress {
   current: number;
   total: number;
