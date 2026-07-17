@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FlacCompagnon — Is your lossless actually lossless?</title>
+    <meta
+      name="description"
+      content="FlacCompagnon detects fake lossless audio: upscaling, upsampling and transcoding (including AAC at every bitrate). A free, open-source, native app for macOS, Windows and Linux."
+    />
+    <meta name="keywords" content="FlacCompagnon, FLAC checker, fake lossless, upscaled FLAC, upsampled FLAC, transcoded FLAC, AAC detection, lossless audio checker, spectrogram, DSD, Hi-Res Audio, audio integrity" />
+    <meta name="author" content="craft-and-code" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://craft-and-code.github.io/FlacCompagnon/" />
+
+    <!-- Open Graph / Facebook / Discord / LinkedIn -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://craft-and-code.github.io/FlacCompagnon/" />
+    <meta property="og:site_name" content="FlacCompagnon" />
+    <meta property="og:title" content="FlacCompagnon — Is your lossless actually lossless?" />
+    <meta
+      property="og:description"
+      content="Detects fake lossless audio: upscaling, upsampling and transcoding (including AAC at every bitrate). Free, open-source, native app for macOS, Windows and Linux."
+    />
+    <meta property="og:image" content="https://craft-and-code.github.io/FlacCompagnon/assets/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:locale:alternate" content="en_US" />
+
+    <!-- Twitter / X card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="FlacCompagnon — Is your lossless actually lossless?" />
+    <meta
+      name="twitter:description"
+      content="Detects fake lossless audio: upscaling, upsampling and transcoding (including AAC at every bitrate)."
+    />
+    <meta name="twitter:image" content="https://craft-and-code.github.io/FlacCompagnon/assets/og-image.png" />
+
+    <meta name="theme-color" content="#0d0e13" />
+    <link rel="icon" href="assets/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png" />
+    <link rel="apple-touch-icon" href="assets/favicon-180.png" />
+    <link rel="stylesheet" href="styles.css" />
+
+    <!-- Structured data: helps search engines show FlacCompagnon as a downloadable
+         app (price, platforms, rating box) in rich results. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "FlacCompagnon",
+        "url": "https://craft-and-code.github.io/FlacCompagnon/",
+        "description": "Detects fake lossless audio files: upscaling, upsampling and transcoding, including AAC transcodes at every bitrate. Free, open-source, native app for macOS, Windows and Linux.",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "macOS, Windows, Linux",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "author": {
+          "@type": "Organization",
+          "name": "craft-and-code",
+          "url": "https://github.com/craft-and-code"
+        },
+        "license": "https://github.com/craft-and-code/FlacCompagnon/blob/main/LICENSE",
+        "downloadUrl": "https://github.com/craft-and-code/FlacCompagnon/releases/latest",
+        "softwareVersion": "0.5.0"
+      }
+    </script>
+    <!-- Fonts loaded non-render-blocking: the page shows instantly with system
+         fonts (see the CSS fallbacks) and Space Grotesk / IBM Plex Mono swap in
+         when available. A slow or blocked Google Fonts request never leaves the
+         page blank. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      />
+    </noscript>
+  </head>
+  <body>
+    <canvas id="bgc" aria-hidden="true"></canvas>
+
+    <!-- Nav -->
+    <header class="nav">
+      <a class="brand" href="#top">
+        <img src="assets/logo.png" alt="FlacCompagnon" width="28" height="28" />
+        <span>FlacCompagnon</span>
+      </a>
+      <nav class="nav-links">
+        <a href="#apercu" data-i18n="nPrev">Aperçu</a>
+        <a href="#detections" data-i18n="nDet">Détections</a>
+        <a href="#integrite" data-i18n="nInt">Intégrité</a>
+        <a href="#spectrogrammes" data-i18n="nSpec">Spectrogrammes</a>
+        <a href="#export" data-i18n="nExp">Export</a>
+        <a href="#pipeline" data-i18n="nPipe">Pipeline</a>
+        <a href="https://craft-and-code.github.io/FlacCompagnon/doc/" target="_blank" rel="noopener" data-i18n="nDoc">Docs</a>
+      </nav>
+      <div class="nav-right">
+        <div class="lang" role="group" aria-label="Language">
+          <button id="lang-en" type="button">EN</button>
+          <button id="lang-fr" type="button">FR</button>
+        </div>
+        <a class="btn btn-grad" href="#telecharger" data-i18n="nDl">Télécharger</a>
+      </div>
+    </header>
+
+    <main id="top">
+      <!-- Hero -->
+      <section class="hero">
+        <p class="kicker" data-i18n="kick">Open source · Rust + Tauri · macOS · Windows · Linux</p>
+        <h1>
+          <span class="up" data-i18n="h1a">Votre lossless est-il</span>
+          <span class="up grad" data-i18n="h1b">vraiment lossless ?</span>
+        </h1>
+        <p class="sub up" data-i18n="sub"></p>
+        <div class="hero-cta up">
+          <a class="btn btn-grad" href="#telecharger" data-i18n="ctaDl">Télécharger</a>
+          <a class="btn btn-outline" href="https://github.com/craft-and-code/FlacCompagnon" target="_blank" rel="noopener" data-i18n="ctaGh">Voir sur GitHub</a>
+        </div>
+        <p class="note up" data-i18n="note"></p>
+        <a class="scroll-cue" href="#apercu" aria-label="scroll">▾</a>
+      </section>
+
+      <!-- Aperçu -->
+      <section id="apercu" class="section">
+        <p class="kicker" data-i18n="s1k">Aperçu</p>
+        <h2 data-i18n="s1t">L'analyse en un coup d'œil</h2>
+        <p class="lead" data-i18n="s1p"></p>
+
+        <div class="app-window">
+          <div class="titlebar">
+            <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+            <span class="tb-title">FlacCompagnon</span>
+          </div>
+          <div class="toolbar">
+            <span class="count" data-i18n="sumCount">4 fichiers</span>
+            <span class="chip c-clean" data-i18n="chClean">1 clean</span>
+            <span class="chip c-ups" data-i18n="chUps">1 upsamplé</span>
+            <span class="chip c-tr" data-i18n="chTr">1 transcodé</span>
+            <span class="chip c-sus" data-i18n="chSus">1 suspect</span>
+          </div>
+          <div class="table-wrap">
+            <table class="results">
+              <thead>
+                <tr>
+                  <th data-i18n="thFile">Fichier</th>
+                  <th data-i18n="thFmt">Format</th>
+                  <th data-i18n="thDur">Durée</th>
+                  <th data-i18n="thSr">Échantillonnage</th>
+                  <th data-i18n="thBits">Bits réels</th>
+                  <th data-i18n="thCut">Cut-off</th>
+                  <th data-i18n="thDet">Détections</th>
+                  <th>MD5</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="fname" data-path="/Users/you/Music/Miles Davis - Kind of Blue/01 · So What.flac">01 · So What.flac</td>
+                  <td>FLAC</td><td>9:26</td><td>44.1k</td>
+                  <td class="c-ok">16-bit</td><td>21.9 kHz (99%)</td>
+                  <td><span class="tag t-ok" data-tip="tipClean">Clean</span></td>
+                  <td class="c-ok">✓ OK</td>
+                </tr>
+                <tr>
+                  <td class="fname" data-path="/Users/you/Music/Studio Master/02 · Studio Master.flac">02 · Studio Master.flac</td>
+                  <td>FLAC</td><td>4:11</td><td>96k</td>
+                  <td class="c-ok">24-bit</td><td>22.0 kHz (46%)</td>
+                  <td><span class="tag t-ups" data-tip="d2tip">Upsampled</span></td>
+                  <td class="c-ok">✓ OK</td>
+                </tr>
+                <tr>
+                  <td class="fname" data-path="/Users/you/Music/Remaster 2019/03 · Remaster 2019.flac">03 · Remaster 2019.flac</td>
+                  <td>FLAC</td><td>3:37</td><td>44.1k</td>
+                  <td class="c-ok">16-bit</td><td>22.05 kHz (100%)</td>
+                  <td><span class="tag t-tr" data-tip="d3tip">Transcoded</span></td>
+                  <td class="c-ok">✓ OK</td>
+                </tr>
+                <tr>
+                  <td class="fname" data-path="/Users/you/Music/Acoustic Live/04 · Acoustic Live.flac">04 · Acoustic Live.flac</td>
+                  <td>FLAC</td><td>5:02</td><td>44.1k</td>
+                  <td class="c-ok">16-bit</td><td>18.6 kHz (84%)</td>
+                  <td><span class="tag t-sus" data-tip="tipSus">Transcoded?</span></td>
+                  <td class="c-mut">— <span class="nosig">no MD5</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p class="cap" data-i18n="cap1"></p>
+      </section>
+
+      <!-- Détections -->
+      <section id="detections" class="section">
+        <p class="kicker" data-i18n="s2k">Détections</p>
+        <h2 data-i18n="s2t">Trois détections indépendantes</h2>
+        <p class="lead" data-i18n="s2p"></p>
+
+        <div class="cards cards-3">
+          <article class="card det">
+            <span class="tag t-up">Upscaled</span>
+            <h3 data-i18n="d1t">Upscaling — fausse résolution</h3>
+            <p data-i18n="d1p"></p>
+            <canvas id="gUp" class="det-canvas"></canvas>
+            <p class="cap" data-i18n="d1cap"></p>
+          </article>
+          <article class="card det">
+            <span class="tag t-ups">Upsampled</span>
+            <h3 data-i18n="d2t">Upsampling — faux échantillonnage</h3>
+            <p data-i18n="d2p"></p>
+            <canvas id="gWall" class="det-canvas"></canvas>
+            <p class="cap" data-i18n="d2cap"></p>
+          </article>
+          <article class="card det">
+            <span class="tag t-tr">Transcoded</span>
+            <h3 data-i18n="d3t">Transcoding — source lossy</h3>
+            <p data-i18n="d3p"></p>
+            <canvas id="gGrid" class="det-canvas"></canvas>
+            <p class="cap" data-i18n="d3cap"></p>
+          </article>
+        </div>
+        <p class="note-box" data-i18n="s2note"></p>
+      </section>
+
+      <!-- Intégrité -->
+      <section id="integrite" class="section">
+        <p class="kicker" data-i18n="s3k">Intégrité</p>
+        <h2 data-i18n="s3t">Au-delà des détections</h2>
+        <p class="lead" data-i18n="s3p"></p>
+        <div class="cards cards-3">
+          <article class="card">
+            <h3 data-i18n="i1t">Vérification MD5 FLAC</h3>
+            <p data-i18n-html="i1p"></p>
+          </article>
+          <article class="card">
+            <h3 data-i18n="i2t">Fake stereo</h3>
+            <p data-i18n="i2p"></p>
+          </article>
+          <article class="card">
+            <h3 data-i18n="i3t">Clipping</h3>
+            <p data-i18n="i3p"></p>
+          </article>
+          <article class="card">
+            <h3 data-i18n="i4t">Détection du format réel</h3>
+            <p data-i18n-html="i4p"></p>
+          </article>
+          <article class="card">
+            <h3 data-i18n="i5t">Dynamique (DR)</h3>
+            <p data-i18n="i5p"></p>
+          </article>
+          <article class="card">
+            <h3 data-i18n="i6t">Hi-Res &amp; DSD</h3>
+            <p data-i18n-html="i6p"></p>
+          </article>
+        </div>
+      </section>
+
+      <!-- Spectrogrammes -->
+      <section id="spectrogrammes" class="section">
+        <p class="kicker" data-i18n="s4k">Spectrogrammes</p>
+        <h2 data-i18n="s4t">Le juge de paix</h2>
+        <div class="spec-grid">
+          <div>
+            <p class="lead" data-i18n="s4p"></p>
+            <p class="note-inline" data-i18n="s4n1"></p>
+            <p class="note-inline" data-i18n-html="s4n2"></p>
+          </div>
+          <canvas id="gSpec" class="spec-canvas"></canvas>
+        </div>
+      </section>
+
+      <!-- Export CSV -->
+      <section id="export" class="section">
+        <p class="kicker" data-i18n="s7k">Export</p>
+        <h2 data-i18n="s7t">Emportez vos résultats</h2>
+        <p class="lead" data-i18n="s7p"></p>
+        <p class="note-inline" data-i18n="s7n1"></p>
+      </section>
+
+      <!-- Pipeline -->
+      <section id="pipeline" class="section">
+        <p class="kicker" data-i18n="s5k">Pipeline</p>
+        <h2 data-i18n="s5t">Comment ça marche</h2>
+        <p class="lead" data-i18n="s5p"></p>
+        <div class="pipeline">
+          <div class="pstage">
+            <span class="pnum">1</span>
+            <span class="plabel" data-i18n="p1">dossier déposé</span>
+          </div>
+          <span class="parrow" aria-hidden="true"></span>
+          <div class="pstage">
+            <span class="pnum">2</span>
+            <span class="plabel" data-i18n="p2">décodage · symphonia</span>
+          </div>
+          <span class="parrow" aria-hidden="true"></span>
+          <div class="pstage wide">
+            <span class="pnum">3</span>
+            <span class="plabel" data-i18n="p3">analyse streaming</span>
+            <div class="psub">
+              <span data-i18n="p3a">FFT ▸ cut-off</span>
+              <span data-i18n="p3b">MDCT ▸ grille AAC</span>
+              <span data-i18n="p3c">bits effectifs</span>
+              <span data-i18n="p3d">clipping · fake stereo</span>
+            </div>
+          </div>
+          <span class="parrow" aria-hidden="true"></span>
+          <div class="pstage">
+            <span class="pnum">4</span>
+            <span class="plabel" data-i18n="p4">table de résultats</span>
+          </div>
+        </div>
+        <p class="note-box" data-i18n="s5note"></p>
+      </section>
+
+      <!-- Téléchargement -->
+      <section id="telecharger" class="section">
+        <p class="kicker" data-i18n="s6k">Téléchargement</p>
+        <h2 data-i18n="s6t">Une petite app native</h2>
+        <p class="lead" data-i18n="s6p"></p>
+        <div class="cards cards-3 dl">
+          <a class="card dlcard" href="https://github.com/craft-and-code/FlacCompagnon/releases/latest">
+            <span class="os">macOS</span>
+            <span class="osx"><code>.dmg</code> · Apple Silicon</span>
+            <span class="btn btn-grad small" data-i18n="dlBtn">Télécharger</span>
+          </a>
+          <a class="card dlcard" href="https://github.com/craft-and-code/FlacCompagnon/releases/latest">
+            <span class="os">Windows</span>
+            <span class="osx"><code>.msi</code> · x64</span>
+            <span class="btn btn-grad small" data-i18n="dlBtn">Télécharger</span>
+          </a>
+          <a class="card dlcard" href="https://github.com/craft-and-code/FlacCompagnon/releases/latest">
+            <span class="os">Linux</span>
+            <span class="osx"><code>.AppImage</code> · <code>.deb</code></span>
+            <span class="btn btn-grad small" data-i18n="dlBtn">Télécharger</span>
+          </a>
+        </div>
+        <p class="note-inline center" data-i18n="ffnote"></p>
+        <p class="note-inline center" data-i18n-html="ffinstall"></p>
+
+        <div class="refs">
+          <h4 data-i18n="refT">Références</h4>
+          <p data-i18n="ref1"></p>
+          <p data-i18n="ref2"></p>
+          <p data-i18n="ref3"></p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span data-i18n="ftLeft">© 2026 FlacCompagnon · Licence MIT · Construit en Rust + Tauri</span>
+      <span class="ft-links">
+        <a href="https://github.com/craft-and-code/FlacCompagnon">GitHub</a>
+        <a href="https://github.com/craft-and-code/FlacCompagnon/releases/latest">Releases</a>
+        <a href="https://craft-and-code.github.io/FlacCompagnon/doc/" target="_blank" rel="noopener">Docs</a>
+      </span>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
