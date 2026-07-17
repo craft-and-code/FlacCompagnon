@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["SUPPORTED_EXTENSIONS"],"enum":["AnalysisError"],"fn":["analyze_file","analyze_folder","is_supported_audio","list_audio_files"],"mod":["analyzer","bitdepth","clipping","decode","detections","dsd","flac_md5","mdct","report","requant","spectrum","stereo"],"struct":["ClippingInfo","FileAnalysis","FolderReport","ScanOptions"]};

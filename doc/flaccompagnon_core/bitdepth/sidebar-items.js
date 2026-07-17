@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["effective_bits","is_fake_hires"]};
