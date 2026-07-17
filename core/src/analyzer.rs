@@ -38,6 +38,15 @@ const MDCT_DEAD_TOP_RATIO: f32 = 0.92;
 /// Preferred segment start (sample index; multiple of 1024 ≈ 8 s at 44.1 kHz).
 const REQ_MAIN_START: u64 = 344 * 1024;
 
+// --- Dynamics (DR) ----------------------------------------------------------
+/// Frames per RMS block (~3 s at 44.1 kHz). The exact wall-clock length is not
+/// critical: the DR estimate averages the loudest blocks, so the granularity
+/// only needs to be long enough to smooth individual drum hits.
+const DYN_BLOCK_FRAMES: u64 = 131_072;
+/// Fraction of the loudest blocks that defines the "loud passages" RMS,
+/// mirroring the classic DR-meter approach (peak vs loudest-20% RMS).
+const DYN_TOP_FRACTION: f64 = 0.2;
+
 /// Aggregated results produced by [`StreamAnalyzer::finish`].
 #[derive(Debug, Clone)]
 pub struct AnalysisSummary {
@@ -52,6 +61,12 @@ pub struct AnalysisSummary {
     pub clipping: ClippingInfo,
     pub fake_stereo: bool,
     pub real_bit_depth: Option<u32>,
+
+    /// Dynamic-range estimate in dB: peak level vs the RMS of the loudest 20%
+    /// of ~3 s blocks (crest factor of the loud passages, DR-meter style).
+    /// High values (>= 12 dB) indicate a dynamic master; low values (< 8 dB)
+    /// a loudness-war master. `None` for silent or extremely short streams.
+    pub dr_db: Option<f32>,
 
     // --- MDCT (AAC-SIN) transcode evidence ---
     /// Mean per-frame MDCT cutoff as a fraction of Nyquist (dead-zone frames).
@@ -110,6 +125,11 @@ pub struct StreamAnalyzer {
     req_early_r: Vec<f64>,
     req_main_l: Vec<f64>,
     req_main_r: Vec<f64>,
+
+    // --- dynamics (DR) ---
+    dyn_block_sumsq: f64, // running sum of per-frame mean squares
+    dyn_block_frames: u64,
+    dyn_blocks: Vec<f64>, // mean square of each completed block
 }
 
 impl StreamAnalyzer {
@@ -151,6 +171,9 @@ impl StreamAnalyzer {
             req_early_r: Vec::with_capacity(requant::SEGMENT_LEN),
             req_main_l: Vec::with_capacity(requant::SEGMENT_LEN),
             req_main_r: Vec::with_capacity(requant::SEGMENT_LEN),
+            dyn_block_sumsq: 0.0,
+            dyn_block_frames: 0,
+            dyn_blocks: Vec::new(),
         }
     }
 
@@ -182,9 +205,20 @@ impl StreamAnalyzer {
             }
         }
 
-        // Clipping + peak (per channel).
+        // Clipping + peak (per channel), and the frame's mean square for the
+        // dynamics blocks.
+        let mut frame_sumsq = 0.0f64;
         for &s in samples {
             self.clip_state.push(s);
+            frame_sumsq += (s as f64) * (s as f64);
+        }
+        self.dyn_block_sumsq += frame_sumsq / samples.len() as f64;
+        self.dyn_block_frames += 1;
+        if self.dyn_block_frames == DYN_BLOCK_FRAMES {
+            self.dyn_blocks
+                .push(self.dyn_block_sumsq / self.dyn_block_frames as f64);
+            self.dyn_block_sumsq = 0.0;
+            self.dyn_block_frames = 0;
         }
 
         // Stereo difference energy (first two channels).
@@ -324,7 +358,29 @@ impl StreamAnalyzer {
         let (cliff_db, above_db) =
             spectrum::cutoff_context(&spectrum_db, sample_rate, FFT_SIZE, cutoff_hz);
 
+        // Dynamics: flush a meaningful trailing partial block (>= 1/4 length),
+        // then compare the peak with the RMS of the loudest 20% of blocks.
+        if self.dyn_block_frames >= DYN_BLOCK_FRAMES / 4 {
+            self.dyn_blocks
+                .push(self.dyn_block_sumsq / self.dyn_block_frames as f64);
+        }
         let clipping = self.clip_state.finish(self.channels, self.total_frames);
+        let dr_db = {
+            let mut blocks = self.dyn_blocks.clone();
+            blocks.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+            let top = ((blocks.len() as f64 * DYN_TOP_FRACTION).ceil() as usize).max(1);
+            let loud: Vec<f64> = blocks.into_iter().take(top).collect();
+            if loud.is_empty() {
+                None
+            } else {
+                let rms = (loud.iter().sum::<f64>() / loud.len() as f64).sqrt();
+                if rms > 1e-9 && clipping.peak > 0.0 {
+                    Some((20.0 * (clipping.peak as f64 / rms).log10()) as f32)
+                } else {
+                    None
+                }
+            }
+        };
 
         let fake_stereo = if self.channels >= 2 {
             crate::stereo::is_fake(
@@ -385,10 +441,58 @@ impl StreamAnalyzer {
             clipping,
             fake_stereo,
             real_bit_depth,
+            dr_db,
             mdct_cutoff_ratio,
             mdct_dead_db,
             mdct_dead_fraction,
             requant_rate,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A pure sine has a crest factor of exactly sqrt(2) == 3.01 dB; the DR
+    /// estimate on a steady full-scale sine must land there.
+    #[test]
+    fn dr_of_a_pure_sine_is_3db() {
+        let mut a = StreamAnalyzer::new(1);
+        let rate = 44_100.0f64;
+        for n in 0..(DYN_BLOCK_FRAMES * 2) {
+            let s = (2.0 * std::f64::consts::PI * 1000.0 * n as f64 / rate).sin() as f32 * 0.9;
+            a.push_frame(&[s], None);
+        }
+        let summary = a.finish(44_100, None);
+        let dr = summary.dr_db.expect("dr computed");
+        assert!((dr - 3.01).abs() < 0.1, "dr = {dr}");
+    }
+
+    /// A hard-clipped ("brickwalled") sine approaches a square wave whose
+    /// crest factor tends to 0 dB — the loudness-war signature.
+    #[test]
+    fn dr_of_a_squashed_sine_is_low() {
+        let mut a = StreamAnalyzer::new(1);
+        let rate = 44_100.0f64;
+        for n in 0..(DYN_BLOCK_FRAMES * 2) {
+            let raw = (2.0 * std::f64::consts::PI * 1000.0 * n as f64 / rate).sin() * 8.0;
+            let s = raw.clamp(-0.98, 0.98) as f32;
+            a.push_frame(&[s], None);
+        }
+        let summary = a.finish(44_100, None);
+        let dr = summary.dr_db.expect("dr computed");
+        assert!(dr < 1.0, "dr = {dr}");
+    }
+
+    /// Silence yields no DR value rather than a bogus number.
+    #[test]
+    fn dr_of_silence_is_none() {
+        let mut a = StreamAnalyzer::new(1);
+        for _ in 0..(DYN_BLOCK_FRAMES + 10) {
+            a.push_frame(&[0.0], None);
+        }
+        let summary = a.finish(44_100, None);
+        assert!(summary.dr_db.is_none());
     }
 }

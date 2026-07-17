@@ -60,6 +60,17 @@ export function detectionsTd(d: Detections): string {
   return `<td class="detections" title="${escapeHtml(d.detail)}">${tags.join(" ")}</td>`;
 }
 
+/// Dynamic-range cell: DR-meter-style estimate (peak vs loudest-20% RMS).
+/// >= 12 dB green (dynamic master, e.g. Full Dynamic Range editions),
+/// 8-12 dB neutral, < 8 dB warning (loudness-war master).
+export function drCell(dr: number | null): string {
+  if (dr == null || !Number.isFinite(dr)) return `<td class="c-muted">—</td>`;
+  const v = dr.toFixed(1);
+  const tip = `Dynamic range (crest of the loud passages): peak level vs the RMS of the loudest 20% of ~3 s blocks. High values mean a dynamic master (Full Dynamic Range editions); low values a compressed &quot;loudness war&quot; master. Independent of whether the file is lossless.`;
+  const cls = dr >= 12 ? "c-ok" : dr >= 8 ? "" : "c-warn";
+  return `<td class="${cls} has-tip" title="${tip}">${v} dB</td>`;
+}
+
 export function md5Cell(m: FlacMd5Status | null): string {
   if (!m) return `<td class="c-muted">—</td>`;
   switch (m.state) {

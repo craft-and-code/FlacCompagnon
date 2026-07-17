@@ -95,6 +95,11 @@ pub struct FileAnalysis {
 
     pub clipping: ClippingInfo,
 
+    /// Dynamic-range estimate in dB (peak vs loudest-20% RMS, DR-meter style).
+    /// High (>= 12 dB) == dynamic master (Full Dynamic Range editions);
+    /// low (< 8 dB) == loudness-war master. `None` when not measurable.
+    pub dr_db: Option<f32>,
+
     /// FLAC MD5 signature status. `None` for non-FLAC files (no column shown).
     pub flac_md5: Option<FlacMd5Status>,
 
@@ -170,6 +175,7 @@ pub fn analyze_file(path: &Path, opts: &ScanOptions) -> FileAnalysis {
             peak_dbfs: f32::NEG_INFINITY,
             clipped: false,
         },
+        dr_db: None,
         flac_md5: None,
         error: None,
     };
@@ -232,6 +238,7 @@ pub fn analyze_file(path: &Path, opts: &ScanOptions) -> FileAnalysis {
             result.cutoff_ratio = Some(summary.cutoff_ratio);
             result.requant_rate = summary.requant_rate;
             result.clipping = summary.clipping.clone();
+            result.dr_db = summary.dr_db;
             dsd_heritage = dsd::dsd_heritage_check(
                 &summary.spectrum_db,
                 outcome.sample_rate,
@@ -330,6 +337,7 @@ fn analyze_dsd(path: &Path, opts: &ScanOptions, result: &mut FileAnalysis) {
                 result.cutoff_hz = Some(summary.cutoff_hz);
                 result.cutoff_ratio = Some(summary.cutoff_ratio);
                 result.clipping = summary.clipping.clone();
+                result.dr_db = summary.dr_db;
                 if info.channels >= 2 {
                     result.fake_stereo = Some(summary.fake_stereo);
                 }

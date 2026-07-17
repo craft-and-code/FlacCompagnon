@@ -11,6 +11,7 @@ import {
   csvNameFrom,
   deleteBtn,
   detectionsTd,
+  drCell,
   escapeHtml,
   fmtCutoff,
   fmtDuration,
@@ -184,6 +185,7 @@ function renderReport(report: FolderReport) {
     "Ch",
     "Stereo",
     "Clipping",
+    "Dynamics",
     ...(showMd5 ? ["MD5"] : []),
     "", // delete button
   ];
@@ -285,6 +287,7 @@ function rowHtml(
     <td>${f.channels}</td>
     <td>${stereo}</td>
     <td>${clip}</td>
+    ${drCell(f.dr_db)}
     ${showMd5 ? md5Cell(f.flac_md5) : ""}
     <td class="rowdel">${deleteBtn(f.path)}</td>
   </tr>`;

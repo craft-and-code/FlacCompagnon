@@ -230,6 +230,7 @@ mod tests {
             },
             fake_stereo: false,
             real_bit_depth: None,
+            dr_db: None,
             mdct_cutoff_ratio: mcr,
             mdct_dead_db: mdb,
             mdct_dead_fraction: frac,

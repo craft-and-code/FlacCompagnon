@@ -42,6 +42,7 @@ export interface FileAnalysis {
   fake_stereo: boolean | null;
   badge: string | null;
   clipping: ClippingInfo;
+  dr_db: number | null;
   flac_md5: FlacMd5Status | null;
   error: string | null;
 }
