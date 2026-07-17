@@ -20,6 +20,7 @@ pub mod report;
 pub mod requant;
 pub mod spectrum;
 pub mod stereo;
+pub mod truepeak;
 
 use std::path::{Path, PathBuf};
 
@@ -54,6 +55,13 @@ pub struct ClippingInfo {
     pub peak: f32,
     /// Peak in dBFS (0.0 == full scale).
     pub peak_dbfs: f32,
+    /// True peak (inter-sample peak) magnitude from 4x oversampling
+    /// (BS.1770-style). Can exceed 1.0 when the reconstructed waveform
+    /// overshoots full scale between samples.
+    pub true_peak: f32,
+    /// True peak in dBTP. Positive values are inter-sample "overs": the DAC's
+    /// reconstruction filter will clip even though no stored sample does.
+    pub true_peak_dbtp: f32,
     /// `true` when at least one clip event was detected.
     pub clipped: bool,
 }
@@ -173,6 +181,8 @@ pub fn analyze_file(path: &Path, opts: &ScanOptions) -> FileAnalysis {
             clip_events: 0,
             peak: 0.0,
             peak_dbfs: f32::NEG_INFINITY,
+            true_peak: 0.0,
+            true_peak_dbtp: f32::NEG_INFINITY,
             clipped: false,
         },
         dr_db: None,

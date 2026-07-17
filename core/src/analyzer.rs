@@ -17,6 +17,7 @@ use std::sync::Arc;
 use rustfft::{num_complex::Complex, Fft, FftPlanner};
 
 use crate::mdct::{Mdct, AAC_N};
+use crate::truepeak::TruePeak;
 use crate::{bitdepth, clipping, requant, spectrum, ClippingInfo};
 
 /// Full-scale detection threshold (normalized). Samples with |value| at or
@@ -96,6 +97,7 @@ pub struct StreamAnalyzer {
 
     // --- clipping ---
     clip_state: clipping::ClipState,
+    true_peak: TruePeak,
 
     // --- fake stereo ---
     diff_energy: f64,
@@ -150,6 +152,7 @@ impl StreamAnalyzer {
             power_acc: vec![0.0; FFT_SIZE / 2 + 1],
             window_count: 0,
             clip_state: clipping::ClipState::new(CLIP_THRESHOLD),
+            true_peak: TruePeak::new(channels.max(1)),
             diff_energy: 0.0,
             l_energy: 0.0,
             r_energy: 0.0,
@@ -214,6 +217,7 @@ impl StreamAnalyzer {
         }
         self.dyn_block_sumsq += frame_sumsq / samples.len() as f64;
         self.dyn_block_frames += 1;
+        self.true_peak.push_frame(samples);
         if self.dyn_block_frames == DYN_BLOCK_FRAMES {
             self.dyn_blocks
                 .push(self.dyn_block_sumsq / self.dyn_block_frames as f64);
@@ -364,7 +368,12 @@ impl StreamAnalyzer {
             self.dyn_blocks
                 .push(self.dyn_block_sumsq / self.dyn_block_frames as f64);
         }
-        let clipping = self.clip_state.finish(self.channels, self.total_frames);
+        let mut clipping = self.clip_state.finish(self.channels, self.total_frames);
+        // True peak from the 4x-oversampled stream. It can legitimately sit a
+        // hair above the sample peak on any material, and above 1.0 (positive
+        // dBTP) on loud masters — that's the inter-sample clipping signal.
+        clipping.true_peak = self.true_peak.peak();
+        clipping.true_peak_dbtp = self.true_peak.peak_dbtp();
         let dr_db = {
             let mut blocks = self.dyn_blocks.clone();
             blocks.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));

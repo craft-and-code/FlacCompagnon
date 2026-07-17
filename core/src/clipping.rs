@@ -54,6 +54,9 @@ impl ClipState {
             clip_events: self.clip_events,
             peak,
             peak_dbfs,
+            // Filled in by the analyzer, which owns the oversampling meter.
+            true_peak: peak,
+            true_peak_dbtp: peak_dbfs,
             clipped: self.clip_events > 0,
         }
     }

@@ -13,9 +13,9 @@
     "windows": [
       {
         "title": "FlacCompagnon",
-        "width": 1400,
+        "width": 1450,
         "height": 820,
-        "minWidth": 900,
+        "minWidth": 950,
         "minHeight": 560,
         "dragDropEnabled": true,
         "visible": false

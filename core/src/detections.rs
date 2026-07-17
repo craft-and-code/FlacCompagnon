@@ -226,6 +226,8 @@ mod tests {
                 clip_events: 0,
                 peak: 0.5,
                 peak_dbfs: -6.0,
+                true_peak: 0.5,
+                true_peak_dbtp: -6.0,
                 clipped: false,
             },
             fake_stereo: false,

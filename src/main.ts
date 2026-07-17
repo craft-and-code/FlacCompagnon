@@ -17,6 +17,7 @@ import {
   fmtDuration,
   md5Cell,
   revealBtn,
+  truePeakCell,
 } from "./format";
 
 // --- DOM handles ------------------------------------------------------------
@@ -185,6 +186,7 @@ function renderReport(report: FolderReport) {
     "Ch",
     "Stereo",
     "Clipping",
+    "True Peak",
     "Dynamics",
     ...(showMd5 ? ["MD5"] : []),
     "", // delete button
@@ -256,6 +258,9 @@ function rowHtml(
   }
 
   // Clipping: severity-graded — yellow (a little), orange (a lot), red (heavy).
+  // Sample-domain only; the true peak (inter-sample peak) has its own column,
+  // since it's a level measurement that applies to every track, not just the
+  // clipped ones.
   let clip: string;
   if (!f.clipping.clipped) {
     clip = `<span class="c-muted">none</span>`;
@@ -287,6 +292,7 @@ function rowHtml(
     <td>${f.channels}</td>
     <td>${stereo}</td>
     <td>${clip}</td>
+    ${truePeakCell(f.clipping.true_peak_dbtp)}
     ${drCell(f.dr_db)}
     ${showMd5 ? md5Cell(f.flac_md5) : ""}
     <td class="rowdel">${deleteBtn(f.path)}</td>
@@ -323,24 +329,32 @@ async function analyze(targets: string[]) {
   if (busy || targets.length === 0) return;
   setBusy(true, "Analyzing…");
   let wasCancel = false;
+  let hadError = false;
   try {
     const report = await api.analyzePaths(targets);
     const added = mergeReport(report, targets);
     const total = lastReport ? lastReport.files.length : added;
     showToast(`Added ${added} ${added === 1 ? "file" : "files"} — ${total} in the list.`);
   } catch (e) {
-    if (userCancelled || String(e).includes("cancelled")) wasCancel = true;
-    else showToast(String(e), "error");
+    if (userCancelled || String(e).includes("cancelled")) {
+      wasCancel = true;
+    } else {
+      hadError = true;
+      showToast(String(e), "error");
+    }
   } finally {
     setBusy(false);
-    if (wasCancel) {
+    // Nothing was rendered on cancel or failure (e.g. a dropped file that
+    // isn't a supported audio format) — restore whatever was on screen
+    // before this attempt, otherwise the window is left blank.
+    if (wasCancel || hadError) {
       if (lastReport && lastReport.files.length > 0) {
         renderReport(lastReport);
-        showToast("Analysis cancelled — kept the existing list.");
+        if (wasCancel) showToast("Analysis cancelled — kept the existing list.");
       } else {
         showDropScreen();
         updateControls();
-        showToast("Analysis cancelled.");
+        if (wasCancel) showToast("Analysis cancelled.");
       }
     }
   }

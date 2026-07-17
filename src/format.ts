@@ -71,6 +71,25 @@ export function drCell(dr: number | null): string {
   return `<td class="${cls} has-tip" title="${tip}">${v} dB</td>`;
 }
 
+/// True-peak (inter-sample peak) cell — BS.1770-style, 4x-oversampled.
+/// Always shown, regardless of whether classic sample-domain clipping fired:
+/// it's a level measurement (like a peak meter), not an event count.
+/// > 0 dBTP (red): the reconstructed waveform overshoots full scale
+/// *between* samples even though no stored sample does ("inter-sample over") —
+/// a measured fact, not a heuristic guess, so it gets the same red as other
+/// confirmed issues (fake stereo, bit-depth mismatch, MD5 mismatch).
+/// <= -1 dBTP (green): comfortable headroom. In between: neutral.
+export function truePeakCell(dbtp: number): string {
+  if (!Number.isFinite(dbtp)) return `<td class="c-muted">—</td>`;
+  const v = `${dbtp > 0 ? "+" : ""}${dbtp.toFixed(1)} dBTP`;
+  const over = dbtp > 0;
+  const cls = over ? "c-bad" : dbtp <= -1 ? "c-ok" : "";
+  const title = over
+    ? `Inter-sample over: no stored sample reaches full scale, but the true peak (4x-oversampled, BS.1770-style) reaches ${v} — the waveform a DAC reconstructs between samples overshoots 0 dBFS. A sign of an over-loud master, independent of whether the file is lossless.`
+    : `True peak (4x-oversampled inter-sample peak): ${v}. At or below 0 dBTP means the reconstructed waveform stays under full scale — no inter-sample clipping.`;
+  return `<td class="${cls} has-tip" title="${title}">${v}</td>`;
+}
+
 export function md5Cell(m: FlacMd5Status | null): string {
   if (!m) return `<td class="c-muted">—</td>`;
   switch (m.state) {

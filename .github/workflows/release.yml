@@ -72,10 +72,28 @@ jobs:
           releaseBody: |
             Cross-platform builds of FlacCompagnon.
 
-            Download the installer for your OS below. ffmpeg is **not** bundled —
-            install it separately if you want spectrograms
-            (macOS: `brew install ffmpeg`, Debian/Ubuntu: `sudo apt install ffmpeg`,
-            Windows: `choco install ffmpeg`).
+            **Downloads**
+            - **macOS (Apple Silicon):** the `.dmg` installer, or the `.app.tar.gz`
+              (the raw app, same thing archived).
+            - **Windows:** the `.msi` (or `.exe`) installer.
+            - **Linux:** the `.AppImage` or `.deb`.
+
+            **macOS — first launch.** These builds are **not signed with an Apple
+            Developer ID**, so Gatekeeper will say the app "is damaged" or "cannot
+            be opened". This is expected for an open-source app without a paid
+            Apple certificate. To open it, drag **FlacCompagnon.app** to
+            `/Applications`, then run once in Terminal:
+
+            ```
+            xattr -dr com.apple.quarantine /Applications/FlacCompagnon.app
+            ```
+
+            (Alternatively: right-click the app → **Open** → **Open**, or allow it
+            from **System Settings → Privacy & Security**.)
+
+            **ffmpeg** is **not** bundled — install it separately for spectrograms
+            and DSD content analysis (macOS: `brew install ffmpeg`,
+            Debian/Ubuntu: `sudo apt install ffmpeg`, Windows: `choco install ffmpeg`).
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

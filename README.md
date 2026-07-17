@@ -46,6 +46,7 @@ Click **Generate spectrograms** to render a high-resolution spectrogram image fo
 
 - **Fake stereo** — detects "stereo" files that are really dual-mono (both channels identical).
 - **Clipping** — counts full-scale sample runs (each _event_ = ≥3 consecutive samples at 0 dBFS) and reports the peak level in dBFS. This flags an over-loud master; it is independent of whether the file is lossless.
+- **True peak** — a separate column reporting the **true peak in dBTP** (ITU-R BS.1770-style: the audio is 4×-oversampled through a 48-tap polyphase FIR, revealing **inter-sample peaks** — places where the waveform a DAC reconstructs overshoots full scale *between* stored samples). It is shown for every track, clipped or not: a track can read −0.6 dBTP with a perfectly clean sample-domain signal (safe headroom, no problem) or read −0.2 dBFS sample peak yet **+1 dBTP** true peak — an "inter-sample over" that the classic clipping counter never sees because no single stored sample hits full scale.
 - **Dynamics (DR)** — a DR-meter-style estimate of each track's dynamic range: the peak level against the RMS of the loudest 20% of ~3 s blocks (the crest factor of the loud passages). High values (≥ 12 dB, shown green) indicate a dynamic master such as a Full Dynamic Range edition; low values (< 8 dB, shown amber) betray a loudness-war master. Like clipping, this is independent of losslessness.
 
 ### 5. CSV export (on demand)
@@ -144,22 +145,15 @@ The installer/app bundle is written to `src-tauri/target/release/bundle/`.
 
 > **Cross-platform note:** native desktop apps are normally built **on** their target OS. Build the Windows app on Windows, the macOS app on macOS, and the Linux app on Linux. The easiest way to produce all three from one place is a CI matrix (e.g. GitHub Actions) that runs `npm run tauri build` on `windows-latest`, `macos-latest`, and `ubuntu-latest`.
 
-### App icons
-
-The app icon (a spectrum-bars-under-a-magnifier mark on a blue-to-purple gradient) ships in `src-tauri/icons/`. To replace it with your own artwork:
-
-```bash
-npm run tauri icon path/to/your-1024x1024.png
-```
-
 ---
 
 ## Continuous integration & releases
 
-Two GitHub Actions workflows are included:
+Four GitHub Actions workflows are included:
 
 - **CI** (`.github/workflows/ci.yml`) runs on every push and pull request: it runs the `core` test suite, type-checks and bundles the frontend, and compiles the whole Rust workspace on Linux. The badges at the top of this README reflect its status.
-- **Release** (`.github/workflows/release.yml`) builds installers for **macOS (Apple Silicon + Intel), Windows and Linux** and publishes them to a GitHub Release. It runs when you push a version tag:
+- **Docs** (`.github/workflows/docs.yml`) and **Site** (`.github/workflows/site.yml`) publish, respectively, the rustdoc API reference and the static landing page to the `gh-pages` branch (see [Documentation](#documentation-rustdoc) below for the one-time Pages setup).
+- **Release** (`.github/workflows/release.yml`) builds installers for **macOS (Apple Silicon), Windows and Linux** and publishes them to a GitHub Release. It runs when you push a version tag:
 
   ```bash
   git tag v0.1.0
@@ -167,6 +161,20 @@ Two GitHub Actions workflows are included:
   ```
 
 (or from the Actions tab via "Run workflow"). The release is created as a **draft** — review the attached installers, then publish it. Your downloads then live on the repository's **Releases** page. ffmpeg is not bundled; users install it themselves for the spectrogram feature.
+
+Each release carries, per platform: a macOS `.dmg` **and** an `.app.tar.gz` (the raw `.app`, just archived so it can be attached to the release), a Windows `.msi`/`.exe`, and a Linux `.AppImage`/`.deb`.
+
+### Installing on macOS (unsigned build)
+
+These builds are **not signed with an Apple Developer ID** (that needs a paid, $99/year Apple Developer account and notarization). macOS therefore quarantines the downloaded app and Gatekeeper reports that FlacCompagnon *"is damaged and can't be opened"* or that the developer *"cannot be verified"* — offering only to move it to the Trash. This is expected, not a corrupt download.
+
+To run it: drag **FlacCompagnon.app** into `/Applications`, then clear the quarantine flag once:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/FlacCompagnon.app
+```
+
+Alternatively, right-click the app → **Open** → **Open**, or approve it under **System Settings → Privacy & Security**. To remove the warning entirely, the app would need to be code-signed and notarized with an Apple Developer ID.
 
 ## Testing
 
@@ -221,7 +229,7 @@ FlacCompagnon opens every track **read-only** — it decodes samples to analyze 
 
 ## Roadmap ideas
 
-Easy future additions (the analyzer is modular): per-channel spectral analysis, DR (dynamic range) measurement, true-peak/inter-sample clipping, joint-stereo artifact detection, ReplayGain scanning, and a re-importable JSON report.
+Easy future additions (the analyzer is modular): per-channel spectral analysis, joint-stereo artifact detection, ReplayGain scanning, and a re-importable JSON report.
 
 ## References
 

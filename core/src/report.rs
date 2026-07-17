@@ -15,7 +15,7 @@ pub fn build_csv(report: &FolderReport) -> String {
     out.push_str(
         "file,format,badge,sample_rate,channels,declared_bits,real_bit_depth,duration_s,\
          status,upscaling,upsampling,transcoding,aac_grid,cutoff_hz,cutoff_ratio,fake_stereo,\
-         clipped,clip_events,peak_dbfs,dr_db,md5\n",
+         clipped,clip_events,peak_dbfs,true_peak_dbtp,dr_db,md5\n",
     );
     for f in &report.files {
         let md5 = f
@@ -35,7 +35,7 @@ pub fn build_csv(report: &FolderReport) -> String {
             TranscodeState::Detected => "detected",
         };
         out.push_str(&format!(
-            "{},{},{},{},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{},{:.2},{},{}\n",
+            "{},{},{},{},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{},{:.2},{:.2},{},{}\n",
             csv_escape(&f.file_name),
             f.format,
             f.badge.clone().unwrap_or_default(),
@@ -55,6 +55,7 @@ pub fn build_csv(report: &FolderReport) -> String {
             f.clipping.clipped,
             f.clipping.clip_events,
             f.clipping.peak_dbfs,
+            f.clipping.true_peak_dbtp,
             f.dr_db.map(|v| format!("{v:.1}")).unwrap_or_default(),
             md5,
         ));
@@ -118,6 +119,8 @@ mod tests {
                 clip_events: 0,
                 peak: 0.9,
                 peak_dbfs: -0.9,
+                true_peak: 0.92,
+                true_peak_dbtp: -0.7,
                 clipped: false,
             },
             dr_db: Some(12.3),

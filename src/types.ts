@@ -15,6 +15,8 @@ export interface ClippingInfo {
   clip_events: number;
   peak: number;
   peak_dbfs: number;
+  true_peak: number;
+  true_peak_dbtp: number;
   clipped: boolean;
 }
 
