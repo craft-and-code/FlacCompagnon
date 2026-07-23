@@ -25,6 +25,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+      # Fetch the self-hosted web fonts at deploy time, so the published site
+      # carries them (no external Google Fonts call for visitors) without the
+      # binary .woff2 files needing to be committed to the repo. If they are
+      # already committed, this simply refreshes them.
+      - name: Fetch self-hosted fonts
+        run: bash site/assets/fonts/fetch-fonts.sh
       - name: Publish site to gh-pages root
         uses: peaceiris/actions-gh-pages@v4
         with:
