@@ -159,6 +159,8 @@ function applyLang(l) {
   document.documentElement.lang = lang;
   $("#lang-fr").classList.toggle("on", lang === "fr");
   $("#lang-en").classList.toggle("on", lang === "en");
+  $("#lang-fr").setAttribute("aria-pressed", String(lang === "fr"));
+  $("#lang-en").setAttribute("aria-pressed", String(lang === "en"));
   specState.key = ""; // force spectrogram redraw (caption localization)
   try { localStorage.setItem("fc-lang", lang); } catch {}
 }
@@ -435,7 +437,9 @@ function drawSpec(c, ts) {
   ctx.fillStyle = "#c9cede"; ctx.fillText("96 kHz · 24 bit · stereo · FLAC", padL, h - 5 * s);
 }
 
-function frame(ts) {
+// Draw one frame at time `ts`. Split out from the loop so it can also be called
+// on demand (reduced-motion mode redraws on scroll/resize instead of looping).
+function renderFrame(ts) {
   try {
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     const k = INTENSITY / 6, t = T();
@@ -452,7 +456,49 @@ function frame(ts) {
   } catch (e) {
     /* never let a bad frame kill the animation loop */
   }
-  requestAnimationFrame(frame);
 }
-window.addEventListener("resize", () => { specState.key = ""; });
-requestAnimationFrame(frame);
+
+// Respect the user's "reduce motion" OS setting: no continuous animation loop.
+// The graphics still render (a single static frame, frozen time), and the
+// scroll-driven detection diagrams still update — but only in response to the
+// user's own scrolling/resizing, never on their own. drawBg and drawSpec are
+// called with a fixed timestamp so the background bars and the spectrogram do
+// not stream. Re-checked live via matchMedia so toggling the OS setting takes
+// effect without a reload.
+const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+function frame(ts) {
+  renderFrame(ts);
+  if (!motionQuery.matches) requestAnimationFrame(frame);
+}
+
+let staticScheduled = false;
+function renderStaticFrame() {
+  // Coalesce bursts of scroll events into one draw per animation frame.
+  if (staticScheduled) return;
+  staticScheduled = true;
+  requestAnimationFrame(() => {
+    staticScheduled = false;
+    renderFrame(0);
+  });
+}
+
+function startMotion() {
+  if (motionQuery.matches) {
+    renderFrame(0);
+    window.addEventListener("scroll", renderStaticFrame, { passive: true });
+  } else {
+    requestAnimationFrame(frame);
+  }
+}
+
+window.addEventListener("resize", () => {
+  specState.key = "";
+  if (motionQuery.matches) renderStaticFrame();
+});
+// If the OS setting changes while the page is open, switch modes live.
+motionQuery.addEventListener("change", () => {
+  window.removeEventListener("scroll", renderStaticFrame);
+  startMotion();
+});
+startMotion();

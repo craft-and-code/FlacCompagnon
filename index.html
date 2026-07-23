@@ -42,6 +42,8 @@
     <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png" />
     <link rel="apple-touch-icon" href="assets/favicon-180.png" />
+    <!-- Fonts are self-hosted (see @font-face in styles.css and
+         assets/fonts/). No external requests, no third-party calls. -->
     <link rel="stylesheet" href="styles.css" />
 
     <!-- Structured data: helps search engines show FlacCompagnon as a downloadable
@@ -70,24 +72,6 @@
         "softwareVersion": "0.5.0"
       }
     </script>
-    <!-- Fonts loaded non-render-blocking: the page shows instantly with system
-         fonts (see the CSS fallbacks) and Space Grotesk / IBM Plex Mono swap in
-         when available. A slow or blocked Google Fonts request never leaves the
-         page blank. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
-      media="print"
-      onload="this.media='all'"
-    />
-    <noscript>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
-      />
-    </noscript>
   </head>
   <body>
     <canvas id="bgc" aria-hidden="true"></canvas>
@@ -109,8 +93,8 @@
       </nav>
       <div class="nav-right">
         <div class="lang" role="group" aria-label="Language">
-          <button id="lang-en" type="button">EN</button>
-          <button id="lang-fr" type="button">FR</button>
+          <button id="lang-en" type="button" aria-pressed="false" aria-label="English">EN</button>
+          <button id="lang-fr" type="button" aria-pressed="true" aria-label="Français">FR</button>
         </div>
         <a class="btn btn-grad" href="#telecharger" data-i18n="nDl">Télécharger</a>
       </div>
@@ -212,21 +196,21 @@
             <span class="tag t-up">Upscaled</span>
             <h3 data-i18n="d1t">Upscaling — fausse résolution</h3>
             <p data-i18n="d1p"></p>
-            <canvas id="gUp" class="det-canvas"></canvas>
+            <canvas id="gUp" class="det-canvas" aria-hidden="true"></canvas>
             <p class="cap" data-i18n="d1cap"></p>
           </article>
           <article class="card det">
             <span class="tag t-ups">Upsampled</span>
             <h3 data-i18n="d2t">Upsampling — faux échantillonnage</h3>
             <p data-i18n="d2p"></p>
-            <canvas id="gWall" class="det-canvas"></canvas>
+            <canvas id="gWall" class="det-canvas" aria-hidden="true"></canvas>
             <p class="cap" data-i18n="d2cap"></p>
           </article>
           <article class="card det">
             <span class="tag t-tr">Transcoded</span>
             <h3 data-i18n="d3t">Transcoding — source lossy</h3>
             <p data-i18n="d3p"></p>
-            <canvas id="gGrid" class="det-canvas"></canvas>
+            <canvas id="gGrid" class="det-canvas" aria-hidden="true"></canvas>
             <p class="cap" data-i18n="d3cap"></p>
           </article>
         </div>
@@ -276,7 +260,7 @@
             <p class="note-inline" data-i18n="s4n1"></p>
             <p class="note-inline" data-i18n-html="s4n2"></p>
           </div>
-          <canvas id="gSpec" class="spec-canvas"></canvas>
+          <canvas id="gSpec" class="spec-canvas" aria-hidden="true"></canvas>
         </div>
       </section>
 
