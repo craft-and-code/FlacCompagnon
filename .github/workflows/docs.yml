@@ -12,6 +12,15 @@ name: Docs
 on:
   push:
     branches: [main, master]
+    # Only rebuild the API docs when the documented code (or this workflow)
+    # changes. Without this, a site-only commit would trigger both Docs and
+    # Site, each pushing to gh-pages — the two resulting Pages builds then race
+    # and cancel each other (harmless, but noisy red annotations).
+    paths:
+      - "core/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/docs.yml"
   workflow_dispatch:
 
 permissions:
