@@ -2,7 +2,12 @@
 
 [![CI](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/ci.yml/badge.svg)](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/ci.yml)
 [![Release](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/release.yml/badge.svg)](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/release.yml)
-[![Docs](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/docs.yml/badge.svg)](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/docs.yml)
+[![Deploy to GitHub Pages](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/site.yml/badge.svg)](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/site.yml)
+
+[![Site: GitHub Pages](https://img.shields.io/badge/site-GitHub%20Pages-4b82f0?logo=github&logoColor=white)](https://craft-and-code.github.io/FlacCompagnon/)
+[![Docs: rustdoc](https://img.shields.io/badge/docs-rustdoc-7b4ff0?logo=rust&logoColor=white)](https://craft-and-code.github.io/FlacCompagnon/doc/)
+[![Latest release](https://img.shields.io/github/v/release/craft-and-code/FlacCompagnon?label=download&color=3ecf8e&logo=github)](https://github.com/craft-and-code/FlacCompagnon/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
 **A cross-platform desktop tool that checks whether your "lossless" audio is actually lossless.**
 
@@ -97,11 +102,11 @@ These mirror the three tests described by the authors of the original Lossless A
 
 **Transcoding (lossy source).** Three signatures, from strongest to weakest:
 
-1. _AAC re-quantization grid (the LAC method)_ — an AAC encoder quantizes MDCT coefficients per scale-factor band on the grid `|X| = n^(4/3)·Δ`, and decoding to PCM preserves that structure. FlacCompagnon re-analyzes the audio with AAC's own transform (2048-sample MDCT, both sine and KBD window shapes), sweeping **all 1024 possible frame alignments at one-sample resolution**: only the encoder's exact alignment makes the coefficients snap back onto the quantization grid, and a single sample of misalignment destroys the effect. The fraction of on-grid bands at the best alignment is near-conclusive evidence. Measured on real AAC→FLAC transcodes (16-bit chain) it reaches **0.70–0.97 at every bitrate, including 256 kbps**, while genuine music never exceeded **0.014** at any of the 1024 alignments. This is the only signature able to catch high-bitrate AAC, which keeps the full audio bandwidth. Runs at 44.1/48 kHz (the rates covered by the AAC scale-factor band table, per the LAC paper).
+1. _AAC re-quantization grid (the LAC method, per Derrien's 2019 JAES paper)_ — an AAC encoder quantizes MDCT coefficients per scale-factor band on the grid `|X| = n^(4/3)·Δ`, and decoding to PCM preserves that structure. FlacCompagnon re-analyzes the audio with AAC's own transform (2048-sample MDCT, both sine and KBD window shapes, all four channel representations L/R/M/S), sweeping **all 1024 possible frame alignments at one-sample resolution**: only the encoder's exact alignment makes the coefficients snap back onto the quantization grid, and a single sample of misalignment destroys the effect. For each band the detector sweeps 16 candidate scalefactors across the paper's dead-zone window (δ ∈ [0.3, 0.7] of `φdz = 16/3 + 4·log₂(max|X|)`) and applies the statistical criterion `E(s) < τ(s)` — the rounding-error energy against the threshold derived from the Gaussian model of uniform quantization noise (eq. 8, P = 0.005) — plus a scale-free fallback estimator for coarse grids. The file's score is the **3rd-highest per-frame likelihood** over the 16 most energetic frames at the best alignment (a transcode repeats at its onset in every frame; genuine flukes don't). Calibrated on real AAC→FLAC transcodes (16-bit chain) at **128/192/256/320 kbps**: transcodes score **0.28–1.0**, genuine material stays **≤ 0.23** even on pathological synthetic signals (≤ 0.15 on realistic material); the λ = 0.25 threshold yielded **zero false positives and 22/24 recall** — the two misses being extremely bright, transient-dense content at ≥ 256 kbps, which would need short-window (128-sample MDCT) analysis, a documented future improvement. This is the only signature able to catch high-bitrate AAC, which keeps the full audio bandwidth. Runs at 44.1/48 kHz (the rates covered by the AAC scale-factor band table, per the papers).
 2. _AAC dead zone (MDCT domain)_ — at low-to-mid bitrates the encoder zeroes whole high-frequency coefficient bands, leaving a flat, sharply-bounded dead zone in the MDCT domain that survives the decode. Catches ~128–192 kbps AAC cheaply.
 3. _Spectral brick-wall_ — a sharp cut-off well below Nyquist that drops into a flat, low "dead zone" is characteristic of an MP3/AAC low-pass (≈16 kHz at 128 kbps, ≈19 kHz at 192, ≈20 kHz at 320). A gentle roll-off with no cliff is reported only as _Transcoded?_ (suspected), because it can also be natural.
 
-The re-quantization hit-rate is exported in the CSV as the `aac_grid` column (empty when the check did not run).
+The re-quantization likelihood is exported in the CSV as the `aac_grid` column (empty when the check did not run).
 
 **DSD authenticity (fake-DSD detection).** DSF/DFF headers are parsed natively (magic bytes, 1-bit rate → DSD64/128/256, channels, DST flag) — that authenticates the container exactly. The content check decodes the stream through ffmpeg and looks for a *digital brick wall* at a PCM source's Nyquist frequency: genuine DSD blends smoothly into the sigma-delta noise shaping (measured ≈ 3 dB step across 22.05 kHz on ground-truth files synthesized with a delta-sigma modulator), while DSD converted from 44.1/48 kHz PCM shows a ≈ 50 dB cliff there. A drop ≥ 30 dB flags the file as **Upsampled** (PCM-sourced DSD).
 
@@ -167,7 +172,16 @@ Four GitHub Actions workflows are included:
 
 (or from the Actions tab via "Run workflow"). The release is created as a **draft** — review the attached installers, then publish it. Your downloads then live on the repository's **Releases** page. ffmpeg is not bundled; users install it themselves for the spectrogram feature.
 
-Each release carries, per platform: a macOS `.dmg` **and** an `.app.tar.gz` (the raw `.app`, just archived so it can be attached to the release), a Windows `.msi`/`.exe`, and a Linux `.AppImage`/`.deb`.
+**Every artifact name ends with its platform**, so there is no guessing on the Releases page:
+
+| Your system | File to download |
+| --- | --- |
+| Windows 10/11 (64-bit) | `FlacCompagnon_<version>_Windows-x64.msi` |
+| macOS (Apple Silicon) | `FlacCompagnon_<version>_macOS-AppleSilicon.dmg` |
+| Linux (any distro, 64-bit) | `FlacCompagnon_<version>_Linux-x86_64.AppImage` |
+| Linux (Debian / Ubuntu) | `FlacCompagnon_<version>_Linux-x86_64.deb` |
+
+The macOS `.app.tar.gz` is the same application as the `.dmg`, just archived. The release workflow builds with `tauri-action`, renames each artifact with its platform label, then uploads the set as a **draft** release.
 
 ### Installing on macOS (unsigned build)
 
@@ -227,7 +241,7 @@ FlacCompagnon opens every track **read-only** — it decodes samples to analyze 
 ## Limitations & notes
 
 - The spectral detections are **heuristics** (as in the original). See [Detection algorithms](#detection-algorithms) — in particular, naturally dark/acoustic recordings can read as _Upsampled_ or _Transcoded?_; always sanity-check with the spectrogram. The AAC re-quantization detection, in contrast, is close to a proof: it requires the audio to snap onto AAC's exact quantization grid at a synchronized frame alignment, which genuine audio essentially never does.
-- **AAC transcode detection covers all bitrates at 44.1/48 kHz** (validated on real 128/192/256 kbps AAC→FLAC transcodes against their originals). **MP3 sources** are still only caught through the spectral brick-wall signature, so high-bitrate MP3 (320 kbps) can pass — MP3 uses a different filterbank (hybrid PQMF + 576-point MDCT) and would need its own re-quantization detector.
+- **AAC transcode detection covers all bitrates at 44.1/48 kHz** (validated on real 128/192/256/320 kbps AAC→FLAC transcodes against their originals; zero false positives, 22/24 recall — the misses being very bright, transient-dense content at ≥ 256 kbps, which would need short-window MDCT analysis). **MP3 sources** are still only caught through the spectral brick-wall signature, so high-bitrate MP3 (320 kbps) can pass — MP3 uses a different filterbank (hybrid PQMF + 576-point MDCT) and would need its own re-quantization detector.
 - Effective bit-depth reconstruction is exact for ≤ 24-bit integer sources.
 - FLAC files are decoded **once**: a fused pass feeds the analysis and hashes the MD5 from the same raw integer samples (bit-identical to `flac -t`), so MD5 verification adds only a negligible hashing cost on top of the analysis.
 - Files are analyzed **in parallel**: a worker pool sized to the machine (one worker per CPU core, minus one to keep the UI responsive) processes independent files concurrently, so analyzing an album scales with your core count.
@@ -238,8 +252,8 @@ Easy future additions (the analyzer is modular): per-channel spectral analysis, 
 
 ## References
 
-- J. Lacroix, Y. Prime, A. Remy & O. Derrien, _Lossless Audio Checker: A Software for the Detection of Upscaling, Upsampling, and Transcoding in Lossless Musical Tracks_, AES 139th Convention, Paper 9416, New York, 2015 (AES e-Library #17972). The re-quantization transcoding detection implemented here follows the method described in this paper.
-- O. Derrien et al., _Detection of Genuine Lossless Audio Files: Application to the MPEG-AAC Codec_, Journal of the AES, 2019.
+- J. Lacroix, Y. Prime, A. Remy & O. Derrien, _Lossless Audio Checker: A Software for the Detection of Upscaling, Upsampling, and Transcoding in Lossless Musical Tracks_, AES 139th Convention, Paper 9416, New York, 2015 — [AES e-Library #17972](https://aes.org/publications/elibrary-page/?id=17972).
+- O. Derrien, _Detection of Genuine Lossless Audio Files: Application to the MPEG-AAC Codec_, J. Audio Eng. Soc., vol. 67, no. 3, pp. 116–123, 2019 — [AES e-Library #19892](https://aes.org/publications/elibrary-page/?id=19892), [open-access preprint on HAL](https://hal.science/hal-02055742). The re-quantization transcoding detection implemented here follows the method described in this paper (scalefactor sweep, statistical E(s) < τ(s) criterion, offset/window/channel search).
 - Original project (discontinued): losslessaudiochecker.com; GUI source: <https://github.com/emps/Lossless-Audio-Checker-GUI> (GPL-2.0).
 
 ## License

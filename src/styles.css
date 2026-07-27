@@ -17,10 +17,14 @@
   --ok: #12a06a;
   --bad: #dc2626;
   --warn: #b7790c;
+  --mid: #c56a1a; /* medium severity (clipping) */
+  /* One colour per detection, in increasing order of severity:
+     amber (the container lies about bit depth) -> orange (it lies about the
+     sample rate) -> red (the audio itself was destroyed by a lossy codec). */
   --clean: #12a06a;
-  --upsampled: #b7790c;
+  --upscaled: #b7790c;
+  --upsampled: #c56a1a;
   --transcoded: #dc2626;
-  --suspicious: #c56a1a;
   --unknown: #616a7d;
   --shadow: rgba(20, 30, 50, 0.14);
   --row-hover: #e4eaf5;
@@ -42,10 +46,11 @@
     --ok: #3ecf8e;
     --bad: #ef5b6a;
     --warn: #f0b849;
+    --mid: #e08b3b;
     --clean: #3ecf8e;
-    --upsampled: #f0b849;
+    --upscaled: #f0b849;
+    --upsampled: #e08b3b;
     --transcoded: #ef5b6a;
-    --suspicious: #e08b3b;
     --unknown: #8b93a7;
     --shadow: rgba(0, 0, 0, 0.5);
     --row-hover: #2d3342;
@@ -70,10 +75,11 @@
   --ok: #3ecf8e;
   --bad: #ef5b6a;
   --warn: #f0b849;
+  --mid: #e08b3b;
   --clean: #3ecf8e;
-  --upsampled: #f0b849;
+  --upscaled: #f0b849;
+  --upsampled: #e08b3b;
   --transcoded: #ef5b6a;
-  --suspicious: #e08b3b;
   --unknown: #8b93a7;
   --shadow: rgba(0, 0, 0, 0.5);
   --row-hover: #2d3342;
@@ -202,10 +208,14 @@ html, body {
   background: var(--bg-elev2);
   border: 1px solid var(--border);
 }
+/* Summary chips use the same per-detection colours as the row tags. */
 .chip.v-clean { color: var(--clean); }
+.chip.v-upscaled { color: var(--upscaled); }
 .chip.v-upsampled { color: var(--upsampled); }
 .chip.v-transcoded { color: var(--transcoded); }
-.chip.v-suspicious { color: var(--suspicious); }
+.chip.v-suspected { color: var(--transcoded); }
+.chip.v-bad { color: var(--bad); }
+.chip.v-muted { color: var(--muted); }
 .results-meta { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 45%; }
 
 .table-wrap {
@@ -269,20 +279,7 @@ td.rowdel { width: 32px; padding: 4px 10px 4px 4px; text-align: center; }
   background: color-mix(in srgb, var(--bad) 12%, transparent);
 }
 
-.verdict {
-  padding: 2px 9px;
-  border-radius: 6px;
-  font-weight: 600;
-  font-size: 11.5px;
-  cursor: help;
-  background: var(--bg-elev2);
-  border: 1px solid var(--border);
-}
-.verdict.v-clean { color: var(--clean); }
-.verdict.v-upsampled { color: var(--upsampled); }
-.verdict.v-transcoded { color: var(--transcoded); }
-.verdict.v-suspicious { color: var(--suspicious); }
-.verdict.v-unknown { color: var(--unknown); }
+/* (The old single-verdict cell was replaced by the per-detection tags below.) */
 
 /* Detections column: one or more small tags */
 td.detections { white-space: normal; min-width: 130px; }
@@ -297,15 +294,16 @@ td.detections { white-space: normal; min-width: 130px; }
   background: var(--bg-elev2);
   cursor: help;
 }
-/* One distinct colour per detection, matching the landing-page badges:
-   Upscaled = red, Upsampled = amber, Transcoded = orange, Clean = green.
-   The theme-aware variables already hold those exact hues in dark mode and
-   legible equivalents in light mode. */
-.tag.t-ok  { color: var(--clean);      background: color-mix(in srgb, var(--clean) 14%, transparent);      border-color: color-mix(in srgb, var(--clean) 42%, transparent); }
-.tag.t-up  { color: var(--transcoded); background: color-mix(in srgb, var(--transcoded) 14%, transparent); border-color: color-mix(in srgb, var(--transcoded) 42%, transparent); }
-.tag.t-ups { color: var(--upsampled);  background: color-mix(in srgb, var(--upsampled) 14%, transparent);  border-color: color-mix(in srgb, var(--upsampled) 42%, transparent); }
-.tag.t-tr  { color: var(--suspicious); background: color-mix(in srgb, var(--suspicious) 14%, transparent); border-color: color-mix(in srgb, var(--suspicious) 42%, transparent); }
-.tag.t-sus { color: var(--suspicious); background: color-mix(in srgb, var(--suspicious) 9%, transparent);  border-color: color-mix(in srgb, var(--suspicious) 30%, transparent); }
+/* One colour per detection, identical to the landing page and ordered by
+   severity: Clean = green, Upscaled = amber, Upsampled = orange,
+   Transcoded = red. "Transcoded?" (suspected) reuses the transcoded hue with a
+   fainter fill — same family, weaker claim. Colours come from the theme
+   variables, so light mode gets legible equivalents automatically. */
+.tag.t-clean       { color: var(--clean);      background: color-mix(in srgb, var(--clean) 14%, transparent);      border-color: color-mix(in srgb, var(--clean) 42%, transparent); }
+.tag.t-upscaled    { color: var(--upscaled);   background: color-mix(in srgb, var(--upscaled) 14%, transparent);   border-color: color-mix(in srgb, var(--upscaled) 42%, transparent); }
+.tag.t-upsampled   { color: var(--upsampled);  background: color-mix(in srgb, var(--upsampled) 14%, transparent);  border-color: color-mix(in srgb, var(--upsampled) 42%, transparent); }
+.tag.t-transcoded  { color: var(--transcoded); background: color-mix(in srgb, var(--transcoded) 14%, transparent); border-color: color-mix(in srgb, var(--transcoded) 42%, transparent); }
+.tag.t-suspected   { color: var(--transcoded); background: color-mix(in srgb, var(--transcoded) 8%, transparent);  border-color: color-mix(in srgb, var(--transcoded) 28%, transparent); }
 
 /* Any cell/element that carries an explanatory tooltip */
 .has-tip { cursor: help; }
@@ -335,7 +333,7 @@ td.detections { white-space: normal; min-width: 130px; }
 
 .c-ok { color: var(--ok); font-weight: 600; }
 .c-bad { color: var(--bad); font-weight: 600; }
-.c-mid { color: var(--suspicious); font-weight: 600; }
+.c-mid { color: var(--mid); font-weight: 600; }
 .c-warn { color: var(--warn); }
 .c-muted { color: var(--muted); }
 

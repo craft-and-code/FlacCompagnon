@@ -24,10 +24,13 @@ jobs:
         include:
           - platform: macos-latest
             args: "--target aarch64-apple-darwin"
+            label: macOS-AppleSilicon
           - platform: ubuntu-22.04
             args: ""
+            label: Linux-x86_64
           - platform: windows-latest
             args: ""
+            label: Windows-x64
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -62,21 +65,69 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
-      - name: Build the app and publish the release
+      # Build only — the artifacts are renamed below so every download says
+      # which OS it is for, then uploaded in a separate step.
+      - name: Build the app
+        id: build
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "FlacCompagnon ${{ github.ref_name }}"
-          releaseBody: |
-            Cross-platform builds of FlacCompagnon.
+          args: ${{ matrix.args }}
 
-            **Downloads**
-            - **macOS (Apple Silicon):** the `.dmg` installer, or the `.app.tar.gz`
-              (the raw app, same thing archived).
-            - **Windows:** the `.msi` (or `.exe`) installer.
-            - **Linux:** the `.AppImage` or `.deb`.
+      # Rename every produced installer to <name>_<version>_<Platform>.<ext>
+      # (e.g. FlacCompagnon_0.5.0_Windows-x64.msi) so the Releases page is
+      # unambiguous. tauri-action reports the built files in `artifactPaths`.
+      - name: Rename artifacts with the platform label
+        id: rename
+        shell: bash
+        run: |
+          mkdir -p dist-release
+          # artifactPaths is a JSON array of absolute paths.
+          echo '${{ steps.build.outputs.artifactPaths }}' > paths.json
+          python3 - <<'EOF'
+          import json, os, re, shutil, pathlib
+          paths = json.load(open("paths.json"))
+          label = os.environ["LABEL"]
+          out = pathlib.Path("dist-release"); out.mkdir(exist_ok=True)
+          for p in paths:
+              src = pathlib.Path(p)
+              if not src.exists():
+                  continue
+              name = src.name
+              # Split off the (possibly double) extension: .app.tar.gz, .tar.gz.sig...
+              m = re.match(r"^(?P<stem>.+?)(?P<ext>(\.app)?(\.tar\.gz(\.sig)?|\.[A-Za-z0-9]+))$", name)
+              stem, ext = (m.group("stem"), m.group("ext")) if m else (src.stem, src.suffix)
+              # Drop the arch/locale noise Tauri adds; the label already says it.
+              stem = re.sub(r"[_-](aarch64|x64|x86_64|amd64)([_-](en-US|setup))?$", "", stem)
+              dest = out / f"{stem}_{label}{ext}"
+              shutil.copy2(src, dest)
+              print("renamed:", src.name, "->", dest.name)
+          EOF
+        env:
+          LABEL: ${{ matrix.label }}
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "FlacCompagnon ${{ github.ref_name }}"
+          draft: true
+          prerelease: false
+          files: dist-release/*
+          body: |
+            Cross-platform builds of FlacCompagnon. **Every file name ends with
+            its platform**, so pick the one that matches your system:
+
+            | Your system | Download |
+            | --- | --- |
+            | **Windows** (10/11, 64-bit) | `..._Windows-x64.msi` — the installer |
+            | **macOS** (Apple Silicon: M1/M2/M3/M4) | `..._macOS-AppleSilicon.dmg` — the installer |
+            | **Linux** (any distro, 64-bit) | `..._Linux-x86_64.AppImage` — portable, just make it executable |
+            | **Linux** (Debian / Ubuntu) | `..._Linux-x86_64.deb` — system package |
+
+            The macOS `.app.tar.gz` is the same app as the `.dmg`, just archived —
+            use the `.dmg` unless you specifically want the raw bundle.
 
             **macOS — first launch.** These builds are **not signed with an Apple
             Developer ID**, so Gatekeeper will say the app "is damaged" or "cannot
@@ -94,6 +145,3 @@ jobs:
             **ffmpeg** is **not** bundled — install it separately for spectrograms
             and DSD content analysis (macOS: `brew install ffmpeg`,
             Debian/Ubuntu: `sudo apt install ffmpeg`, Windows: `choco install ffmpeg`).
-          releaseDraft: true
-          prerelease: false
-          args: ${{ matrix.args }}

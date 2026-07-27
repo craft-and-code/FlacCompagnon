@@ -96,8 +96,9 @@ pub fn classify(
     let ratio = summary.cutoff_ratio;
     let brick = stft_brickwall(summary);
     let mdct_dead = mdct_signature(summary);
-    // The re-quantization grid is near-conclusive evidence of an AAC source
-    // (measured: genuine ≤ 0.014 over all onsets, real transcodes ≥ 0.70).
+    // The re-quantization likelihood is near-conclusive evidence of an AAC
+    // source (calibrated: genuine ≤ 0.23 even on pathological synthetics,
+    // real transcodes ≥ 0.28 across 128–320 kbps; λ = DETECT_RATE = 0.25).
     let requant = summary
         .requant_rate
         .map(|r| r >= crate::requant::DETECT_RATE)
@@ -268,7 +269,7 @@ mod tests {
     #[test]
     fn low_requant_rate_does_not_flag() {
         let mut s = summ(21500.0, 44100, 3.0, -70.0, None);
-        s.requant_rate = Some(0.02); // genuine files measure ≤ ~0.014
+        s.requant_rate = Some(0.15); // genuine files stay below λ = 0.25
         let d = classify(&s, 44100, Some(16), Some(16));
         assert_eq!(d.transcoding, TranscodeState::None);
     }

@@ -1,9 +1,9 @@
 //! End-to-end validation of the AAC re-quantization detector against a "toy
 //! codec": MDCT (KBD window) → per-band quantization on the exact AAC grid
 //! (`|X| = n^(4/3)·Δ`) → IMDCT + overlap-add. Re-analyzing that signal must
-//! reveal the grid at onset 0; genuine noise must stay far below the detection
-//! threshold. This mirrors the Python study used to calibrate the thresholds
-//! (real ffmpeg transcodes scored 0.70–0.97; genuine audio ≤ 0.014).
+//! reveal the grid at onset 0; genuine noise must stay below the detection
+//! threshold λ. Validated against a bit-exact Python replica of the detector
+//! (toy transcode → likelihood 1.0 at onset 0; genuine noise → ≈ 0.10).
 
 use flaccompagnon_core::requant::{analyze_segment, kbd_window, Mdct, DETECT_RATE, L, N, SEGMENT_LEN, SWB_4448};
 

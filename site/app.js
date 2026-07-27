@@ -29,7 +29,7 @@ const DICT = {
     d2cap: "Le mur du cut-off à 22,05 kHz",
     d3t: "Transcoding — source lossy",
     d3p: "La signature la plus forte. FlacCompagnon rejoue le calcul interne de l'encodeur AAC : si le fichier est un transcode, ses coefficients « retombent » exactement sur la grille de valeurs que seul l'AAC produit, au bon alignement parmi 1024 essais. Ça démasque l'AAC à tous les débits, même 256 kbps.",
-    d3tip: "Marqué Transcoded : 70–97 % des bandes retombent sur la grille de quantification AAC au meilleur alignement — la musique authentique ne dépasse jamais 1,4 %.",
+    d3tip: "Marqué Transcoded : au meilleur alignement, les bandes retombent de façon répétée sur la grille de quantification AAC (transcodes mesurés : 28–100 % des bandes, musique authentique ≤ 23 %).",
     d3cap: "Les coefficients « snappent » sur la grille AAC",
     s3k: "Intégrité", s3t: "Au-delà des détections",
     s3p: "Six contrôles et fonctions complètent l'analyse.",
@@ -97,7 +97,7 @@ const DICT = {
     d2cap: "The cut-off wall at 22.05 kHz",
     d3t: "Transcoding — lossy source",
     d3p: "The strongest signature. FlacCompagnon replays the AAC encoder's own internal computation: if the file is a transcode, its coefficients land back exactly on the grid of values only AAC produces, at the right alignment out of 1024 tries. It exposes AAC at every bitrate, even 256 kbps.",
-    d3tip: "Flagged Transcoded: 70–97% of bands land on AAC's quantization grid at the best alignment — genuine music never exceeds 1.4%.",
+    d3tip: "Flagged Transcoded: at the best alignment, bands repeatedly land on AAC's quantization grid (measured transcodes: 28–100% of bands, genuine music ≤ 23%).",
     d3cap: "Coefficients snapping onto the AAC grid",
     s3k: "Integrity", s3t: "Beyond the detections",
     s3p: "Six checks and features round out the analysis.",
@@ -213,9 +213,23 @@ function sizeCanvas(c, dpr) {
   if (c.width !== w || c.height !== h) { c.width = w; c.height = h; return true; }
   return false;
 }
+/// Distance below the sticky nav at which a scroll-driven animation is fully
+/// played out — so a card's badge only has to clear the menu by this much,
+/// instead of having to travel up to a quarter of the viewport.
+const ANIM_DONE_BELOW_NAV = 100;
+let navEl = null;
+
 function progress(c) {
-  const r = c.getBoundingClientRect(), vh = window.innerHeight;
-  return Math.max(0, Math.min(1, (vh * 0.88 - r.top) / (vh * 0.62)));
+  // Measure the whole card when there is one: the animation should finish
+  // when the *badge* (at the card's top) clears the nav, not when the canvas
+  // — which sits further down the card — does.
+  const el = c.closest(".card") || c;
+  const r = el.getBoundingClientRect(), vh = window.innerHeight;
+  if (!navEl) navEl = document.querySelector(".nav");
+  const end = (navEl ? navEl.offsetHeight : 64) + ANIM_DONE_BELOW_NAV;
+  const start = vh * 0.88; // starts as the card enters from the bottom
+  if (start <= end) return r.top <= end ? 1 : 0; // very short viewport
+  return Math.max(0, Math.min(1, (start - r.top) / (start - end)));
 }
 function visible(c) {
   const r = c.getBoundingClientRect();

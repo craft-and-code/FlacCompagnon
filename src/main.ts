@@ -159,12 +159,13 @@ function renderReport(report: FolderReport) {
 
   const chips = [
     cClean ? `<span class="chip v-clean">${cClean} clean</span>` : "",
-    cUpscaled ? `<span class="chip v-transcoded">${cUpscaled} upscaled</span>` : "",
+    cUpscaled ? `<span class="chip v-upscaled">${cUpscaled} upscaled</span>` : "",
     cUpsampled ? `<span class="chip v-upsampled">${cUpsampled} upsampled</span>` : "",
     cTranscoded ? `<span class="chip v-transcoded">${cTranscoded} transcoded</span>` : "",
-    cSuspicious ? `<span class="chip v-suspicious">${cSuspicious} suspicious</span>` : "",
-    report.has_flac && md5Bad ? `<span class="chip v-transcoded">${md5Bad} MD5 mismatch</span>` : "",
-    report.has_flac && md5Missing ? `<span class="chip v-suspicious">${md5Missing} no MD5</span>` : "",
+    cSuspicious ? `<span class="chip v-suspected">${cSuspicious} suspicious</span>` : "",
+    report.has_flac && md5Bad ? `<span class="chip v-bad">${md5Bad} MD5 mismatch</span>` : "",
+    // A missing signature is not an error, just missing information.
+    report.has_flac && md5Missing ? `<span class="chip v-muted">${md5Missing} no MD5</span>` : "",
   ]
     .filter(Boolean)
     .join(" ");

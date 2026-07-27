@@ -48,15 +48,17 @@ export function deleteBtn(path: string): string {
 }
 
 export function detectionsTd(d: Detections): string {
+  // Ordered least to most severe — the container's bit depth, then its sample
+  // rate, then the audio itself — matching the colour ramp amber/orange/red.
   const tags: string[] = [];
-  if (d.upscaling) tags.push(`<span class="tag t-up">Upscaled</span>`);
-  if (d.upsampling) tags.push(`<span class="tag t-ups">Upsampled</span>`);
+  if (d.upscaling) tags.push(`<span class="tag t-upscaled">Upscaled</span>`);
+  if (d.upsampling) tags.push(`<span class="tag t-upsampled">Upsampled</span>`);
   if (d.transcoding === "detected") {
-    tags.push(`<span class="tag t-tr">Transcoded</span>`);
+    tags.push(`<span class="tag t-transcoded">Transcoded</span>`);
   } else if (d.transcoding === "suspected") {
-    tags.push(`<span class="tag t-sus">Transcoded?</span>`);
+    tags.push(`<span class="tag t-suspected">Transcoded?</span>`);
   }
-  if (tags.length === 0) tags.push(`<span class="tag t-ok">Clean</span>`);
+  if (tags.length === 0) tags.push(`<span class="tag t-clean">Clean</span>`);
   return `<td class="detections" title="${escapeHtml(d.detail)}">${tags.join(" ")}</td>`;
 }
 
