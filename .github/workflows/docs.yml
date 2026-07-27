@@ -26,6 +26,13 @@ on:
 permissions:
   contents: write # needed to push to the gh-pages branch
 
+# Shared with the Site workflow: both push to gh-pages (this one into doc/, the
+# other into the root), so they must never run at the same time or one push
+# would land on a stale checkout of the branch and clobber the other's files.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   docs:
     runs-on: ubuntu-22.04
