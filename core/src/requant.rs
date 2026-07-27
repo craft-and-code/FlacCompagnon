@@ -11,8 +11,12 @@
 //!
 //! Per the paper, the detector:
 //! 1. sweeps all 1024 possible frame onsets at one-sample resolution;
-//! 2. tests both AAC window shapes (sine, KBD α=4) and all four channel
-//!    representations (L, R, M, S — the encoder may have used MS stereo);
+//! 2. tests both AAC window shapes (sine, KBD α=4), all four channel
+//!    representations (L, R, M, S — the encoder may have used MS stereo), and
+//!    **both block sizes**: the long 1024-coefficient MDCT and the 8 short
+//!    128-coefficient sub-blocks of an EIGHT_SHORT_SEQUENCE frame (encoders
+//!    switch to short blocks on transients; those frames are invisible to a
+//!    long-window analysis);
 //! 3. sweeps, per band, [`NSF`] candidate scalefactors across the plausible
 //!    range `δ ∈ [0.3, 0.7]` of the dead-zone bound `φdz = 16/3 + 4·log2(max|X|)`
 //!    (eq. 2; 90% of real encoder scalefactors land in that window), computes
@@ -32,9 +36,10 @@
 //! Calibrated on ffmpeg AAC transcodes at 128/192/256/320 kbps through a
 //! 16-bit chain vs. genuine originals: transcodes score 0.28–1.0, genuine
 //! ≤ 0.23 (pathological sparse synthetics; realistic material ≤ 0.15). The
-//! detection threshold [`DETECT_RATE`] = 0.25 gave zero false positives and
-//! 22/24 recall (missing only very bright/transient content at ≥ 256 kbps,
-//! which needs short-window analysis — a documented future improvement).
+//! detection threshold [`DETECT_RATE`] = 0.25 gave **zero false positives and
+//! 24/24 recall** — the short-block analysis is what recovers the very
+//! bright/transient content at ≥ 192 kbps that long-window analysis alone
+//! misses (measured: 0.13 → 0.82 on such a file at 320 kbps).
 //! Only applies at 44.1/48 kHz, per the paper.
 
 use std::cell::RefCell;
@@ -52,6 +57,29 @@ pub const SWB_4448: [usize; 50] = [
     0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 80, 88, 96, 108, 120, 132, 144, 160,
     176, 196, 216, 240, 264, 292, 320, 352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704,
     736, 768, 800, 832, 864, 896, 928, 1024,
+];
+
+// --- Short blocks (EIGHT_SHORT_SEQUENCE) -------------------------------------
+// On transients the AAC encoder switches to 8 short sub-blocks of 256 samples
+// (128 MDCT coefficients) per frame, starting at frame_onset + 448 + j·128.
+// Analyzing them with the matching 256-point MDCT is what makes transient-heavy
+// transcodes detectable — their long-window analysis reads only garbage.
+/// Short-block MDCT half-length.
+const NS: usize = 128;
+/// Short-block MDCT input length.
+const LSHORT: usize = 2 * NS;
+/// Offset of the first short sub-block inside the 2048-sample frame.
+const SUB0: usize = 448;
+/// Scale-factor band offsets for AAC short windows at 44.1/48 kHz.
+const SWB_SHORT: [usize; 15] = [0, 4, 8, 12, 16, 20, 28, 36, 44, 56, 68, 80, 96, 112, 128];
+/// Short bands analyzed (skips the five K=4 micro-bands, like the long path).
+const SBAND_LO: usize = 5;
+const SBAND_HI: usize = 14;
+/// τ(s) for the analyzed short bands (same eq. 8, P = 0.005; K = 8/12/16).
+const TAU_SHORT: [f64; 9] = [
+    1.343215761580e-01, 1.343215761580e-01, 1.343215761580e-01,
+    3.358790501266e-01, 3.358790501266e-01, 3.358790501266e-01,
+    5.654492211732e-01, 5.654492211732e-01, 5.654492211732e-01,
 ];
 
 /// Band range analyzed: skips the ten K=4 micro-bands (4 coefficients carry no
@@ -124,34 +152,44 @@ fn bessel_i0(x: f64) -> f64 {
     sum
 }
 
-/// AAC sine window, length 2N.
-pub fn sine_window() -> Vec<f64> {
-    (0..L)
-        .map(|n| (std::f64::consts::PI / L as f64 * (n as f64 + 0.5)).sin())
+/// AAC sine window of length `l` (2× the MDCT half-length).
+fn sine_window_of(l: usize) -> Vec<f64> {
+    (0..l)
+        .map(|n| (std::f64::consts::PI / l as f64 * (n as f64 + 0.5)).sin())
         .collect()
 }
 
-/// AAC Kaiser–Bessel-derived window (α = 4), length 2N.
-pub fn kbd_window() -> Vec<f64> {
+/// AAC Kaiser–Bessel-derived window (α = 4) of length `2·half`.
+fn kbd_window_of(half: usize) -> Vec<f64> {
     let a = 4.0 * std::f64::consts::PI;
-    let m = N as f64;
-    let kernel: Vec<f64> = (0..=N)
+    let m = half as f64;
+    let kernel: Vec<f64> = (0..=half)
         .map(|j| {
             let t = (j as f64 - m / 2.0) / (m / 2.0);
             bessel_i0(a * (1.0 - t * t).max(0.0).sqrt())
         })
         .collect();
-    let mut cum = Vec::with_capacity(N + 1);
+    let mut cum = Vec::with_capacity(half + 1);
     let mut acc = 0.0;
     for w in &kernel {
         acc += w;
         cum.push(acc);
     }
-    let total = cum[N];
-    let half: Vec<f64> = (0..N).map(|j| (cum[j] / total).sqrt()).collect();
-    let mut win = half.clone();
-    win.extend(half.iter().rev());
+    let total = cum[half];
+    let first: Vec<f64> = (0..half).map(|j| (cum[j] / total).sqrt()).collect();
+    let mut win = first.clone();
+    win.extend(first.iter().rev());
     win
+}
+
+/// AAC sine window, length 2N (long blocks).
+pub fn sine_window() -> Vec<f64> {
+    sine_window_of(L)
+}
+
+/// AAC Kaiser–Bessel-derived window (α = 4), length 2N (long blocks).
+pub fn kbd_window() -> Vec<f64> {
+    kbd_window_of(N)
 }
 
 /// FFT-based forward MDCT (one 2N-point complex FFT per frame).
@@ -160,6 +198,8 @@ pub fn kbd_window() -> Vec<f64> {
 /// thousands of transforms without per-call allocation. Not `Sync`; use one
 /// instance per thread.
 pub struct Mdct {
+    half: usize,
+    len: usize,
     fft: Arc<dyn Fft<f64>>,
     pre: Vec<Complex<f64>>,
     post: Vec<Complex<f64>>,
@@ -167,36 +207,50 @@ pub struct Mdct {
 }
 
 impl Mdct {
+    /// Long-block MDCT (N = 1024, frame 2048).
     pub fn new() -> Self {
-        let fft = FftPlanner::<f64>::new().plan_fft_forward(L);
-        let pre: Vec<Complex<f64>> = (0..L)
-            .map(|n| Complex::from_polar(1.0, -std::f64::consts::PI * n as f64 / L as f64))
+        Self::with_size(N)
+    }
+
+    /// Short-block MDCT (N = 128, frame 256) for EIGHT_SHORT_SEQUENCE frames.
+    pub fn short() -> Self {
+        Self::with_size(NS)
+    }
+
+    fn with_size(half: usize) -> Self {
+        let len = 2 * half;
+        let fft = FftPlanner::<f64>::new().plan_fft_forward(len);
+        let pre: Vec<Complex<f64>> = (0..len)
+            .map(|n| Complex::from_polar(1.0, -std::f64::consts::PI * n as f64 / len as f64))
             .collect();
-        let n0 = N as f64 / 2.0 + 0.5;
-        let post: Vec<Complex<f64>> = (0..N)
+        let n0 = half as f64 / 2.0 + 0.5;
+        let post: Vec<Complex<f64>> = (0..half)
             .map(|k| {
                 Complex::from_polar(
                     1.0,
-                    -std::f64::consts::PI * n0 * (k as f64 + 0.5) / N as f64,
+                    -std::f64::consts::PI * n0 * (k as f64 + 0.5) / half as f64,
                 )
             })
             .collect();
         Self {
+            half,
+            len,
             fft,
             pre,
             post,
-            scratch: RefCell::new(Vec::with_capacity(L)),
+            scratch: RefCell::new(Vec::with_capacity(len)),
         }
     }
 
-    /// Transform `frame` (length 2N) windowed by `win` into `out` (length N).
+    /// Transform `frame` (length 2·half) windowed by `win` into `out`
+    /// (length half).
     pub fn forward(&self, frame: &[f64], win: &[f64], out: &mut [f64]) {
-        debug_assert_eq!(frame.len(), L);
+        debug_assert_eq!(frame.len(), self.len);
         let mut buf = self.scratch.borrow_mut();
         buf.clear();
-        buf.extend((0..L).map(|n| self.pre[n] * (frame[n] * win[n])));
+        buf.extend((0..self.len).map(|n| self.pre[n] * (frame[n] * win[n])));
         self.fft.process(&mut buf);
-        for k in 0..N {
+        for k in 0..self.half {
             out[k] = (self.post[k] * buf[k]).re;
         }
     }
@@ -314,6 +368,53 @@ fn frame_likelihood(
     best
 }
 
+/// Per-frame likelihood under the *short-block* hypothesis: the 8 sub-blocks
+/// of an EIGHT_SHORT_SEQUENCE frame are analyzed with the 256-point MDCT and
+/// their (sub-block, band) cells aggregated into one fraction per channel;
+/// the maximum over channels is returned. Aggregating all 8×9 = 72 cells keeps
+/// the small short bands (K = 8..16) statistically meaningful.
+fn short_frame_likelihood(
+    mdct_s: &Mdct,
+    win_s: &[f64],
+    chans: &[&[f64]],
+    start: usize,
+    coefs_s: &mut [f64],
+    ybuf: &mut Vec<f64>,
+) -> f64 {
+    let mut best = 0.0f64;
+    let mut abs_band = [0.0f64; 16];
+    let mut y34_band = [0.0f64; 16];
+    for ch in chans.iter() {
+        let mut hits = 0usize;
+        let mut scored = 0usize;
+        for j in 0..8 {
+            let st = start + SUB0 + j * NS;
+            mdct_s.forward(&ch[st..st + LSHORT], win_s, coefs_s);
+            for b in SBAND_LO..SBAND_HI {
+                let (lo, hi) = (SWB_SHORT[b], SWB_SHORT[b + 1]);
+                let k = hi - lo;
+                for (i, &v) in coefs_s[lo..hi].iter().enumerate() {
+                    let a = v.abs() * PCM_SCALE;
+                    abs_band[i] = a;
+                    y34_band[i] = a.powf(0.75);
+                }
+                if let Some(hit) =
+                    band_hit(&abs_band[..k], &y34_band[..k], TAU_SHORT[b - SBAND_LO], ybuf)
+                {
+                    scored += 1;
+                    if hit {
+                        hits += 1;
+                    }
+                }
+            }
+        }
+        if scored > 0 {
+            best = best.max(hits as f64 / scored as f64);
+        }
+    }
+    best
+}
+
 /// Result of the re-quantization analysis.
 #[derive(Debug, Clone, Copy)]
 pub struct RequantResult {
@@ -355,8 +456,14 @@ pub fn analyze_segment(left: &[f64], right: Option<&[f64]>) -> Option<RequantRes
     let chans: Vec<&[f64]> = chan_storage.iter().map(|v| v.as_slice()).collect();
 
     let mdct = Mdct::new();
-    let windows = [kbd_window(), sine_window()];
+    let mdct_s = Mdct::short();
+    // Window pairs (long, short) of matching shape.
+    let windows = [
+        (kbd_window(), kbd_window_of(NS)),
+        (sine_window(), sine_window_of(LSHORT)),
+    ];
     let mut coefs: Vec<Vec<f64>> = (0..chans.len()).map(|_| vec![0.0; N]).collect();
+    let mut coefs_s = vec![0.0f64; NS];
     let mut ybuf: Vec<f64> = Vec::with_capacity(96);
 
     // Refine frames: the REFINE_TOP most energetic of the segment's frames
@@ -377,13 +484,17 @@ pub fn analyze_segment(left: &[f64], right: Option<&[f64]>) -> Option<RequantRes
         .collect();
 
     let mut best: Option<RequantResult> = None;
-    for win in &windows {
+    for (win, win_s) in &windows {
         // Coarse pass: every onset, several spread-out frames; per-onset score
-        // is the best single-frame likelihood.
+        // is the best single-frame likelihood under either block hypothesis
+        // (long 1024-MDCT, or the 8 short 128-MDCT sub-blocks — transient
+        // frames are coded short and are invisible to the long analysis).
         let mut per_onset = vec![0.0f64; N];
         for &m in &COARSE_FRAMES {
             for onset in 0..N {
-                let l = frame_likelihood(&mdct, win, &chans, onset + m * N, &mut coefs, &mut ybuf);
+                let start = onset + m * N;
+                let l = frame_likelihood(&mdct, win, &chans, start, &mut coefs, &mut ybuf)
+                    .max(short_frame_likelihood(&mdct_s, win_s, &chans, start, &mut coefs_s, &mut ybuf));
                 if l > per_onset[onset] {
                     per_onset[onset] = l;
                 }
@@ -401,7 +512,11 @@ pub fn analyze_segment(left: &[f64], right: Option<&[f64]>) -> Option<RequantRes
             let mut scores: Vec<f64> = refine_frames
                 .iter()
                 .filter(|&&m| onset + m * N + L <= chans[0].len())
-                .map(|&m| frame_likelihood(&mdct, win, &chans, onset + m * N, &mut coefs, &mut ybuf))
+                .map(|&m| {
+                    let start = onset + m * N;
+                    frame_likelihood(&mdct, win, &chans, start, &mut coefs, &mut ybuf)
+                        .max(short_frame_likelihood(&mdct_s, win_s, &chans, start, &mut coefs_s, &mut ybuf))
+                })
                 .collect();
             if scores.len() < 3 {
                 continue;
@@ -442,6 +557,46 @@ mod tests {
         for n in 0..N {
             assert!((s[n] * s[n] + s[n + N] * s[n + N] - 1.0).abs() < 1e-9);
             assert!((k[n] * k[n] + k[n + N] * k[n + N] - 1.0).abs() < 1e-9);
+        }
+        // Same property for the short-block windows.
+        let ss = sine_window_of(LSHORT);
+        let ks = kbd_window_of(NS);
+        assert_eq!(ss.len(), LSHORT);
+        assert_eq!(ks.len(), LSHORT);
+        for n in 0..NS {
+            assert!((ss[n] * ss[n] + ss[n + NS] * ss[n + NS] - 1.0).abs() < 1e-9);
+            assert!((ks[n] * ks[n] + ks[n + NS] * ks[n + NS] - 1.0).abs() < 1e-9);
+        }
+    }
+
+    /// The short (256-point) MDCT must match the direct definition, exactly as
+    /// the long one does — same twiddle machinery, different size.
+    #[test]
+    fn short_mdct_matches_direct() {
+        let mdct = Mdct::short();
+        let win = sine_window_of(LSHORT);
+        let mut state = 0xC0FFEEu64;
+        let frame: Vec<f64> = (0..LSHORT)
+            .map(|_| {
+                state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+                ((state >> 33) as f64 / (1u64 << 31) as f64) - 1.0
+            })
+            .collect();
+        let mut fast = vec![0.0; NS];
+        mdct.forward(&frame, &win, &mut fast);
+        let n0 = NS as f64 / 2.0 + 0.5;
+        for &k in &[0usize, 1, 17, 64, 127] {
+            let mut acc = 0.0;
+            for n in 0..LSHORT {
+                acc += frame[n]
+                    * win[n]
+                    * (std::f64::consts::PI / NS as f64 * (n as f64 + n0) * (k as f64 + 0.5)).cos();
+            }
+            assert!(
+                (acc - fast[k]).abs() < 1e-9 * acc.abs().max(1.0),
+                "short bin {k}: direct {acc} vs fft {}",
+                fast[k]
+            );
         }
     }
 

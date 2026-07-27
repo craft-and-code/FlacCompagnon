@@ -7,6 +7,48 @@
 //! * [`analyze_file`]  — analyze a single audio file.
 //! * [`analyze_folder`] — analyze every supported audio file inside a folder
 //!   (non-recursive by default; see [`ScanOptions`]).
+//!
+//! # Example
+//!
+//! Analyzing one file and reading its verdict. Audio files are only ever
+//! opened read-only — nothing is written unless you call [`report::write_csv`]
+//! or [`report::write_json`] yourself.
+//!
+//! ```no_run
+//! use std::path::Path;
+//! use flaccompagnon_core::{analyze_file, ScanOptions, TranscodeState};
+//!
+//! let report = analyze_file(Path::new("track.flac"), &ScanOptions::default());
+//!
+//! if let Some(err) = &report.error {
+//!     eprintln!("could not analyze: {err}");
+//! } else {
+//!     println!("{} — {}", report.file_name, report.detections.summary);
+//!     if report.detections.upscaling {
+//!         println!("  declared {:?} bits, really {:?}",
+//!                  report.declared_bits, report.real_bit_depth);
+//!     }
+//!     if report.detections.transcoding == TranscodeState::Detected {
+//!         println!("  lossy source: {}", report.detections.detail);
+//!     }
+//! }
+//! ```
+//!
+//! Scanning a whole folder and exporting the result:
+//!
+//! ```no_run
+//! use std::path::Path;
+//! use flaccompagnon_core::{analyze_folder, report, ScanOptions};
+//!
+//! let opts = ScanOptions { recursive: true, ..ScanOptions::default() };
+//! let folder = analyze_folder(Path::new("/music/album"), &opts)?;
+//!
+//! println!("{} files, {} flagged", folder.files.len(),
+//!          folder.files.iter().filter(|f| f.detections.summary == "Flagged").count());
+//!
+//! report::write_csv(Path::new("album.csv"), &folder)?;
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
 
 pub mod analyzer;
 pub mod bitdepth;
@@ -37,6 +79,21 @@ pub const SUPPORTED_EXTENSIONS: &[&str] = &[
 ];
 
 /// Returns `true` if `path` has an extension FlacCompagnon knows how to decode.
+///
+/// The check is on the extension only and is case-insensitive; the *real*
+/// container is identified later from the file's magic bytes (which is how a
+/// WAV renamed to `.flac` gets flagged).
+///
+/// ```
+/// use std::path::Path;
+/// use flaccompagnon_core::is_supported_audio;
+///
+/// assert!(is_supported_audio(Path::new("song.flac")));
+/// assert!(is_supported_audio(Path::new("song.FLAC")));   // case-insensitive
+/// assert!(is_supported_audio(Path::new("album.dsf")));   // DSD
+/// assert!(!is_supported_audio(Path::new("cover.jpg")));
+/// assert!(!is_supported_audio(Path::new("README")));     // no extension
+/// ```
 pub fn is_supported_audio(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
@@ -116,6 +173,24 @@ pub struct FileAnalysis {
 }
 
 /// Options controlling how a folder is scanned.
+///
+/// ```
+/// use flaccompagnon_core::ScanOptions;
+///
+/// // Defaults: recurse, verify FLAC MD5, no ffmpeg (DSD headers only).
+/// let opts = ScanOptions::default();
+/// assert!(opts.recursive);
+/// assert!(opts.verify_flac_md5);
+/// assert!(opts.ffmpeg.is_none());
+///
+/// // Skim a single folder, and enable DSD content analysis.
+/// let quick = ScanOptions {
+///     recursive: false,
+///     ffmpeg: Some("/opt/homebrew/bin/ffmpeg".into()),
+///     ..ScanOptions::default()
+/// };
+/// assert!(!quick.recursive);
+/// ```
 #[derive(Debug, Clone)]
 pub struct ScanOptions {
     /// Recurse into sub-folders.
@@ -151,6 +226,32 @@ pub enum AnalysisError {
 }
 
 /// Analyze a single audio file end-to-end.
+///
+/// The file is opened **read-only** and never modified. This never panics and
+/// never returns an `Err`: a file that cannot be decoded comes back with
+/// [`FileAnalysis::error`] set and best-effort defaults elsewhere, so a batch
+/// can keep going.
+///
+/// ```no_run
+/// use std::path::Path;
+/// use flaccompagnon_core::{analyze_file, FlacMd5Status, ScanOptions};
+///
+/// let r = analyze_file(Path::new("track.flac"), &ScanOptions::default());
+///
+/// // The three authenticity detections are independent: a file may trip none,
+/// // one, or several of them.
+/// println!("upscaled:   {}", r.detections.upscaling);
+/// println!("upsampled:  {}", r.detections.upsampling);
+/// println!("transcoded: {:?}", r.detections.transcoding);
+///
+/// // Integrity extras.
+/// if matches!(r.flac_md5, Some(FlacMd5Status::Mismatch)) {
+///     println!("the decoded audio does not match the stored MD5!");
+/// }
+/// if let Some(dr) = r.dr_db {
+///     println!("dynamic range: {dr:.1} dB");
+/// }
+/// ```
 pub fn analyze_file(path: &Path, opts: &ScanOptions) -> FileAnalysis {
     let file_name = path
         .file_name()

@@ -113,6 +113,20 @@ pub fn write_json(dest: &Path, report: &FolderReport) -> std::io::Result<()> {
 /// can be rendered without re-analyzing any audio. Rejects JSON that doesn't
 /// carry FlacCompagnon's format marker, with a message meant for end users
 /// (someone dropped an unrelated `.json` file).
+///
+/// ```
+/// use flaccompagnon_core::{report, FolderReport};
+///
+/// let empty = FolderReport { root: "/music".into(), files: vec![], has_flac: false };
+///
+/// // build_json / parse_json round-trip the whole report.
+/// let json = report::build_json(&empty).unwrap();
+/// let back = report::parse_json(&json).unwrap();
+/// assert_eq!(back.root, "/music");
+///
+/// // Unrelated JSON is refused with a message meant for the user.
+/// assert!(report::parse_json(r#"{"hello":"world"}"#).is_err());
+/// ```
 pub fn parse_json(text: &str) -> Result<FolderReport, String> {
     let wrapped: JsonReport = serde_json::from_str(text).map_err(|e| {
         format!("This doesn't look like a FlacCompagnon JSON report ({e}).")

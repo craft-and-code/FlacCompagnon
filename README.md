@@ -73,17 +73,43 @@ FLAC, WAV, AIFF, ALAC/MP4 (`.m4a`), CAF, OGG/Vorbis, MP3, AAC, and **DSD** (`.ds
 
 ## How it works
 
+```mermaid
+flowchart LR
+    subgraph UI["TypeScript UI"]
+        drop["Drop a folder<br/>or audio files"]
+        table["Results table<br/>+ progress"]
+    end
+
+    subgraph core["flaccompagnon-core (Rust)"]
+        list["List supported<br/>files"]
+        decode["Decode<br/>(symphonia)"]
+        fused["FLAC: fused pass<br/>analysis + MD5 (claxon)"]
+
+        subgraph analyzer["Streaming analyzer — one pass over the samples"]
+            fft["FFT spectrum<br/>▸ cut-off"]
+            mdct["MDCT long + short<br/>▸ AAC re-quantization grid"]
+            bits["Effective bit depth"]
+            levels["Clipping · true peak<br/>dynamics · fake stereo"]
+        end
+
+        verdict{{"Upscaling · Upsampling · Transcoding"}}
+    end
+
+    save["Save…<br/>CSV + JSON"]
+    spectro["Spectrograms<br/>▸ system ffmpeg ▸ spectres/"]
+
+    drop --> list --> decode --> analyzer
+    decode -.->|FLAC only| fused
+    fft & mdct & bits --> verdict
+    verdict --> table
+    levels --> table
+    fused -.->|MD5 verdict| table
+    table -->|on demand| save
+    table -->|on demand| spectro
+    save -.->|drop the .json back| table
 ```
-                    ┌──────────────────────────── Tauri (Rust) ────────────────────────────────┐
-  drop a folder ──▶ │  list files ─▶ decode (symphonia) ─▶ streaming analyzer                  │
-                    │                                       ├─ FFT spectrum ─▶ cut-off         │
-   TypeScript UI    │                                       ├─ MDCT ─▶ AAC requant + dead zone │
-   (results table,  │                                       ├─ clipping / fake-stereo          │
-    progress, ◀──── │                                       └─ effective bit depth ─▶ 3 checks │
-    spectrograms)   │  FLAC ─▶ fused decode: analysis + MD5 in one pass (claxon)              │
-                    │  save: CSV + JSON (on demand)   spectrograms ─▶ system ffmpeg ─▶ spectres/│
-                    └──────────────────────────────────────────────────────────────────────────┘
-```
+
+<sub>Audio files are only ever read. The CSV/JSON report and the spectrogram PNGs are the only files ever written, and only when you ask for them.</sub>
 
 The project is a Cargo workspace with two crates:
 
@@ -102,7 +128,7 @@ These mirror the three tests described by the authors of the original Lossless A
 
 **Transcoding (lossy source).** Three signatures, from strongest to weakest:
 
-1. _AAC re-quantization grid (the LAC method, per Derrien's 2019 JAES paper)_ — an AAC encoder quantizes MDCT coefficients per scale-factor band on the grid `|X| = n^(4/3)·Δ`, and decoding to PCM preserves that structure. FlacCompagnon re-analyzes the audio with AAC's own transform (2048-sample MDCT, both sine and KBD window shapes, all four channel representations L/R/M/S), sweeping **all 1024 possible frame alignments at one-sample resolution**: only the encoder's exact alignment makes the coefficients snap back onto the quantization grid, and a single sample of misalignment destroys the effect. For each band the detector sweeps 16 candidate scalefactors across the paper's dead-zone window (δ ∈ [0.3, 0.7] of `φdz = 16/3 + 4·log₂(max|X|)`) and applies the statistical criterion `E(s) < τ(s)` — the rounding-error energy against the threshold derived from the Gaussian model of uniform quantization noise (eq. 8, P = 0.005) — plus a scale-free fallback estimator for coarse grids. The file's score is the **3rd-highest per-frame likelihood** over the 16 most energetic frames at the best alignment (a transcode repeats at its onset in every frame; genuine flukes don't). Calibrated on real AAC→FLAC transcodes (16-bit chain) at **128/192/256/320 kbps**: transcodes score **0.28–1.0**, genuine material stays **≤ 0.23** even on pathological synthetic signals (≤ 0.15 on realistic material); the λ = 0.25 threshold yielded **zero false positives and 22/24 recall** — the two misses being extremely bright, transient-dense content at ≥ 256 kbps, which would need short-window (128-sample MDCT) analysis, a documented future improvement. This is the only signature able to catch high-bitrate AAC, which keeps the full audio bandwidth. Runs at 44.1/48 kHz (the rates covered by the AAC scale-factor band table, per the papers).
+1. _AAC re-quantization grid (the LAC method, per Derrien's 2019 JAES paper)_ — an AAC encoder quantizes MDCT coefficients per scale-factor band on the grid `|X| = n^(4/3)·Δ`, and decoding to PCM preserves that structure. FlacCompagnon re-analyzes the audio with AAC's own transform — **both block sizes**: the long 2048-sample MDCT and the 8 short 256-sample sub-blocks of an EIGHT_SHORT_SEQUENCE frame (encoders switch to short blocks on transients, which a long-window analysis cannot see) — with both sine and KBD window shapes and all four channel representations L/R/M/S, sweeping **all 1024 possible frame alignments at one-sample resolution**: only the encoder's exact alignment makes the coefficients snap back onto the quantization grid, and a single sample of misalignment destroys the effect. For each band the detector sweeps 16 candidate scalefactors across the paper's dead-zone window (δ ∈ [0.3, 0.7] of `φdz = 16/3 + 4·log₂(max|X|)`) and applies the statistical criterion `E(s) < τ(s)` — the rounding-error energy against the threshold derived from the Gaussian model of uniform quantization noise (eq. 8, P = 0.005) — plus a scale-free fallback estimator for coarse grids. The file's score is the **3rd-highest per-frame likelihood** over the 16 most energetic frames at the best alignment (a transcode repeats at its onset in every frame; genuine flukes don't). Calibrated on real AAC→FLAC transcodes (16-bit chain) at **128/192/256/320 kbps**: transcodes score **0.28–1.0**, genuine material stays **≤ 0.23** even on pathological synthetic signals (≤ 0.15 on realistic material); the λ = 0.25 threshold yielded **zero false positives and 24/24 recall** — the short-block analysis is what recovers extremely bright, transient-dense content at high bitrates (measured: 0.13 → 0.82 on such a file at 320 kbps). This is the only signature able to catch high-bitrate AAC, which keeps the full audio bandwidth. Runs at 44.1/48 kHz (the rates covered by the AAC scale-factor band tables, per the papers).
 2. _AAC dead zone (MDCT domain)_ — at low-to-mid bitrates the encoder zeroes whole high-frequency coefficient bands, leaving a flat, sharply-bounded dead zone in the MDCT domain that survives the decode. Catches ~128–192 kbps AAC cheaply.
 3. _Spectral brick-wall_ — a sharp cut-off well below Nyquist that drops into a flat, low "dead zone" is characteristic of an MP3/AAC low-pass (≈16 kHz at 128 kbps, ≈19 kHz at 192, ≈20 kHz at 320). A gentle roll-off with no cliff is reported only as _Transcoded?_ (suspected), because it can also be natural.
 
@@ -241,7 +267,7 @@ FlacCompagnon opens every track **read-only** — it decodes samples to analyze 
 ## Limitations & notes
 
 - The spectral detections are **heuristics** (as in the original). See [Detection algorithms](#detection-algorithms) — in particular, naturally dark/acoustic recordings can read as _Upsampled_ or _Transcoded?_; always sanity-check with the spectrogram. The AAC re-quantization detection, in contrast, is close to a proof: it requires the audio to snap onto AAC's exact quantization grid at a synchronized frame alignment, which genuine audio essentially never does.
-- **AAC transcode detection covers all bitrates at 44.1/48 kHz** (validated on real 128/192/256/320 kbps AAC→FLAC transcodes against their originals; zero false positives, 22/24 recall — the misses being very bright, transient-dense content at ≥ 256 kbps, which would need short-window MDCT analysis). **MP3 sources** are still only caught through the spectral brick-wall signature, so high-bitrate MP3 (320 kbps) can pass — MP3 uses a different filterbank (hybrid PQMF + 576-point MDCT) and would need its own re-quantization detector.
+- **AAC transcode detection covers all bitrates at 44.1/48 kHz** (validated on real 128/192/256/320 kbps AAC→FLAC transcodes against their originals: zero false positives, 24/24 recall, including transient-dense content via the short-block analysis). **MP3 sources** are still only caught through the spectral brick-wall signature, so high-bitrate MP3 (320 kbps) can pass — MP3 uses a different filterbank (hybrid PQMF + 576-point MDCT) and would need its own re-quantization detector.
 - Effective bit-depth reconstruction is exact for ≤ 24-bit integer sources.
 - FLAC files are decoded **once**: a fused pass feeds the analysis and hashes the MD5 from the same raw integer samples (bit-identical to `flac -t`), so MD5 verification adds only a negligible hashing cost on top of the analysis.
 - Files are analyzed **in parallel**: a worker pool sized to the machine (one worker per CPU core, minus one to keep the UI responsive) processes independent files concurrently, so analyzing an album scales with your core count.

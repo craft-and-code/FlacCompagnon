@@ -7,7 +7,7 @@ members = ["core", "src-tauri"]
 resolver = "2"
 
 [workspace.package]
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 license = "MIT"
 authors = ["FlacCompagnon contributors"]
@@ -17,3 +17,12 @@ opt-level = 3
 lto = true
 codegen-units = 1
 strip = true
+
+# The analysis core is heavy DSP (FFT/MDCT sweeps over thousands of frames).
+# Unoptimized, a plain `cargo test` takes minutes per analyzed file; optimizing
+# just the hot crates in dev/test builds keeps the edit-compile loop fast while
+# making the test suite run in seconds without needing `--release`.
+[profile.dev.package.flaccompagnon-core]
+opt-level = 3
+[profile.dev.package.rustfft]
+opt-level = 3

@@ -28,7 +28,7 @@ const DICT = {
     d2tip: "Marqué Upsampled : conteneur 96 kHz, mais le contenu s'arrête net à 22,05 kHz — le mur caractéristique d'un suréchantillonnage depuis 44,1 kHz.",
     d2cap: "Le mur du cut-off à 22,05 kHz",
     d3t: "Transcoding — source lossy",
-    d3p: "La signature la plus forte. FlacCompagnon rejoue le calcul interne de l'encodeur AAC : si le fichier est un transcode, ses coefficients « retombent » exactement sur la grille de valeurs que seul l'AAC produit, au bon alignement parmi 1024 essais. Ça démasque l'AAC à tous les débits, même 256 kbps.",
+    d3p: "La signature la plus forte. FlacCompagnon rejoue le calcul interne de l'encodeur AAC : au bon alignement parmi 1024 essais, les coefficients d'un transcode « retombent » exactement sur la grille de valeurs que seul l'AAC produit. Efficace jusqu'à 320 kbps, y compris sur les passages percussifs.",
     d3tip: "Marqué Transcoded : au meilleur alignement, les bandes retombent de façon répétée sur la grille de quantification AAC (transcodes mesurés : 28–100 % des bandes, musique authentique ≤ 23 %).",
     d3cap: "Les coefficients « snappent » sur la grille AAC",
     s3k: "Intégrité", s3t: "Au-delà des détections",
@@ -96,7 +96,7 @@ const DICT = {
     d2tip: "Flagged Upsampled: 96 kHz container, but the content stops dead at 22.05 kHz — the tell-tale wall of upsampling from 44.1 kHz.",
     d2cap: "The cut-off wall at 22.05 kHz",
     d3t: "Transcoding — lossy source",
-    d3p: "The strongest signature. FlacCompagnon replays the AAC encoder's own internal computation: if the file is a transcode, its coefficients land back exactly on the grid of values only AAC produces, at the right alignment out of 1024 tries. It exposes AAC at every bitrate, even 256 kbps.",
+    d3p: "The strongest signature. FlacCompagnon replays the AAC encoder's own internal computation: at the right alignment out of 1024 tries, a transcode's coefficients land back exactly on the grid of values only AAC produces. Effective up to 320 kbps, percussive passages included.",
     d3tip: "Flagged Transcoded: at the best alignment, bands repeatedly land on AAC's quantization grid (measured transcodes: 28–100% of bands, genuine music ≤ 23%).",
     d3cap: "Coefficients snapping onto the AAC grid",
     s3k: "Integrity", s3t: "Beyond the detections",
@@ -213,22 +213,20 @@ function sizeCanvas(c, dpr) {
   if (c.width !== w || c.height !== h) { c.width = w; c.height = h; return true; }
   return false;
 }
-/// Distance below the sticky nav at which a scroll-driven animation is fully
-/// played out — so a card's badge only has to clear the menu by this much,
-/// instead of having to travel up to a quarter of the viewport.
-const ANIM_DONE_BELOW_NAV = 100;
-let navEl = null;
+// Scroll window over which a diagram animates, as fractions of the viewport
+// height measured on the *canvas itself* — not on its card. The canvas is
+// pinned to the bottom of the card, so a card-based measure would run most of
+// the animation while the drawing is still off-screen. Starting at 0.95 means
+// it begins as the canvas first peeks in from the bottom; ending at 0.52 means
+// it is fully played once the canvas sits mid-screen, which also puts the
+// card's badge roughly 100 px below the sticky nav.
+const ANIM_START_VH = 0.95;
+const ANIM_END_VH = 0.52;
 
 function progress(c) {
-  // Measure the whole card when there is one: the animation should finish
-  // when the *badge* (at the card's top) clears the nav, not when the canvas
-  // — which sits further down the card — does.
-  const el = c.closest(".card") || c;
-  const r = el.getBoundingClientRect(), vh = window.innerHeight;
-  if (!navEl) navEl = document.querySelector(".nav");
-  const end = (navEl ? navEl.offsetHeight : 64) + ANIM_DONE_BELOW_NAV;
-  const start = vh * 0.88; // starts as the card enters from the bottom
-  if (start <= end) return r.top <= end ? 1 : 0; // very short viewport
+  const r = c.getBoundingClientRect(), vh = window.innerHeight;
+  const start = vh * ANIM_START_VH;
+  const end = vh * ANIM_END_VH;
   return Math.max(0, Math.min(1, (start - r.top) / (start - end)));
 }
 function visible(c) {

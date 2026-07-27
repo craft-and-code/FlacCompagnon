@@ -44,6 +44,30 @@ struct Channel {
 }
 
 /// Streaming multi-channel true-peak meter.
+///
+/// Feed it frames as they are decoded, then read [`TruePeak::peak_dbtp`].
+/// A positive value is an inter-sample "over": the waveform a DAC reconstructs
+/// exceeds full scale even though no stored sample does.
+///
+/// ```
+/// use flaccompagnon_core::truepeak::TruePeak;
+///
+/// // A quarter-rate sine sampled at its zero-crossing offset: every stored
+/// // sample sits at ±0.693, but the real crest between them is 0.98.
+/// let mut tp = TruePeak::new(1);
+/// let mut sample_peak: f32 = 0.0;
+/// for n in 0..4096 {
+///     let phase = std::f32::consts::FRAC_PI_2 * (n % 4) as f32
+///         + std::f32::consts::FRAC_PI_4;
+///     let x = 0.98 * phase.sin();
+///     sample_peak = sample_peak.max(x.abs());
+///     tp.push_frame(&[x]);
+/// }
+///
+/// assert!(sample_peak < 0.70);          // what a naive peak meter reports
+/// assert!(tp.peak() > 0.95);            // what the signal actually reaches
+/// assert!(tp.peak_dbtp() < 0.0);        // still below full scale here
+/// ```
 pub struct TruePeak {
     channels: Vec<Channel>,
     peak: f32,
