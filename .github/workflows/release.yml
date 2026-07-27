@@ -104,12 +104,20 @@ jobs:
               if not src.exists():
                   print("skip (missing):", p)
                   continue
+              # On macOS the list also contains the FlacCompagnon.app *bundle*,
+              # which is a directory. A directory cannot be a release asset (and
+              # copying one would raise IsADirectoryError), so skip it: the .dmg
+              # next to it already carries the same application.
+              if not src.is_file():
+                  print("skip (directory):", src.name)
+                  continue
               name = src.name
               # Split off the (possibly double) extension: .app.tar.gz, .tar.gz.sig...
               m = re.match(r"^(?P<stem>.+?)(?P<ext>(\.app)?(\.tar\.gz(\.sig)?|\.[A-Za-z0-9]+))$", name)
               stem, ext = (m.group("stem"), m.group("ext")) if m else (src.stem, src.suffix)
               # Drop the arch/locale noise Tauri adds; the label already says it.
-              stem = re.sub(r"[_-](aarch64|x64|x86_64|amd64)([_-](en-US|setup))?$", "", stem)
+              # The separator may be "_", "-" or "." (RPM: name-ver-rel.arch.rpm).
+              stem = re.sub(r"[._-](aarch64|x64|x86_64|amd64)([_-](en-US|setup))?$", "", stem)
               dest = out / f"{stem}_{label}{ext}"
               shutil.copy2(src, dest)
               copied += 1
