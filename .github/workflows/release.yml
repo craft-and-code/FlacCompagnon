@@ -76,23 +76,33 @@ jobs:
           args: ${{ matrix.args }}
 
       # Rename every produced installer to <name>_<version>_<Platform>.<ext>
-      # (e.g. FlacCompagnon_0.5.0_Windows-x64.msi) so the Releases page is
-      # unambiguous. tauri-action reports the built files in `artifactPaths`.
+      # (e.g. FlacCompagnon_0.7.0_Windows-x64.msi) so the Releases page is
+      # unambiguous. tauri-action reports the built files in `artifactPaths`
+      # (a JSON array); it is written to a file rather than interpolated into
+      # the script so no path can break the quoting.
       - name: Rename artifacts with the platform label
-        id: rename
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p dist-release
-          # artifactPaths is a JSON array of absolute paths.
-          echo '${{ steps.build.outputs.artifactPaths }}' > paths.json
-          python3 - <<'EOF'
-          import json, os, re, shutil, pathlib
-          paths = json.load(open("paths.json"))
+          cat > paths.json <<'JSON'
+          ${{ steps.build.outputs.artifactPaths }}
+          JSON
+          echo "--- tauri reported these artifacts ---"
+          cat paths.json
+          python3 - <<'PY'
+          import json, os, re, shutil, pathlib, sys
+          raw = pathlib.Path("paths.json").read_text().strip()
+          if not raw:
+              sys.exit("tauri-action reported no artifacts (empty artifactPaths)")
+          paths = json.loads(raw)
           label = os.environ["LABEL"]
-          out = pathlib.Path("dist-release"); out.mkdir(exist_ok=True)
+          out = pathlib.Path("dist-release")
+          copied = 0
           for p in paths:
               src = pathlib.Path(p)
               if not src.exists():
+                  print("skip (missing):", p)
                   continue
               name = src.name
               # Split off the (possibly double) extension: .app.tar.gz, .tar.gz.sig...
@@ -102,12 +112,39 @@ jobs:
               stem = re.sub(r"[_-](aarch64|x64|x86_64|amd64)([_-](en-US|setup))?$", "", stem)
               dest = out / f"{stem}_{label}{ext}"
               shutil.copy2(src, dest)
-              print("renamed:", src.name, "->", dest.name)
-          EOF
+              copied += 1
+              print("renamed:", name, "->", dest.name)
+          if copied == 0:
+              sys.exit("no artifact could be copied")
+          PY
         env:
           LABEL: ${{ matrix.label }}
 
-      - name: Publish the release
+      # Hand the renamed files to the single publish job below. Creating the
+      # release from each matrix job instead would produce one *draft per job*:
+      # a draft has no tag ref yet, so GitHub cannot deduplicate them.
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.label }}
+          path: dist-release/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: release
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Collect every platform's installers
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-release
+          merge-multiple: true
+
+      - name: List what will be published
+        run: ls -lh dist-release
+
+      - name: Publish the draft release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
