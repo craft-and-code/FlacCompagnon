@@ -69,7 +69,7 @@
         },
         "license": "https://github.com/craft-and-code/FlacCompagnon/blob/main/LICENSE",
         "downloadUrl": "https://github.com/craft-and-code/FlacCompagnon/releases/latest",
-        "softwareVersion": "0.5.0"
+        "softwareVersion": "0.7.0"
       }
     </script>
   </head>
@@ -131,9 +131,9 @@
           <div class="toolbar">
             <span class="count" data-i18n="sumCount">4 fichiers</span>
             <span class="chip c-clean" data-i18n="chClean">1 clean</span>
-            <span class="chip c-ups" data-i18n="chUps">1 upsamplé</span>
-            <span class="chip c-tr" data-i18n="chTr">1 transcodé</span>
-            <span class="chip c-sus" data-i18n="chSus">1 suspect</span>
+            <span class="chip c-upsampled" data-i18n="chUps">1 upsamplé</span>
+            <span class="chip c-transcoded" data-i18n="chTr">1 transcodé</span>
+            <span class="chip c-suspected" data-i18n="chSus">1 suspect</span>
           </div>
           <div class="table-wrap">
             <table class="results">
@@ -154,28 +154,28 @@
                   <td class="fname" data-path="/Users/you/Music/Miles Davis - Kind of Blue/01 · So What.flac">01 · So What.flac</td>
                   <td>FLAC</td><td>9:26</td><td>44.1k</td>
                   <td class="c-ok">16-bit</td><td>21.9 kHz (99%)</td>
-                  <td><span class="tag t-ok" data-tip="tipClean">Clean</span></td>
+                  <td><span class="tag t-clean" data-tip="tipClean">Clean</span></td>
                   <td class="c-ok">✓ OK</td>
                 </tr>
                 <tr>
                   <td class="fname" data-path="/Users/you/Music/Studio Master/02 · Studio Master.flac">02 · Studio Master.flac</td>
                   <td>FLAC</td><td>4:11</td><td>96k</td>
                   <td class="c-ok">24-bit</td><td>22.0 kHz (46%)</td>
-                  <td><span class="tag t-ups" data-tip="d2tip">Upsampled</span></td>
+                  <td><span class="tag t-upsampled" data-tip="d2tip">Upsampled</span></td>
                   <td class="c-ok">✓ OK</td>
                 </tr>
                 <tr>
                   <td class="fname" data-path="/Users/you/Music/Remaster 2019/03 · Remaster 2019.flac">03 · Remaster 2019.flac</td>
                   <td>FLAC</td><td>3:37</td><td>44.1k</td>
                   <td class="c-ok">16-bit</td><td>22.05 kHz (100%)</td>
-                  <td><span class="tag t-tr" data-tip="d3tip">Transcoded</span></td>
+                  <td><span class="tag t-transcoded" data-tip="d3tip">Transcoded</span></td>
                   <td class="c-ok">✓ OK</td>
                 </tr>
                 <tr>
                   <td class="fname" data-path="/Users/you/Music/Acoustic Live/04 · Acoustic Live.flac">04 · Acoustic Live.flac</td>
                   <td>FLAC</td><td>5:02</td><td>44.1k</td>
                   <td class="c-ok">16-bit</td><td>18.6 kHz (84%)</td>
-                  <td><span class="tag t-sus" data-tip="tipSus">Transcoded?</span></td>
+                  <td><span class="tag t-suspected" data-tip="tipSus">Transcoded?</span></td>
                   <td class="c-mut">— <span class="nosig">no MD5</span></td>
                 </tr>
               </tbody>
@@ -193,21 +193,21 @@
 
         <div class="cards cards-3">
           <article class="card det">
-            <span class="tag t-up">Upscaled</span>
+            <span class="tag t-upscaled">Upscaled</span>
             <h3 data-i18n="d1t">Upscaling — fausse résolution</h3>
             <p data-i18n="d1p"></p>
             <canvas id="gUp" class="det-canvas" aria-hidden="true"></canvas>
             <p class="cap" data-i18n="d1cap"></p>
           </article>
           <article class="card det">
-            <span class="tag t-ups">Upsampled</span>
+            <span class="tag t-upsampled">Upsampled</span>
             <h3 data-i18n="d2t">Upsampling — faux échantillonnage</h3>
             <p data-i18n="d2p"></p>
             <canvas id="gWall" class="det-canvas" aria-hidden="true"></canvas>
             <p class="cap" data-i18n="d2cap"></p>
           </article>
           <article class="card det">
-            <span class="tag t-tr">Transcoded</span>
+            <span class="tag t-transcoded">Transcoded</span>
             <h3 data-i18n="d3t">Transcoding — source lossy</h3>
             <p data-i18n="d3p"></p>
             <canvas id="gGrid" class="det-canvas" aria-hidden="true"></canvas>

@@ -1,9 +1,9 @@
 /* ============ Self-hosted fonts (no external requests) =====================
-   The .woff2 files live in assets/fonts/ and are fetched once at build time
-   with assets/fonts/fetch-fonts.sh (they are gitignore-friendly binaries, not
-   checked in by default). Until they are present the page falls back to the
-   system fonts declared in --sans / --mono, so nothing breaks — it just looks
-   like the OS default. font-display: swap keeps text visible during load. */
+   The .woff2 files are committed in assets/fonts/ (see the README there for
+   provenance and licensing), so the page makes no third-party request. If one
+   were missing the page falls back to the system fonts declared in --sans /
+   --mono, so nothing breaks — it just looks like the OS default.
+   font-display: swap keeps text visible while they load. */
 @font-face {
   font-family: "Space Grotesk"; font-style: normal; font-weight: 400;
   font-display: swap; src: url("assets/fonts/space-grotesk-400.woff2") format("woff2");
@@ -42,9 +42,12 @@
   --accent: linear-gradient(135deg, #4b82f0, #7b4ff0);
   --link: #8fb0f5;
   --link-h: #b39cf7;
-  --up: #ef5b6a; /* upscaled  */
-  --ups: #f0b849; /* upsampled */
-  --tr: #e08b3b; /* transcoded */
+  /* One colour per detection, ramping with severity: the container lies about
+     bit depth (amber), then about the sample rate (orange), then the audio
+     itself was destroyed by a lossy codec (red). */
+  --upscaled: #f0b849;
+  --upsampled: #e08b3b;
+  --transcoded: #ef5b6a;
   --clean: #3ecf8e;
   --sans: "Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, monospace;
@@ -168,11 +171,14 @@ a:hover { color: var(--link-h); }
   display: inline-block; padding: 3px 10px; border-radius: 8px; font-size: 12px;
   font-weight: 600; border: 1px solid transparent;
 }
-.t-ok { color: var(--clean); background: rgba(62, 207, 142, 0.13); border-color: rgba(62, 207, 142, 0.4); }
-.t-up { color: var(--up); background: rgba(239, 91, 106, 0.13); border-color: rgba(239, 91, 106, 0.4); }
-.t-ups { color: var(--ups); background: rgba(240, 184, 73, 0.13); border-color: rgba(240, 184, 73, 0.4); }
-.t-tr { color: var(--tr); background: rgba(224, 139, 59, 0.13); border-color: rgba(224, 139, 59, 0.4); }
-.t-sus { color: var(--tr); background: rgba(224, 139, 59, 0.09); border-color: rgba(224, 139, 59, 0.3); }
+/* Fills derive from the variables via color-mix, so changing a detection's
+   colour in one place updates its tag everywhere. "Transcoded?" (suspected)
+   reuses the transcoded hue with a fainter fill — same family, weaker claim. */
+.t-clean      { color: var(--clean);      background: color-mix(in srgb, var(--clean) 13%, transparent);      border-color: color-mix(in srgb, var(--clean) 40%, transparent); }
+.t-upscaled   { color: var(--upscaled);   background: color-mix(in srgb, var(--upscaled) 13%, transparent);   border-color: color-mix(in srgb, var(--upscaled) 40%, transparent); }
+.t-upsampled  { color: var(--upsampled);  background: color-mix(in srgb, var(--upsampled) 13%, transparent);  border-color: color-mix(in srgb, var(--upsampled) 40%, transparent); }
+.t-transcoded { color: var(--transcoded); background: color-mix(in srgb, var(--transcoded) 13%, transparent); border-color: color-mix(in srgb, var(--transcoded) 40%, transparent); }
+.t-suspected  { color: var(--transcoded); background: color-mix(in srgb, var(--transcoded) 8%, transparent);  border-color: color-mix(in srgb, var(--transcoded) 28%, transparent); }
 [data-tip], [data-path] { cursor: help; }
 
 /* inline code (e.g. flac -t) */
@@ -232,8 +238,9 @@ code {
 }
 .count { font-weight: 600; font-size: 13px; }
 .chip { font-size: 11.5px; padding: 3px 9px; border-radius: 20px; border: 1px solid var(--border); }
-.c-clean { color: var(--clean); } .c-ups { color: var(--ups); }
-.c-tr { color: var(--tr); } .c-sus { color: var(--tr); }
+.c-clean { color: var(--clean); } .c-upscaled { color: var(--upscaled); }
+.c-upsampled { color: var(--upsampled); } .c-transcoded { color: var(--transcoded); }
+.c-suspected { color: var(--transcoded); }
 .table-wrap { overflow-x: auto; }
 table.results { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.results th {
