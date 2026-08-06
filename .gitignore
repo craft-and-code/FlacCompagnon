@@ -391,8 +391,10 @@ Sessionx.vim
 
 # Temporary
 .netrwhist
-# Auto-generated tag files
-tags
+# Auto-generated tag files (root-level ctags index only — unanchored "tags"
+# would also match core/src/tags/, a real source module, and silently drop
+# it from every commit without any warning).
+/tags
 # Persistent undo
 [._]*.un~
 
