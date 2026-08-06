@@ -22,7 +22,8 @@ jobs:
             patchelf \
             build-essential \
             libgtk-3-dev \
-            libssl-dev
+            libssl-dev \
+            libasound2-dev
 
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
