@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["AnalysisError"],"struct":["ClippingInfo","FileAnalysis","FolderReport","ScanOptions"]};

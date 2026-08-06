@@ -1,2 +1,2 @@
-createSrcSidebar('[["flaccompagnon_core",["",[],["analyzer.rs","bitdepth.rs","clipping.rs","decode.rs","detections.rs","dsd.rs","flac_md5.rs","lib.rs","mdct.rs","report.rs","requant.rs","spectrum.rs","stereo.rs","truepeak.rs"]]]]');
-//{"start":19,"fragment_lengths":[209]}
+createSrcSidebar('[["flaccompagnon_core",["",[["decode",[],["container.rs","dsd.rs","flac.rs","mod.rs","playback.rs","probe.rs","stream.rs"]],["dsd",[],["container.rs","mod.rs","spectral.rs"]],["pipeline",[],["dsd.rs","mod.rs"]],["tags",[],["cover.rs","mod.rs"]]],["analyzer.rs","bitdepth.rs","clipping.rs","detections.rs","flac_md5.rs","lib.rs","mdct.rs","playlist.rs","report.rs","requant.rs","scan.rs","spectrum.rs","stereo.rs","truepeak.rs","types.rs"]]]]');
+//{"start":19,"fragment_lengths":[439]}

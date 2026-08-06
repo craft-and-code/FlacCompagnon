@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["detect_container","ext_canonical"]};

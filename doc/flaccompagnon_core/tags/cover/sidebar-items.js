@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["CoverEdit"],"fn":["cover_from_bytes","read_cover_file","write_cover_file"],"struct":["CoverArt"]};
