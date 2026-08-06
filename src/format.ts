@@ -1,22 +1,40 @@
-// Pure, DOM-free helpers for formatting values and building table-cell HTML.
+// Pure, DOM-free helpers for formatting values.
+//
+// This file used to also build table-cell HTML as strings, which meant every
+// value that reached the page had to be run through an `escapeHtml` by hand.
+// Components render that markup now, and JSX escapes interpolated values
+// itself, so that whole class of mistake is gone along with the helper.
 
-import type { Detections, FileAnalysis, FlacMd5Status } from "./types";
+import type { CoverArt, FileAnalysis } from "./types";
 
-/// Audio extensions, used to strip the extension from a single dropped file
-/// when suggesting a CSV name.
-export const AUDIO_EXTS = [
+/// Audio extensions, stripped when suggesting a file name from a dropped file.
+const AUDIO_EXTS = [
   "flac", "wav", "wave", "aif", "aiff", "aifc", "alac", "m4a", "mp4", "caf",
   "ogg", "oga", "mp3", "aac",
 ];
 
-export function escapeHtml(s: string): string {
-  return s.replace(
-    /[&<>"']/g,
-    (c) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-        c
-      ]!,
-  );
+/// Image MIME types a cover may legitimately declare. Anything else is treated
+/// as "no usable image" rather than passed through.
+const SAFE_IMAGE_MIMES = [
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/bmp",
+  "image/webp",
+  "image/tiff",
+];
+
+/// A `data:` URL for a cover.
+///
+/// The MIME string comes from the audio file's own tag — i.e. from a file the
+/// user merely opened — so it is not trusted: only a known image type is
+/// accepted, and `null` means "don't render an image". (`data_base64` needs no
+/// such care: the backend base64-encodes it, so it can only ever contain
+/// `A-Za-z0-9+/=`.)
+export function coverDataUrl(cover: CoverArt): string | null {
+  const mime = cover.mime.trim().toLowerCase();
+  if (!SAFE_IMAGE_MIMES.includes(mime)) return null;
+  return `data:${mime};base64,${cover.data_base64}`;
 }
 
 export function fmtDuration(secs: number): string {
@@ -26,90 +44,69 @@ export function fmtDuration(secs: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+/// File size from the exact byte count the Rust core read off the filesystem.
+///
+/// Uses **decimal** units (1 kB = 1000 bytes), which is what macOS Finder and
+/// most Linux file managers display — so the number matches what the OS shows
+/// for the same file. Windows Explorer instead labels *binary* units "KB"/"MB",
+/// so it reads slightly smaller there; switching `STEP` to 1024 and the labels
+/// to KiB/MiB is the one-line change if that convention is ever preferred.
+export function fmtSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "—";
+  const STEP = 1000;
+  if (bytes < STEP) return `${bytes} B`;
+  const units = ["kB", "MB", "GB", "TB"];
+  let value = bytes / STEP;
+  let unit = 0;
+  while (value >= STEP && unit < units.length - 1) {
+    value /= STEP;
+    unit++;
+  }
+  // Sub-MB sizes are shown whole (Finder-style "573 kB"); larger ones keep a
+  // decimal so a 32.3 MB track doesn't collapse to a bare "32 MB".
+  const digits = unit === 0 ? 0 : value < 100 ? 1 : 0;
+  return `${value.toFixed(digits)} ${units[unit]}`;
+}
+
 export function fmtCutoff(f: FileAnalysis): string {
   if (f.cutoff_hz == null || f.cutoff_ratio == null) return "—";
-  return `${(f.cutoff_hz / 1000).toFixed(1)} kHz (${Math.round(
-    f.cutoff_ratio * 100,
-  )}%)`;
+  return `${(f.cutoff_hz / 1000).toFixed(1)} kHz (${Math.round(f.cutoff_ratio * 100)}%)`;
 }
 
-// Small magnifier icon for the "reveal in file browser" row button.
-const MAG_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.3"/><line x1="10.4" y1="10.4" x2="14" y2="14"/></svg>`;
+/// `CoverArt.picture_type` is Rust's `Debug` output for lofty's `PictureType`
+/// enum (e.g. `"CoverFront"`). These keys are exactly the strings
+/// `core::tags::parse_picture_type` understands on the Rust side; anything
+/// else falls back to "Other" there too.
+export const PICTURE_TYPE_LABELS: Record<string, string> = {
+  CoverFront: "Front cover",
+  CoverBack: "Back cover",
+  Icon: "Icon",
+  OtherIcon: "Other icon",
+  Leaflet: "Leaflet page",
+  Media: "Media (label/disc)",
+  LeadArtist: "Lead artist",
+  Artist: "Artist",
+  Conductor: "Conductor",
+  Band: "Band/orchestra",
+  Composer: "Composer",
+  Lyricist: "Lyricist/writer",
+  RecordingLocation: "Recording location",
+  DuringRecording: "During recording",
+  DuringPerformance: "During performance",
+  ScreenCapture: "Movie/video screen capture",
+  BrightFish: "Bright colored fish",
+  Illustration: "Illustration",
+  BandLogo: "Band/artist logo",
+  PublisherLogo: "Publisher/studio logo",
+  Other: "Other",
+};
 
-// Trash icon for removing a row before exporting.
-const TRASH_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4h11"/><path d="M6 4V2.6h4V4"/><path d="M4.2 4l.6 9.4a1 1 0 0 0 1 .9h4.4a1 1 0 0 0 1-.9L11.8 4"/><path d="M6.6 7v4.2M9.4 7v4.2"/></svg>`;
-
-export function revealBtn(path: string): string {
-  return `<button class="reveal-btn" data-path="${escapeHtml(path)}" title="Reveal in file browser">${MAG_ICON}</button>`;
+export function pictureTypeLabel(raw: string): string {
+  return PICTURE_TYPE_LABELS[raw] ?? raw;
 }
 
-export function deleteBtn(path: string): string {
-  return `<button class="delete-btn" data-path="${escapeHtml(path)}" title="Remove this row">${TRASH_ICON}</button>`;
-}
-
-export function detectionsTd(d: Detections): string {
-  // Ordered least to most severe — the container's bit depth, then its sample
-  // rate, then the audio itself — matching the colour ramp amber/orange/red.
-  const tags: string[] = [];
-  if (d.upscaling) tags.push(`<span class="tag t-upscaled">Upscaled</span>`);
-  if (d.upsampling) tags.push(`<span class="tag t-upsampled">Upsampled</span>`);
-  if (d.transcoding === "detected") {
-    tags.push(`<span class="tag t-transcoded">Transcoded</span>`);
-  } else if (d.transcoding === "suspected") {
-    tags.push(`<span class="tag t-suspected">Transcoded?</span>`);
-  }
-  if (tags.length === 0) tags.push(`<span class="tag t-clean">Clean</span>`);
-  return `<td class="detections" title="${escapeHtml(d.detail)}">${tags.join(" ")}</td>`;
-}
-
-/// Dynamic-range cell: DR-meter-style estimate (peak vs loudest-20% RMS).
-/// >= 12 dB green (dynamic master, e.g. Full Dynamic Range editions),
-/// 8-12 dB neutral, < 8 dB warning (loudness-war master).
-export function drCell(dr: number | null): string {
-  if (dr == null || !Number.isFinite(dr)) return `<td class="c-muted">—</td>`;
-  const v = dr.toFixed(1);
-  const tip = `Dynamic range (crest of the loud passages): peak level vs the RMS of the loudest 20% of ~3 s blocks. High values mean a dynamic master (Full Dynamic Range editions); low values a compressed &quot;loudness war&quot; master. Independent of whether the file is lossless.`;
-  const cls = dr >= 12 ? "c-ok" : dr >= 8 ? "" : "c-warn";
-  return `<td class="${cls} has-tip" title="${tip}">${v} dB</td>`;
-}
-
-/// True-peak (inter-sample peak) cell — BS.1770-style, 4x-oversampled.
-/// Always shown, regardless of whether classic sample-domain clipping fired:
-/// it's a level measurement (like a peak meter), not an event count.
-/// > 0 dBTP (red): the reconstructed waveform overshoots full scale
-/// *between* samples even though no stored sample does ("inter-sample over") —
-/// a measured fact, not a heuristic guess, so it gets the same red as other
-/// confirmed issues (fake stereo, bit-depth mismatch, MD5 mismatch).
-/// <= -1 dBTP (green): comfortable headroom. In between: neutral.
-export function truePeakCell(dbtp: number): string {
-  if (!Number.isFinite(dbtp)) return `<td class="c-muted">—</td>`;
-  const v = `${dbtp > 0 ? "+" : ""}${dbtp.toFixed(1)} dBTP`;
-  const over = dbtp > 0;
-  const cls = over ? "c-bad" : dbtp <= -1 ? "c-ok" : "";
-  const title = over
-    ? `Inter-sample over: no stored sample reaches full scale, but the true peak (4x-oversampled, BS.1770-style) reaches ${v} — the waveform a DAC reconstructs between samples overshoots 0 dBFS. A sign of an over-loud master, independent of whether the file is lossless.`
-    : `True peak (4x-oversampled inter-sample peak): ${v}. At or below 0 dBTP means the reconstructed waveform stays under full scale — no inter-sample clipping.`;
-  return `<td class="${cls} has-tip" title="${title}">${v}</td>`;
-}
-
-export function md5Cell(m: FlacMd5Status | null): string {
-  if (!m) return `<td class="c-muted">—</td>`;
-  switch (m.state) {
-    case "Match":
-      return `<td class="c-ok">✓ OK</td>`;
-    case "Mismatch":
-      return `<td class="c-bad">✗ Mismatch</td>`;
-    case "NoSignature":
-      return `<td class="c-muted">No signature</td>`;
-    case "Present":
-      return `<td class="c-warn">Present</td>`;
-    case "Error":
-      return `<td class="c-warn has-tip" title="${escapeHtml(m.detail)}">Error</td>`;
-  }
-}
-
-/// The deepest folder that contains every one of `paths`. With a single folder
-/// of files this is that folder; across several folders it is their common
+/// The deepest folder containing every one of `paths`. With a single folder of
+/// files this is that folder; across several folders it is their common
 /// ancestor. Recomputed as files are added.
 export function commonDir(paths: string[]): string {
   if (paths.length === 0) return "";
@@ -124,14 +121,36 @@ export function commonDir(paths: string[]): string {
   return common.join(sep) || sep;
 }
 
-/// Suggest a CSV file name from a single dropped path (folder or file name,
-/// with an audio extension stripped). `fallback` is used otherwise.
-export function csvNameFrom(path: string, fallback = "FlacCompagnon"): string {
+function nameFrom(path: string, fallback: string): string {
   const segments = path.split(/[\\/]/).filter(Boolean);
   let name = segments.length ? segments[segments.length - 1] : fallback;
   const m = name.match(/\.([A-Za-z0-9]+)$/);
   if (m && AUDIO_EXTS.includes(m[1].toLowerCase())) {
     name = name.slice(0, -(m[1].length + 1));
   }
-  return `${name || fallback}.csv`;
+  return name || fallback;
+}
+
+/// Suggested report file name from a single dropped path (folder or file name,
+/// with an audio extension stripped).
+///
+/// `ext` must match the format actually being written. The save dialog appends
+/// its own extension when the name it's given doesn't already carry the right
+/// one, so offering `Album.csv` while saving JSON produced `Album.csv.json`.
+export function reportNameFrom(
+  path: string,
+  ext: "csv" | "json" = "csv",
+  fallback = "FlacCompagnon",
+): string {
+  return `${nameFrom(path, fallback)}.${ext}`;
+}
+
+/// Same idea for a playlist. Extended M3U conventionally uses `.m3u8` (UTF-8),
+/// Simple sticks to the plain `.m3u`.
+export function playlistNameFrom(
+  path: string,
+  ext: "m3u8" | "m3u" = "m3u8",
+  fallback = "Playlist",
+): string {
+  return `${nameFrom(path, fallback)}.${ext}`;
 }

@@ -20,3 +20,19 @@ tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 flaccompagnon-core = { path = "../core" }
+# Audio output for the results table's hover-to-preview playback button.
+cpal = "0.18"
+# HTTP client for the tag panel's optional "Search online" lookup
+# (MusicBrainz + Discogs) — the only feature in this app that reaches the
+# network, and only ever on explicit user action (see src/lookup.rs).
+# reqwest's default TLS backend is rustls (no system OpenSSL to link
+# against on any platform); `json` is for parsing responses, `query` for
+# building each request's query string (both API endpoints take their
+# search terms/params that way).
+reqwest = { version = "0.13", features = ["json", "query"] }
+
+[dev-dependencies]
+# Scratch folders for the target-expansion tests in commands/batch.rs, which
+# need real files on disk (`gather_targets` asks the filesystem what exists).
+# Same version core already uses, so this adds no new crate to the lockfile.
+tempfile = "3"

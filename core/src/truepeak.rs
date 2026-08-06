@@ -74,6 +74,8 @@ pub struct TruePeak {
 }
 
 impl TruePeak {
+    /// Start tracking oversampled peak for a stream with `channels` audio
+    /// channels (at least one channel is always allocated).
     pub fn new(channels: usize) -> Self {
         Self {
             channels: (0..channels.max(1))

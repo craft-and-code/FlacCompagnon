@@ -21,16 +21,24 @@ use crate::analyzer::AnalysisSummary;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TranscodeState {
+    /// No evidence of a lossy source.
     None,
+    /// Early spectral roll-off with no sharp cliff — could be a transcode or
+    /// a naturally dark/acoustic master; not conclusive on its own.
     Suspected,
+    /// A lossy-encoder signature was found (brick wall, MDCT dead zone, or
+    /// AAC re-quantization grid).
     Detected,
 }
 
 /// The three independent detections plus a human summary.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Detections {
+    /// `true` when the content uses fewer bits than the container declares.
     pub upscaling: bool,
+    /// `true` when a hi-res container's extra bandwidth is empty.
     pub upsampling: bool,
+    /// Lossy-transcode verdict; see [`TranscodeState`].
     pub transcoding: TranscodeState,
     /// One-line explanation of the flagged issues (or why the file looks clean).
     pub detail: String,
@@ -39,6 +47,8 @@ pub struct Detections {
 }
 
 impl Detections {
+    /// A neutral placeholder for a file that hasn't been (or couldn't be)
+    /// analyzed yet — no detections flagged, summary left blank.
     pub fn unknown() -> Self {
         Detections {
             upscaling: false,

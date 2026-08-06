@@ -143,6 +143,13 @@ jobs:
     needs: release
     runs-on: ubuntu-22.04
     steps:
+      # Needed for the changelog step below: it walks the commit range since
+      # the previous tag, which requires the actual git history (this job
+      # otherwise only downloads build artifacts, no checkout at all).
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Collect every platform's installers
         uses: actions/download-artifact@v4
         with:
@@ -152,6 +159,71 @@ jobs:
       - name: List what will be published
         run: ls -lh dist-release
 
+      # Every past release body was the install-instructions boilerplate
+      # below and *nothing else* — no "what changed" section, ever. This
+      # can't fully write itself (commit subjects here are terse: "Export
+      # JSON", "Fix CI"), so it generates a real commit list plus a clearly
+      # marked placeholder, forcing a deliberate pass over "Highlights"
+      # before hitting Publish on the draft rather than that section quietly
+      # never existing.
+      - name: Draft the "what's new" section
+        run: |
+          set -euo pipefail
+          prev_tag=$(git tag --sort=-v:refname | grep -A1 "^${GITHUB_REF_NAME}$" | tail -n1)
+          {
+            echo "## What's new in ${GITHUB_REF_NAME}"
+            echo
+            echo "<!-- TODO before publishing: replace this with 2-4 real highlight bullets. -->"
+            echo
+            if [ -n "$prev_tag" ] && [ "$prev_tag" != "$GITHUB_REF_NAME" ]; then
+              echo "<details><summary>Commits since ${prev_tag}</summary>"
+              echo
+              git log --no-merges --pretty=format:'- %s (%h)' "${prev_tag}..${GITHUB_REF_NAME}"
+              echo
+              echo
+              echo "</details>"
+            else
+              echo "_First tagged release — no previous tag to diff against._"
+            fi
+          } > release-notes.md
+
+      - name: Append the install instructions
+        run: |
+          cat >> release-notes.md <<'EOF'
+
+          ---
+
+          Cross-platform builds of FlacCompagnon. **Every file name ends with
+          its platform**, so pick the one that matches your system:
+
+          | Your system | Download |
+          | --- | --- |
+          | **Windows** (10/11, 64-bit) | `..._Windows-x64.msi` — the installer |
+          | **macOS** (Apple Silicon: M1/M2/M3/M4) | `..._macOS-AppleSilicon.dmg` — the installer |
+          | **Linux** (any distro, 64-bit) | `..._Linux-x86_64.AppImage` — portable, just make it executable |
+          | **Linux** (Debian / Ubuntu) | `..._Linux-x86_64.deb` — system package |
+
+          The macOS `.app.tar.gz` is the same app as the `.dmg`, just archived —
+          use the `.dmg` unless you specifically want the raw bundle.
+
+          **macOS — first launch.** These builds are **not signed with an Apple
+          Developer ID**, so Gatekeeper will say the app "is damaged" or "cannot
+          be opened". This is expected for an open-source app without a paid
+          Apple certificate. To open it, drag **FlacCompagnon.app** to
+          `/Applications`, then run once in Terminal:
+
+          ```
+          xattr -dr com.apple.quarantine /Applications/FlacCompagnon.app
+          ```
+
+          (Alternatively: right-click the app → **Open** → **Open**, or allow it
+          from **System Settings → Privacy & Security**.)
+
+          **ffmpeg** is **not** bundled — install it separately for spectrograms
+          and DSD content analysis (macOS: `brew install ffmpeg`,
+          Debian/Ubuntu: `sudo apt install ffmpeg`, Windows: `choco install ffmpeg`).
+          EOF
+
       - name: Publish the draft release
         uses: softprops/action-gh-release@v2
         with:
@@ -160,33 +232,4 @@ jobs:
           draft: true
           prerelease: false
           files: dist-release/*
-          body: |
-            Cross-platform builds of FlacCompagnon. **Every file name ends with
-            its platform**, so pick the one that matches your system:
-
-            | Your system | Download |
-            | --- | --- |
-            | **Windows** (10/11, 64-bit) | `..._Windows-x64.msi` — the installer |
-            | **macOS** (Apple Silicon: M1/M2/M3/M4) | `..._macOS-AppleSilicon.dmg` — the installer |
-            | **Linux** (any distro, 64-bit) | `..._Linux-x86_64.AppImage` — portable, just make it executable |
-            | **Linux** (Debian / Ubuntu) | `..._Linux-x86_64.deb` — system package |
-
-            The macOS `.app.tar.gz` is the same app as the `.dmg`, just archived —
-            use the `.dmg` unless you specifically want the raw bundle.
-
-            **macOS — first launch.** These builds are **not signed with an Apple
-            Developer ID**, so Gatekeeper will say the app "is damaged" or "cannot
-            be opened". This is expected for an open-source app without a paid
-            Apple certificate. To open it, drag **FlacCompagnon.app** to
-            `/Applications`, then run once in Terminal:
-
-            ```
-            xattr -dr com.apple.quarantine /Applications/FlacCompagnon.app
-            ```
-
-            (Alternatively: right-click the app → **Open** → **Open**, or allow it
-            from **System Settings → Privacy & Security**.)
-
-            **ffmpeg** is **not** bundled — install it separately for spectrograms
-            and DSD content analysis (macOS: `brew install ffmpeg`,
-            Debian/Ubuntu: `sudo apt install ffmpeg`, Windows: `choco install ffmpeg`).
+          body_path: release-notes.md

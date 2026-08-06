@@ -11,6 +11,19 @@
 //!
 //! Nothing here depends on a specific file format; [`decode`](crate::decode)
 //! adapts each codec to the [`StreamAnalyzer::push_frame`] interface.
+//!
+//! # Size
+//!
+//! Over CLAUDE.md's 300-line ceiling, deliberately. Each metric already lives
+//! in its own module ([`spectrum`](crate::spectrum),
+//! [`clipping`](crate::clipping), [`stereo`](crate::stereo),
+//! [`bitdepth`](crate::bitdepth), [`mdct`](crate::mdct)); what is left here is
+//! the single hot loop that feeds them all from one pass over the samples,
+//! plus the state that loop carries. That single pass *is* the design — the
+//! whole reason this type exists rather than five independent analyzers is
+//! that an album must be read once, not five times. Splitting the loop would
+//! hide exactly the thing a reviewer needs to see whole, and any split would
+//! be by metric, which is the axis already covered by those modules.
 
 use std::sync::Arc;
 
@@ -51,7 +64,9 @@ const DYN_TOP_FRACTION: f64 = 0.2;
 /// Aggregated results produced by [`StreamAnalyzer::finish`].
 #[derive(Debug, Clone)]
 pub struct AnalysisSummary {
+    /// Estimated frequency-response cutoff, in Hz.
     pub cutoff_hz: f64,
+    /// [`cutoff_hz`](Self::cutoff_hz) as a fraction of Nyquist (0..1).
     pub cutoff_ratio: f64,
     /// How sharply the level drops at the cutoff (dB). Large == a brick wall.
     pub cliff_db: f32,
@@ -59,8 +74,13 @@ pub struct AnalysisSummary {
     pub above_db: f32,
     /// Averaged magnitude spectrum in dB, one entry per FFT bin (0..=N/2).
     pub spectrum_db: Vec<f32>,
+    /// Clipping / true-peak-ish statistics accumulated over the stream.
     pub clipping: ClippingInfo,
+    /// `true` when the left and right channels were identical (or near
+    /// enough) for long enough to suggest a mono source duplicated to stereo.
     pub fake_stereo: bool,
+    /// The bit depth actually used by the samples, when it could be
+    /// determined from an integer PCM source (`None` for float sources).
     pub real_bit_depth: Option<u32>,
 
     /// Dynamic-range estimate in dB: peak level vs the RMS of the loudest 20%
@@ -82,6 +102,19 @@ pub struct AnalysisSummary {
     /// ≥ [`requant::DETECT_RATE`] means an AAC source. `None` when the check
     /// did not run (unsupported rate or file too short).
     pub requant_rate: Option<f32>,
+}
+
+impl AnalysisSummary {
+    /// The FFT size [`spectrum_db`](Self::spectrum_db) was produced with.
+    ///
+    /// The spectrum holds bins `0..=N/2` (a real FFT's non-redundant half), so
+    /// `N` is recovered as `(len - 1) * 2`. Callers need it to turn a bin index
+    /// back into a frequency; it lives here rather than being re-derived at
+    /// each call site, where the off-by-one is easy to get wrong and silently
+    /// shifts every frequency band that depends on it.
+    pub fn fft_size(&self) -> usize {
+        self.spectrum_db.len().saturating_sub(1) * 2
+    }
 }
 
 /// Incremental audio analyzer.
@@ -135,6 +168,7 @@ pub struct StreamAnalyzer {
 }
 
 impl StreamAnalyzer {
+    /// Start a fresh analysis for a stream with `channels` audio channels.
     pub fn new(channels: usize) -> Self {
         let mut planner = FftPlanner::<f32>::new();
         let fft = planner.plan_fft_forward(FFT_SIZE);

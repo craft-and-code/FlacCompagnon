@@ -41,6 +41,19 @@
 //! bright/transient content at ≥ 192 kbps that long-window analysis alone
 //! misses (measured: 0.13 → 0.82 on such a file at 320 kbps).
 //! Only applies at 44.1/48 kHz, per the paper.
+//!
+//! # Size
+//!
+//! Over CLAUDE.md's 300-line ceiling, deliberately. This is one method from
+//! one paper, and its steps are only correct in relation to each other: the
+//! alignment sweep exists to make the scalefactor sweep meaningful, which
+//! exists to make the `E(s) < τ(s)` test meaningful, which exists to make the
+//! per-frame aggregation meaningful. Split across files, a reader could no
+//! longer check the implementation against §3 of the paper by reading top to
+//! bottom, and the constants (`SWB_4448`, `NSF`, `DETECT_RATE`) would sit
+//! away from the equations that justify them. The tuned thresholds are the
+//! part most likely to be revisited, and they are the part that most needs
+//! its derivation in view.
 
 use std::cell::RefCell;
 use std::sync::Arc;

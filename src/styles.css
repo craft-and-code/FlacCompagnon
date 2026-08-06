@@ -34,7 +34,7 @@
 /* Dark palette. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --bg: #14161c;
+    --bg: #0d0e13; /* matches the marketing site's dark background (site/styles.css) */
     --bg-elev: #1c1f28;
     --bg-elev2: #232734;
     --border: #2c3140;
@@ -63,7 +63,7 @@
   color-scheme: light;
 }
 :root[data-theme="dark"] {
-  --bg: #14161c;
+  --bg: #0d0e13; /* matches the marketing site's dark background (site/styles.css) */
   --bg-elev: #1c1f28;
   --bg-elev2: #232734;
   --border: #2c3140;
@@ -105,7 +105,11 @@ html, body {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  padding: 18px 22px;
+  /* Top padding much smaller than the other sides: the window has a normal
+     OS title bar above it already (no overlay/hiddenInset titlebar, so no
+     traffic lights to clear), so the extra ~18px here was just dead space
+     stacking on top of it rather than serving any layout purpose. */
+  padding: 6px 22px 18px;
   gap: 16px;
 }
 
@@ -117,12 +121,11 @@ html, body {
   gap: 12px;
   flex-wrap: wrap;
 }
-.brand { display: flex; align-items: center; gap: 12px; }
-.logo { font-size: 30px; color: var(--accent); }
-.brand h1 { margin: 0; font-size: 20px; letter-spacing: 0.2px; }
-.tagline { margin: 0; color: var(--muted); font-size: 12px; }
-
-.actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+/* No `.brand` block anymore — the window's own titlebar already shows
+   "FlacCompagnon", so a second title + tagline here was a duplicate.
+   `margin-left: auto` keeps the actions where they were (flush right)
+   now that they're `.topbar`'s only child. */
+.actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-left: auto; }
 .btn {
   background: var(--accent);
   color: var(--accent-contrast);
@@ -140,6 +143,301 @@ html, body {
 .btn-secondary:not(:disabled):hover { background: var(--border); }
 .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
 .btn-ghost:not(:disabled):hover { background: var(--bg-elev2); color: var(--text); }
+.btn-danger { background: var(--bad); color: #fff; }
+.btn-danger:not(:disabled):hover { background: color-mix(in srgb, var(--bad) 82%, black); }
+
+/* --- Main row: tag panel (left) + dropzone/results/progress column --- */
+.main-row {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 16px;
+}
+.main-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* --- Tag panel --- */
+.tag-panel {
+  flex: none;
+  width: 272px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.tag-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.tag-panel-head h2 { margin: 0; font-size: 14px; }
+.tag-panel-head .muted { font-size: 11.5px; }
+.tag-panel-head-right { display: flex; align-items: center; gap: 8px; }
+/* Closing the panel just deselects every row (`onClose` in TagPanel.tsx) —
+   there's otherwise no way back to the empty state once a selection opens
+   it. Uses IconButton (`.icon-btn`, variant "close" — see its definition
+   further down, next to the rest of the shared icon-button family). */
+.tag-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tag-lookup-btn {
+  width: 100%;
+  flex: none;
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.tag-lookup-icon { flex: none; }
+
+/* Lives between `.tag-panel-head` and the padded, scrollable
+   `.tag-panel-body` — a direct child of `.tag-panel` itself, not nested
+   inside the padded body. That's deliberate: it lets the artwork bleed
+   edge-to-edge (no left/right margin, no gap under the header), fixed in
+   place while the fields below it scroll — the layout density of Meta's
+   sidebar artwork, rather than a card floating inside the panel's padding. */
+.tag-cover {
+  width: 100%;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+}
+/* Full-bleed artwork: no border/radius/shadow, since it now sits flush
+   against the panel's own edges rather than being an inset "well".
+   `.tag-cover-info` immediately below it forms one continuous block. */
+.tag-cover-frame {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-elev2);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s, box-shadow 0.15s;
+}
+/* Drop target for replacing the selection's cover — see `useNativeDrop`,
+   driven by the webview's native drag-drop position events (HTML5 dragover
+   doesn't fire; same constraint as row reordering). `.drag-over` lands
+   directly on `.tag-cover-frame` (CoverArt re-renders that element on every
+   drag-position update). An inset ring is used instead of a border so the
+   drop feedback doesn't nudge the edge-to-edge layout. */
+.tag-cover-frame.drag-over {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-elev2));
+}
+/* Centered feedback layered over the frame: a drop-upload icon while
+   something is being dragged over the box, a spinner once it's been
+   released and is being read from disk. Sits above the image/placeholder
+   either way, which is why the frame needs `position: relative`. */
+.tag-cover-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, black 35%, transparent);
+  color: #fff;
+  pointer-events: none;
+}
+.tag-cover-overlay svg { width: 32px; height: 32px; }
+.tag-cover-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tag-cover-nav:hover { background: rgba(0, 0, 0, 0.75); }
+.tag-cover-prev { left: 6px; }
+.tag-cover-next { right: 6px; }
+/* Width fills the panel; height follows naturally from the image's own
+   aspect ratio (no cropping) — deliberately not object-fit: cover, so a
+   non-square cover isn't chopped down to a square. */
+.tag-cover-img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+/* Bandeau below the artwork — a distinct shaded strip (not just muted
+   caption text) for the image's dimensions/format/size plus a role picker,
+   flush against the image above it and the panel's edges on either side.
+   The border-bottom is what separates the fixed cover block from the
+   scrollable field list below it. */
+.tag-cover-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 12px 5px 16px;
+  font-size: 10.5px;
+  color: var(--muted);
+  background: var(--bg-elev2);
+  border-bottom: 1px solid var(--border);
+}
+/* The text side of the bandeau: `flex: 1` + `min-width: 0` is what lets it
+   shrink below its content's natural width instead of pushing the icon/role
+   group off to the right (or forcing the whole row wider than the panel) —
+   without it, an ellipsis-only truncation used to hide most of the line. See
+   `MarqueeText` for how the now-hidden overflow is made readable instead. */
+.tag-marquee {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
+.tag-marquee-track {
+  display: flex;
+  width: max-content;
+}
+.tag-marquee-track:not(.tag-marquee-static) {
+  animation: tag-marquee-scroll 9s linear infinite;
+}
+.tag-marquee-item {
+  flex: none;
+  white-space: nowrap;
+  padding-right: 28px; /* breathing room before the looping duplicate */
+}
+/* Moves by exactly one item's width (item + its trailing gap) — the two
+   copies are pixel-for-pixel aligned at that point, so the loop is seamless
+   rather than visibly "jumping" back to the start. */
+@keyframes tag-marquee-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+/* Groups the delete/extract buttons with the role picker so `.tag-cover-info`
+   still has just two flex children (the marquee and this) — with `justify-
+   content: space-between` and a third top-level child, the extra free space
+   would spread unevenly across all three instead of just pinning the two
+   ends. */
+.tag-cover-controls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+}
+/* Extract/delete here are `.icon-btn` (IconButton) — see its shared
+   definition further down, next to the reveal-in-file-browser column. */
+/* A fixed px cap, not a percentage: `.tag-cover-controls` is `flex: none`
+   (sized to its own content), so a percentage here would be relative to a
+   box whose width depends on this element's — that circular case is exactly
+   what CSS resolves by ignoring the percentage, letting the longest role
+   label (e.g. "Media (e.g. label side of a CD)") render at full width and
+   push the whole control group past the panel's edge instead of sitting
+   flush against it. */
+.tag-cover-role {
+  flex: none;
+  max-width: 74px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 10px;
+  padding: 1px 3px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+}
+.tag-cover-role:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.tag-cover-placeholder {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.tag-fields { display: flex; flex-direction: column; gap: 11px; }
+.tag-field-row { display: flex; gap: 10px; }
+.tag-field-row > .tag-field-narrow { flex: 1; min-width: 0; }
+.tag-field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.tag-field-head span:first-child { font-size: 11.5px; color: var(--muted); }
+.tag-field-badge {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: 6px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+.tag-field input[type="text"],
+.tag-field textarea {
+  width: 100%;
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 6px 8px;
+  font-size: 12.5px;
+  color: var(--text);
+  font-family: inherit;
+  resize: vertical;
+}
+.tag-field input[type="text"]:focus,
+.tag-field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.tag-field input::placeholder,
+.tag-field textarea::placeholder {
+  color: var(--muted);
+  font-style: italic;
+}
+.tag-field-pair { display: flex; align-items: center; gap: 5px; }
+.tag-field-pair input { min-width: 0; text-align: center; }
+.tag-field-sep { color: var(--muted); flex: none; }
+.tag-field-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.tag-panel-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+.tag-panel-actions .btn { flex: 1; }
 
 /* --- Drop zone (fills all remaining space) --- */
 .dropzone {
@@ -158,8 +456,9 @@ html, body {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 8%, var(--bg-elev));
 }
-.dropzone-inner { max-width: 520px; padding: 26px; }
-.drop-icon { font-size: 46px; color: var(--accent); }
+.dropzone-inner { max-width: 580px; padding: 26px; }
+.drop-icon { color: var(--accent); }
+.drop-icon svg { width: 44px; height: 44px; }
 .dropzone p { margin: 8px 0; font-size: 15px; }
 .muted { color: var(--muted); font-size: 12.5px; }
 
@@ -174,19 +473,21 @@ html, body {
   justify-content: space-between;
   gap: 12px;
 }
-.cancel-btn {
-  flex: none;
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  font-size: 15px;
-  line-height: 1;
-  padding: 2px 6px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+/* `${verb} ${current}/${total} — ${file}` can be long enough to wrap inside
+   the flex row above — without `min-width: 0`, a flex item won't shrink
+   below its content's width, so the line would break wherever it had to
+   (often stranding the leading word, e.g. "Analyzing", alone below the rest).
+   Truncating to one line with an ellipsis instead is the same convention
+   already used for long values elsewhere (`.fname`, `.results-meta`). */
+#progress-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.cancel-btn:hover { background: var(--bg-elev2); color: var(--bad); }
+/* The cancel "✕" is `.icon-btn` (IconButton, variant "close") — shared
+   definition further down. */
 .progress-track { height: 8px; background: var(--bg-elev2); border-radius: 6px; overflow: hidden; }
 .progress-bar { height: 100%; width: 0%; background: var(--accent); transition: width 0.2s ease; }
 
@@ -216,7 +517,24 @@ html, body {
 .chip.v-suspected { color: var(--transcoded); }
 .chip.v-bad { color: var(--bad); }
 .chip.v-muted { color: var(--muted); }
-.results-meta { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 45%; }
+/* `.results-meta-path` (not `.results-meta` itself) carries the ellipsis
+   truncation and `min-width: 0` — the same split as `.tag-cover-info`/
+   `.tag-marquee`, and for the same reason: the icon button next to it is a
+   sibling flex item, and truncating the row itself would risk clipping that
+   button along with the overflowing text instead of just the text. */
+.results-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  max-width: 45%;
+}
+.results-meta-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .table-wrap {
   flex: 1;
@@ -241,45 +559,210 @@ thead th {
 tbody td { padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: var(--row-hover); }
+/* Table-wide: rows are dragged/selected by clicking, never by selecting
+   text — `-webkit-user-select` is required in addition to the unprefixed
+   property for this to actually take effect in Tauri's WKWebView. */
+table { -webkit-user-select: none; user-select: none; }
+tbody tr { cursor: grab; }
+tbody tr.selected { background: color-mix(in srgb, var(--accent) 16%, var(--bg-elev)); }
+tbody tr.selected:hover { background: color-mix(in srgb, var(--accent) 22%, var(--bg-elev)); }
 .fname { max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
 
-/* Reveal-in-file-browser button column */
-th:first-child { width: 32px; }
-td.reveal { width: 32px; padding: 4px 4px 4px 10px; text-align: center; }
-.reveal-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
-  transition: background 0.15s, color 0.15s;
+/* Manual row reordering (mousedown-based, see main.ts for why). `.pressing`
+   gives immediate feedback the instant the mouse goes down — before the
+   movement threshold promotes it to an actual drag. Once dragging is under
+   way, the "picked up" look moves to `.row-drag-ghost` (a floating copy that
+   tracks the cursor — see below); the original row becomes a faint,
+   half-emptied placeholder so it's clear that's where it came from. */
+tbody tr.pressing {
+  position: relative;
+  z-index: 2;
+  background: var(--bg-elev);
+  transform: translateY(-3px) scale(1.012);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.35),
+    0 3px 8px rgba(0, 0, 0, 0.28);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
-.reveal-btn:hover { color: var(--accent); background: var(--bg-elev2); }
+tbody tr.dragging {
+  cursor: grabbing;
+  opacity: 0.3;
+}
 
-/* Delete-row button column */
-td.rowdel { width: 32px; padding: 4px 10px 4px 4px; text-align: center; }
-.delete-btn {
+/* Insertion line — a solid rule between the two rows the dragged one would
+   land between. Applied to the `td`s rather than the `tr` itself: box-shadow
+   and borders on `<tr>` render unreliably across table layout engines
+   (notably in Tauri's WKWebView), `td` borders don't have that problem. */
+tbody tr.drop-before td { border-top: 3px solid var(--text); }
+tbody tr.drop-after td { border-bottom: 3px solid var(--text); }
+
+/* Floating "layer" that follows the cursor while a row is being dragged — a
+   semi-transparent snapshot of the row, positioned via inline `left`/`top`
+   in main.ts on every mousemove. `pointer-events: none` is required so it
+   doesn't itself become the element under the cursor (which would break the
+   `elementFromPoint` lookup used to find the actual drop target beneath it). */
+.row-drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.88;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.4),
+    0 4px 10px rgba(0, 0, 0, 0.3);
+}
+.row-drag-ghost table { margin: 0; }
+.row-drag-ghost td { border-bottom: none !important; }
+/* Shown under the stacked rows when a multi-row drag has more selected rows
+   than the ghost bothers to render (see GHOST_STACK_CAP) — a plain summary
+   line, not a badge, so it reads as part of the same floating list. */
+.row-drag-more {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-muted, #888);
+  text-align: center;
+  background: var(--bg-elev);
+}
+
+/* Every icon-only button in the app (IconButton.tsx) shares this: one 20px
+   box, one border-radius, one set of hover treatments picked by variant.
+   This used to be five copy-pasted `.xxx-btn` rules that had quietly drifted
+   apart (4px vs. 6px radius, `--bg-elev` vs. `--bg-elev2` hover surface, a
+   12% vs. 14% red hover tint) — one definition means one place to keep them
+   in sync from here on. */
+.icon-btn {
+  flex: none;
+  width: 20px;
+  height: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
+  padding: 0;
   border: none;
-  color: var(--muted);
-  cursor: pointer;
-  padding: 4px;
   border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
-.delete-btn:hover {
+.icon-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+/* "neutral" (default, no modifier class): reveal, extract cover — just does
+   something, turns accent blue on hover. */
+.icon-btn:hover { background: var(--bg-elev2); color: var(--accent); }
+/* "close": dismiss/stop, not destructive — panel close, cancel task. Red
+   text on hover, no background tint (that tint is reserved for things that
+   actually delete data, right below). */
+.icon-btn-close:hover { color: var(--bad); }
+/* "danger": deletes something — muted at rest like everything else, but the
+   hover gets a red tint on the background too, not just the icon, since
+   this one hover state has to read as more consequential than "close"'s. */
+.icon-btn-danger:hover {
   color: var(--bad);
   background: color-mix(in srgb, var(--bad) 12%, transparent);
 }
+/* "danger-persistent": same as "danger", but red even before the mouse gets
+   there. Reserved for the one delete button that stands alone rather than
+   sitting in a dense, repeated list (the tag panel's cover) — a whole
+   table's worth of permanently-red trash icons would be visual noise, but a
+   single one earns the extra warning. */
+.icon-btn-danger-persistent,
+.icon-btn-danger-persistent:hover {
+  color: var(--bad);
+}
+.icon-btn-danger-persistent:hover {
+  background: color-mix(in srgb, var(--bad) 12%, transparent);
+}
+
+/* Reveal-in-file-browser button column. */
+th:first-child { width: 32px; }
+td.reveal { width: 32px; padding: 4px 4px 4px 10px; text-align: center; }
+
+/* Thumbnail / hover-to-preview column, right after the reveal button */
+th:nth-child(2) { width: 32px; }
+td.thumb { width: 32px; padding: 4px; text-align: center; }
+.play-btn {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: var(--bg-elev2);
+  color: var(--muted);
+  cursor: pointer;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.play-btn.playing { outline: 2px solid var(--accent); outline-offset: 1px; }
+.thumb-img { width: 24px; height: 24px; object-fit: cover; display: block; border-radius: 4px; }
+.thumb-placeholder { display: flex; align-items: center; justify-content: center; }
+.play-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+/* A playing row keeps its overlay visible at rest (the equalizer bars are the
+   "now playing" indicator, not just a hover affordance); every other row
+   only reveals its overlay (a plain Play icon) on hover. */
+.play-btn:hover .play-overlay,
+.play-btn.playing .play-overlay { opacity: 1; }
+
+/* Two overlay states for a playing row: the bars at rest, the Stop icon on
+   hover — swapped with `display` rather than unmounted, so hovering never
+   restarts the bars' animation. */
+.play-overlay-hover { display: none; }
+.play-btn.playing:hover .play-overlay-idle { display: none; }
+.play-btn.playing:hover .play-overlay-hover { display: flex; }
+
+/* Heights are set inline per bar from real playback loudness (see
+   `LiveEqualizerBars`), not a CSS keyframe loop — the transition is what
+   turns the ~16 updates/second it receives into smooth motion instead of
+   visible steps. */
+.eq-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  width: 14px; /* 4 bars at 2px + 3 gaps at 2px — the 24x24 thumbnail button
+                  around it isn't growing, so this has to clear its edges
+                  with room to spare, not just fit exactly. */
+  height: 12px;
+}
+.eq-bars span {
+  width: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  transition: height 0.08s linear;
+}
+
+/* Delete-row button column. The button is `.icon-btn`, variant "danger"
+   (red only on hover — see the shared IconButton definition above; this is
+   the one deliberate exception from the cover panel's always-red delete,
+   since a whole table's worth of permanently-red icons would be noise). */
+td.rowdel { width: 32px; padding: 4px 10px 4px 4px; text-align: center; }
 
 /* (The old single-verdict cell was replaced by the per-detection tags below.) */
+
+/* Size column: right-aligned and tabular so the magnitudes line up and can
+   be compared down the column at a glance. */
+td.size {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
 /* Detections column: one or more small tags */
 td.detections { white-space: normal; min-width: 130px; }
@@ -388,5 +871,325 @@ td.detections { white-space: normal; min-width: 130px; }
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Cover lightbox — click the tag panel's artwork to check it at full size,
+   with the same info line plus the picture's role (Front cover, etc.). */
+.cover-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  background: color-mix(in srgb, var(--bg) 55%, black 25%);
+  backdrop-filter: blur(3px);
+  cursor: zoom-out;
+}
+.cover-modal-inner {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: default;
+}
+.cover-modal-img {
+  display: block;
+  max-width: min(80vw, 640px);
+  max-height: 72vh;
+  width: auto;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: 0 20px 50px var(--shadow);
+}
+.cover-modal-info {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 14px;
+}
+.cover-modal-close {
+  position: absolute;
+  /* Above the lookup pop-in's loading overlay, so a slow request never
+     traps the user inside a modal they can't dismiss. */
+  z-index: 2;
+  top: -14px;
+  right: -14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px var(--shadow);
+}
+.cover-modal-close:hover { background: var(--bg-elev2); }
+
+/* Extended-tags link in the panel + its pop-in — everything lofty read that
+   isn't one of the common fields above (ISRC, BPM, ReplayGain, custom
+   frames, ...), read-only for now. */
+.tag-extended-btn {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  color: var(--accent);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tag-extended-btn:hover { text-decoration: underline; }
+.tag-extended-count { color: var(--muted); font-weight: 400; }
+
+.extended-tags-inner {
+  width: min(480px, 88vw);
+  max-height: 78vh;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 22px 16px;
+  box-shadow: 0 20px 50px var(--shadow);
+  align-items: stretch;
+}
+.extended-tags-title { margin: 0 0 4px; font-size: 14px; }
+.extended-tags-body {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ext-row {
+  display: flex;
+  gap: 14px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.ext-row:last-child { border-bottom: none; }
+.ext-key {
+  flex: none;
+  width: 40%;
+  color: var(--muted);
+  word-break: break-word;
+}
+.ext-value { flex: 1; min-width: 0; word-break: break-word; }
+.ext-value.ext-mixed { color: var(--muted); font-style: italic; }
+.extended-tags-empty { color: var(--muted); font-size: 12.5px; padding: 8px 0; }
+
+/* Online lookup (MusicBrainz + Discogs) — "Search online" button's pop-in.
+   Reuses the extended-tags pop-in's frame (`.extended-tags-inner`) sized a
+   bit wider for the results list / track list. */
+.lookup-inner {
+  width: min(520px, 90vw);
+  max-height: 82vh;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 22px 16px;
+  box-shadow: 0 20px 50px var(--shadow);
+  align-items: stretch;
+}
+.lookup-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+}
+.lookup-search-row { display: flex; gap: 8px; }
+.lookup-search-row input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text);
+}
+.lookup-search-row input:focus { outline: none; border-color: var(--accent); }
+.lookup-settings {
+  font-size: 11.5px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.lookup-settings summary { cursor: pointer; font-weight: 600; color: var(--text); }
+.lookup-settings p { margin: 6px 0; }
+.lookup-settings input {
+  width: 100%;
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text);
+}
+.lookup-status { margin: 0; display: flex; align-items: center; gap: 8px; }
+.lookup-status.lookup-status-error { color: var(--bad); }
+.spinner-sm { width: 13px; height: 13px; border-width: 2px; flex: none; }
+.lookup-results { display: flex; flex-direction: column; gap: 6px; }
+
+/* Loading overlay covering the whole pop-in rather than a discreet line of
+   status text at the top — a fetch that fails (or is slow) was easy to miss
+   up there, which read as "clicking a result does nothing". */
+.lookup-inner { position: relative; }
+.lookup-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg-elev) 82%, transparent);
+  backdrop-filter: blur(1.5px);
+  font-size: 12.5px;
+  color: var(--text);
+}
+.lookup-candidate {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s;
+}
+.lookup-candidate:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg-elev2)); }
+.lookup-candidate-source {
+  flex: none;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+.lookup-candidate-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.lookup-candidate-title { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lookup-candidate-artist { display: block; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lookup-candidate-meta { flex: none; color: var(--muted); font-size: 11px; }
+.lookup-back-btn { align-self: flex-start; flex: none; }
+.lookup-detail-body { display: flex; flex-direction: column; gap: 12px; }
+.lookup-detail-head { display: flex; gap: 12px; align-items: flex-start; }
+.lookup-detail-cover {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev2);
+}
+.lookup-detail-meta { min-width: 0; }
+.lookup-detail-title { font-weight: 600; font-size: 13.5px; margin: 0 0 3px; word-break: break-word; }
+.lookup-detail-artist { color: var(--muted); font-size: 12px; margin: 0; }
+.lookup-note { color: var(--muted); font-size: 11px; margin: 0; }
+.lookup-note-match { color: var(--accent); }
+/* No `gap` here on purpose: a flex gap would show the container's own
+   background as a hairline above each row, which reads as a broken row
+   separator once a row is highlighted on hover. Rows carry their own
+   `border-bottom` instead. */
+.lookup-tracklist {
+  display: flex;
+  flex-direction: column;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.lookup-track {
+  display: flex;
+  gap: 10px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+}
+.lookup-track:last-child { border-bottom: none; }
+.lookup-track:hover { background: var(--bg-elev2); }
+.lookup-track.selected { background: color-mix(in srgb, var(--accent) 16%, var(--bg-elev)); }
+.lookup-track:disabled { opacity: 0.6; cursor: default; }
+.lookup-track:disabled:hover { background: none; }
+.lookup-track-pos { flex: none; width: 26px; color: var(--muted); text-align: right; }
+.lookup-track-title { flex: 1; min-width: 0; word-break: break-word; }
+.lookup-detail-actions { display: flex; }
+.lookup-detail-actions .btn { flex: 1; }
+
+/* Playlist export format pop-in — a tiny choice step before the native save
+   dialog opens, since that dialog can't host a custom radio group itself. */
+.playlist-format-inner { width: min(360px, 88vw); }
+.playlist-format-options { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 4px; }
+.playlist-format-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.playlist-format-option:hover { border-color: var(--accent); }
+/* `:has()` covers modern engines; `.selected` (toggled in main.ts on
+   change) is the fallback for anything older. */
+.playlist-format-option:has(input:checked),
+.playlist-format-option.selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.playlist-format-option input { margin-top: 3px; flex: none; }
+.playlist-format-option span { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; }
+.playlist-format-option small { font-size: 11px; }
+.playlist-format-actions { display: flex; gap: 8px; margin-top: 4px; }
+.playlist-format-actions .btn { flex: 1; }
+
+/* Generic confirm/cancel pop-in — see ConfirmDialog. */
+/* `.cover-modal-inner` (the shared base every Modal instance gets) is
+   deliberately bare — the cover lightbox sits directly on the backdrop with
+   no card behind the image. Every other pop-in (this one included) supplies
+   its own solid background/border/shadow, the way `.extended-tags-inner`
+   and `.lookup-inner` already do. */
+.confirm-dialog-inner {
+  width: min(340px, 88vw);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 22px 16px;
+  box-shadow: 0 20px 50px var(--shadow);
+  align-items: stretch;
+}
+.confirm-dialog-message { margin: 4px 0 0; font-size: 13px; color: var(--text); line-height: 1.5; }
+.confirm-dialog-actions { display: flex; gap: 8px; margin-top: 16px; }
+.confirm-dialog-actions .btn { flex: 1; }
 
 .hidden { display: none !important; }

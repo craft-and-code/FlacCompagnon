@@ -1,8 +1,10 @@
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 // Vite config tuned for Tauri: fixed dev port, no clearing of the terminal so
 // Rust build output stays visible.
 export default defineConfig({
+  plugins: [react()],
   clearScreen: false,
   server: {
     port: 1420,

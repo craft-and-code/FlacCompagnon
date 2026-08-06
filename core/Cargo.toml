@@ -25,7 +25,16 @@ serde_json = "1"
 thiserror = "1"
 # Recursive folder walking
 walkdir = "2"
+# Reading/writing tags (title, artist, cover art, ...) across FLAC, MP3,
+# MP4/M4A, WAV and Ogg/Opus with a single API. Not used for DSD, which lofty
+# doesn't have a resolver for; tags::read_tags/write_tags return a named error
+# for those instead of panicking.
+lofty = "0.24"
+# Cover art is transported to/from the frontend as a data-URL-ready base64
+# string rather than a raw byte array (much cheaper over the Tauri IPC bridge).
+base64 = "0.22"
 
 [dev-dependencies]
 hound = "3"       # write synthetic WAV files for integration tests
 rustfft = "6"     # synthesize truly band-limited test signals (inverse FFT)
+tempfile = "3"    # scratch files for the tag read/write round-trip tests

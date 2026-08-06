@@ -15,6 +15,8 @@
 
 FlacCompagnon is a from-scratch, open-source successor to the discontinued _Lossless Audio Checker_. Drop a folder **or a single audio file** onto the window and it runs the same three independent detections as the original — **Upscaling**, **Upsampling**, and **Transcoding** (including the **AAC re-quantization** test, which catches AAC sources at every bitrate) — verifies **FLAC MD5** signatures, flags **fake stereo** files, detects **clipping**, and can render a **spectrogram** for each track.
 
+Beyond checking, it also **edits tags and cover art** (single files or whole selections at once, with an optional **MusicBrainz/Discogs** lookup) and **exports M3U playlists** in whatever order you arrange the table.
+
 Built with **Rust** and **Tauri v2**, it compiles to a small native app for **Linux, Windows, and macOS**.
 
 ---
@@ -53,15 +55,51 @@ Click **Generate spectrograms** to render a high-resolution spectrogram image fo
 - **Clipping** — counts full-scale sample runs (each _event_ = ≥3 consecutive samples at 0 dBFS) and reports the peak level in dBFS. This flags an over-loud master; it is independent of whether the file is lossless.
 - **True peak** — a separate column reporting the **true peak in dBTP** (ITU-R BS.1770-style: the audio is 4×-oversampled through a 48-tap polyphase FIR, revealing **inter-sample peaks** — places where the waveform a DAC reconstructs overshoots full scale *between* stored samples). It is shown for every track, clipped or not: a track can read −0.6 dBTP with a perfectly clean sample-domain signal (safe headroom, no problem) or read −0.2 dBFS sample peak yet **+1 dBTP** true peak — an "inter-sample over" that the classic clipping counter never sees because no single stored sample hits full scale.
 - **Dynamics (DR)** — a DR-meter-style estimate of each track's dynamic range: the peak level against the RMS of the loudest 20% of ~3 s blocks (the crest factor of the loud passages). High values (≥ 12 dB, shown green) indicate a dynamic master such as a Full Dynamic Range edition; low values (< 8 dB, shown amber) betray a loudness-war master. Like clipping, this is independent of losslessness.
+- **File size** — read straight from the filesystem by the Rust core, never derived from bitrate × duration, so it matches what your file manager reports for the same file. Displayed with **decimal** units (1 kB = 1000 bytes, as macOS Finder and most Linux file managers do); hovering the cell shows the exact byte count. Note that Windows Explorer labels *binary* units "KB"/"MB", so it will show a slightly smaller number for the same file.
 
 ### 5. Save & reload (on demand)
 
 Analysis never writes anything by itself. When you want to keep the results, click **Save…** and pick a name and location — nothing is dropped into your music folders unless you ask for it. One dialog pick writes **two files, same stem, same folder**:
 
-- a spreadsheet-friendly **`.csv`** (all columns: status, upscaling, upsampling, transcoding, cutoff, bit depth, clipping, true peak, dynamics, MD5, …);
+- a spreadsheet-friendly **`.csv`** (all columns: status, upscaling, upsampling, transcoding, cutoff, bit depth, file size, clipping, true peak, dynamics, MD5, …) — the size is exported as a raw byte count so it can be summed and sorted;
 - a **`.json`** that round-trips the *entire* analysis — every field, including the nested per-detection detail — so it can be reloaded later.
 
 To reload a saved analysis, **drop the `.json` file onto the window**, same gesture as dropping a folder — there's no separate button for it. The table renders instantly from the file, with no audio re-decoded. This also means the export reflects exactly what's on screen: rows removed with the trash icon before saving are **not** included in either file, and won't come back on reload.
+
+### 6. Tag editing
+
+Selecting rows opens a **tag panel** on the left — the one place in the app that can write to your audio files, and only when you click **Save** in that panel.
+
+- **The usual fields**, Mp3tag-style: title, artist, album, album artist, composer, year, genre, track and disc numbers (with totals), comment, and a compilation flag.
+- **Batch editing**: select several tracks and every field shows either the shared value or a **“multiple values”** badge. Only the fields you actually touch are written — the others are left exactly as they are on each file, so editing the album of 12 tracks never flattens their differing titles.
+- **Cover art**, shown edge-to-edge at its own aspect ratio with a banner below carrying its dimensions/format/size and a **role picker** (_Front cover_, _Back cover_, _Artist_, …) — pick a different role to relabel the artwork without touching the image itself. When the selection holds several different covers, chevrons (and a 3 s auto-advance) cycle through them and the role picker is disabled (relabeling only makes sense when every selected file shares the exact same image). **Drop an image file onto the artwork** to replace the cover — as _Front cover_ — on every selected track.
+- **Extended tags**: a read-only viewer for everything else present in the file (ISRC, BPM, ReplayGain, custom frames, …), merged across the selection with the same “multiple values” handling.
+- **Search online** looks the release up on **MusicBrainz** and, optionally, **Discogs**, and pre-fills the panel from the result — see below.
+
+Nothing is written until you press **Save**; **Reset** discards every pending change and re-reads the files.
+
+#### Online lookup (MusicBrainz + Discogs)
+
+This is the **only** feature that uses the network, and it only ever runs when you click **Search online** — never automatically, never in the background.
+
+It picks the most precise starting point available:
+
+1. If the files already carry a **MusicBrainz Release ID** (e.g. they were tagged with Picard), it goes straight to that exact release — no guessing.
+2. Otherwise it searches using the **artist/album already in the tags**.
+3. With no usable tags at all, it *suggests* a query guessed from the **file name** (`01 - Artist - Title.flac`), shown for you to confirm rather than searched blindly.
+
+Results from both sources are listed with a source badge. Picking one shows its track list and cover; **Apply** stages the values into the tag panel’s fields — it does not write anything, so you can review or adjust before pressing **Save** as usual. With a single track selected you can also click a track in the list to fill in its title and number; with several selected, only album-level fields are offered (there is no reliable way to guess which file is which track).
+
+**Discogs** requires your own free personal access token (discogs.com → Settings → Developers), pasted once into the panel inside the search pop-in; it is kept locally in the app and never sent anywhere but Discogs. Without a token, only MusicBrainz is searched. **MusicBrainz needs no key.**
+
+### 7. Playlist export (M3U)
+
+Click **Export playlist…** to write the current list to an M3U playlist, **in the order shown on screen** — including any manual reordering you did by dragging rows, and excluding rows you deleted with the trash icon. Two formats are offered, Extended by default:
+
+- **Extended M3U** (`.m3u8`) — adds an `#EXTINF` line per track carrying its duration and `Artist - Title` (from the tags, falling back to the file name), so players show proper names without opening every file.
+- **Simple M3U** (`.m3u`) — the paths only; understood by essentially everything.
+
+Paths are written **absolute**, so the playlist plays from anywhere on the machine, but it will break if you later move the audio files.
 
 ---
 
@@ -97,6 +135,12 @@ flowchart LR
 
     save["Save…<br/>CSV + JSON"]
     spectro["Spectrograms<br/>▸ system ffmpeg ▸ spectres/"]
+    m3u["Export playlist…<br/>M3U / Extended M3U"]
+
+    subgraph tagging["Tag panel — the only writer"]
+        tags["Read/write tags + cover<br/>(lofty)"]
+        online["Search online<br/>▸ MusicBrainz · Discogs"]
+    end
 
     drop --> list --> decode --> analyzer
     decode -.->|FLAC only| fused
@@ -106,10 +150,13 @@ flowchart LR
     fused -.->|MD5 verdict| table
     table -->|on demand| save
     table -->|on demand| spectro
+    table -->|on demand| m3u
     save -.->|drop the .json back| table
+    table <-->|on selection| tags
+    online -.->|staged into the fields,<br/>you still press Save| tags
 ```
 
-<sub>Audio files are only ever read. The CSV/JSON report and the spectrogram PNGs are the only files ever written, and only when you ask for them.</sub>
+<sub>Analysis only ever reads your audio. The CSV/JSON report, the spectrogram PNGs and the M3U playlist are written only when you ask, and never inside your audio files. The tag panel is the single path that writes to a track, and only on its explicit <b>Save</b> — the audio stream itself is never re-encoded. <b>Search online</b> is the only feature that touches the network, and only on an explicit click.</sub>
 
 The project is a Cargo workspace with two crates:
 
@@ -158,6 +205,20 @@ All cut-off-based detection — LAC included — assumes genuine music has energ
     - Windows: `choco install ffmpeg` (or download from ffmpeg.org and add it to `PATH`)
 
 `ffmpeg` is located automatically at runtime (it checks `PATH` plus common install locations such as Homebrew's `/opt/homebrew/bin`). If it lives somewhere unusual, point the app at it with the `FLACCOMPAGNON_FFMPEG` environment variable. Analysis, MD5 verification, and reports do **not** require ffmpeg for FLAC/WAV/AIFF/ALAC/CAF/OGG/MP3/AAC — only spectrogram rendering does. **DSD (`.dsf`/`.dff`) is the one exception**: its container header is always verified natively, but the content-level checks (dynamic range, clipping, cutoff, and the real-DSD-vs-PCM-sourced authenticity check) need ffmpeg to decode the 1-bit stream. Without it, a DSD file only gets header verification and its quality badge is marked "(unverified)".
+
+**Optional, for the online tag lookup:** a free [Discogs personal access token](https://www.discogs.com/settings/developers) if you want Discogs results alongside MusicBrainz. It's pasted into the search pop-in once and stored locally. MusicBrainz needs no key, and the whole feature is optional — the app works fully offline without it.
+
+### Notable dependencies
+
+Everything is pure Rust; there is no system library to install beyond Tauri's own prerequisites (and the optional ffmpeg above).
+
+| Crate | Used for |
+| --- | --- |
+| [`symphonia`](https://crates.io/crates/symphonia) / [`claxon`](https://crates.io/crates/claxon) | Audio decoding; `claxon` also drives the fused FLAC + MD5 pass. |
+| [`lofty`](https://crates.io/crates/lofty) | Reading and writing tags and cover art across every supported container. |
+| [`cpal`](https://crates.io/crates/cpal) | Audio output for the table's hover-to-preview playback. |
+| [`reqwest`](https://crates.io/crates/reqwest) | The online tag lookup — the only crate here that touches the network. Uses **rustls**, so no system OpenSSL is required. |
+| [`base64`](https://crates.io/crates/base64) | Moving cover-art bytes between the Rust core and the webview. |
 
 ### 1. Install dependencies
 
@@ -229,6 +290,14 @@ All analysis logic lives in the `core` crate and is covered by unit and integrat
 cargo test -p flaccompagnon-core
 ```
 
+Tag reading/writing and playlist building are tested there too — the tag tests write to real temporary files and read them back, so the round trip is exercised end to end rather than mocked. The Tauri crate adds tests for the online lookup's ID validation:
+
+```bash
+cargo test            # the whole workspace
+```
+
+The **network is never touched by the test suite**: the lookup's HTTP calls are not exercised, only the pure input-validation around them, so `cargo test` stays fast and works offline.
+
 ---
 
 ## Documentation (rustdoc)
@@ -245,7 +314,7 @@ On every push to the main branch the `Docs` workflow (`.github/workflows/docs.ym
 
 ## Output layout
 
-Analysis alone writes **nothing**. The only files FlacCompagnon can create are the spectrogram PNGs (when you click _Generate spectrograms_) and the CSV + JSON report pair (when you click _Save…_ and pick a location). For a dropped folder:
+Analysis alone writes **nothing**. The only files FlacCompagnon creates are the spectrogram PNGs (_Generate spectrograms_), the CSV + JSON report pair (_Save…_), and an M3U playlist (_Export playlist…_) — each written only where you point it. For a dropped folder:
 
 ```
 My Album/
@@ -258,9 +327,24 @@ My Album/
 
 Sub-folders that contain audio each get their own `spectres/` folder next to their files.
 
-### Your audio is never modified
+### Your audio is only ever modified when you ask
 
-FlacCompagnon opens every track **read-only** — it decodes samples to analyze them and never writes back to an audio file in any way. The MD5 check only reads the FLAC and recomputes a hash in memory; it does not alter the file.
+**Analysis never writes to your files.** Every track is opened **read-only** to decode and measure it; the MD5 check reads the FLAC and recomputes the hash in memory without altering anything. Dropping, analyzing, generating spectrograms, saving a report and exporting a playlist all leave your audio byte-for-byte untouched.
+
+The **one** exception is the tag panel: pressing its **Save** button writes the tags (and cover art) you edited back into the selected files. That is an explicit, deliberate action — it never happens automatically, and only the fields you actually changed are written. The **audio stream itself is never re-encoded or touched**, only the metadata container around it.
+
+If you want the guarantee that nothing can ever be written, simply don't use the tag panel's Save button — every other feature is read-only.
+
+### Network use & privacy
+
+FlacCompagnon works **fully offline**. The single feature that makes a network request is the tag panel's **Search online** button, and only on that click:
+
+- Requests go to **MusicBrainz**, the **Cover Art Archive**, and — only if you configured a token — **Discogs**. Nowhere else.
+- What is sent is the **search text** (artist/album, or a release ID already in your tags). **No audio, no file paths, no file contents, and no identifying information about you** ever leave the machine.
+- There is **no telemetry, analytics, crash reporting or update check** anywhere in the app.
+- Your Discogs token is stored locally by the app and is only ever sent to Discogs.
+
+Requests carry a descriptive `User-Agent` (as MusicBrainz's usage policy requires), time out after 20 s, and downloaded cover images are size-capped.
 
 ---
 
@@ -271,10 +355,15 @@ FlacCompagnon opens every track **read-only** — it decodes samples to analyze 
 - Effective bit-depth reconstruction is exact for ≤ 24-bit integer sources.
 - FLAC files are decoded **once**: a fused pass feeds the analysis and hashes the MD5 from the same raw integer samples (bit-identical to `flac -t`), so MD5 verification adds only a negligible hashing cost on top of the analysis.
 - Files are analyzed **in parallel**: a worker pool sized to the machine (one worker per CPU core, minus one to keep the UI responsive) processes independent files concurrently, so analyzing an album scales with your core count.
+- **Extended tags are read-only.** They are displayed and merged across a selection, but not editable: writing them back would mean translating raw per-format tag keys into the tagging library's own key type, which is easy to get subtly wrong on a real music library.
+- **The online lookup matches by text, not by audio.** It uses an existing MusicBrainz ID when the files carry one, otherwise the tags, otherwise a guess from the file name. It does **not** fingerprint the audio, so a badly-named, untagged file may need the query typed by hand.
+- **Playlists store absolute paths**, so they survive being opened from anywhere on the machine but break if the audio files are moved afterwards.
 
 ## Roadmap ideas
 
-Easy future additions (the analyzer is modular): per-channel spectral analysis, joint-stereo artifact detection, and ReplayGain scanning.
+Easy future additions (the analyzer is modular): per-channel spectral analysis, ReplayGain scanning, and reporting **intensity-stereo damage** as a quality indicator. Note that the transcode detector is already *robust to* joint-stereo coding — it tests the L, R, M and S representations, so an M/S-coded (or intensity-stereo) transcode is still caught. What is missing is the separate measurement of the harm that coding leaves behind: a Side channel that collapses above the intensity cutoff, and the stereo image narrowing with it.
+
+On the tagging side: making the extended tags editable, and **AcoustID/Chromaprint audio fingerprinting** so a track can be identified from its sound rather than its metadata — the way MusicBrainz Picard does. Fingerprinting needs an extra native dependency and an AcoustID API key, so it is deliberately out of scope for now.
 
 ## References
 

@@ -15,6 +15,8 @@ pub struct ClipState {
 }
 
 impl ClipState {
+    /// Start tracking clipping against `threshold` (a sample magnitude, e.g.
+    /// `1.0` for exact full-scale).
     pub fn new(threshold: f32) -> Self {
         Self {
             threshold,
@@ -42,6 +44,12 @@ impl ClipState {
         }
     }
 
+    /// Consume the accumulated state into a final [`ClippingInfo`].
+    ///
+    /// `_channels`/`_frames` are accepted but currently unused here — they
+    /// exist so the signature doesn't need to change if a future metric
+    /// needs them, and to match the shape of the analyzer's other `finish`
+    /// calls.
     pub fn finish(self, _channels: usize, _frames: u64) -> ClippingInfo {
         let peak = self.peak.min(1.0);
         let peak_dbfs = if peak > 0.0 {

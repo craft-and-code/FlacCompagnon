@@ -55,6 +55,8 @@ impl Mdct {
         SHARED.get_or_init(|| Mdct::new(AAC_N))
     }
 
+    /// The transform size `N` this instance was built for (half the input
+    /// frame length).
     pub fn n(&self) -> usize {
         self.n
     }

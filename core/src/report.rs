@@ -34,7 +34,7 @@ struct JsonReport {
 pub fn build_csv(report: &FolderReport) -> String {
     let mut out = String::new();
     out.push_str(
-        "file,format,badge,sample_rate,channels,declared_bits,real_bit_depth,duration_s,\
+        "file,format,badge,size_bytes,sample_rate,channels,declared_bits,real_bit_depth,duration_s,\
          status,upscaling,upsampling,transcoding,aac_grid,cutoff_hz,cutoff_ratio,fake_stereo,\
          clipped,clip_events,peak_dbfs,true_peak_dbtp,dr_db,md5\n",
     );
@@ -56,10 +56,13 @@ pub fn build_csv(report: &FolderReport) -> String {
             TranscodeState::Detected => "detected",
         };
         out.push_str(&format!(
-            "{},{},{},{},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{},{:.2},{:.2},{},{}\n",
+            "{},{},{},{},{},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{},{:.2},{:.2},{},{}\n",
             csv_escape(&f.file_name),
             f.format,
             f.badge.clone().unwrap_or_default(),
+            // Raw byte count, not a human-readable string: a spreadsheet can
+            // then sum/sort it, and the reader picks their own unit convention.
+            f.size_bytes,
             f.sample_rate,
             f.channels,
             opt(f.declared_bits),
@@ -175,6 +178,7 @@ mod tests {
             channels: 2,
             declared_bits: Some(16),
             duration_secs: 183.4,
+            size_bytes: 32_345_678,
             detections: Detections {
                 upscaling: false,
                 upsampling: false,
@@ -217,6 +221,17 @@ mod tests {
         assert!(lines[0].trim_end().ends_with(",md5"));
         assert!(lines[1].contains("a.flac"));
         assert!(lines[1].contains("ok"));
+        // The size is exported as a raw byte count, not a formatted string,
+        // so a spreadsheet can sum and sort it.
+        assert!(lines[0].contains(",size_bytes,"));
+        assert!(lines[1].contains(",32345678,"));
+        // Header and row must stay in lockstep — an easy thing to break when
+        // adding a column to one and forgetting the other.
+        assert_eq!(
+            lines[0].split(',').count(),
+            lines[1].split(',').count(),
+            "CSV header and row column counts must match"
+        );
     }
 
     #[test]
@@ -235,6 +250,31 @@ mod tests {
         assert_eq!(parsed.files[0].dr_db, Some(12.3));
         assert_eq!(parsed.files[0].clipping.true_peak_dbtp, -0.7);
         assert_eq!(parsed.files[0].flac_md5, Some(FlacMd5Status::Match));
+        assert_eq!(parsed.files[0].size_bytes, 32_345_678);
+    }
+
+    /// A report exported before `size_bytes` existed must still load — the
+    /// field is `serde(default)` precisely so an older `.json` dropped onto
+    /// the window doesn't fail to parse.
+    #[test]
+    fn json_without_size_bytes_still_loads() {
+        let report = FolderReport {
+            root: "/music".into(),
+            files: vec![sample_file()],
+            has_flac: true,
+        };
+        let json = build_json(&report).expect("serializes");
+        // Strip the field the way an older export simply wouldn't have it.
+        let mut doc: serde_json::Value = serde_json::from_str(&json).unwrap();
+        doc["report"]["files"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("size_bytes");
+        let older = serde_json::to_string(&doc).unwrap();
+
+        let parsed = parse_json(&older).expect("older reports must still parse");
+        assert_eq!(parsed.files[0].size_bytes, 0);
+        assert_eq!(parsed.files[0].file_name, "a.flac");
     }
 
     #[test]
