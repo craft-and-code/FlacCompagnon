@@ -79,7 +79,7 @@
 <a href=#79 id=79 data-nosnippet>79</a>            <span class="kw">continue</span>;
 <a href=#80 id=80 data-nosnippet>80</a>        }
 <a href=#81 id=81 data-nosnippet>81</a>        <span class="kw">let </span>drop = lo - hi;
-<a href=#82 id=82 data-nosnippet>82</a>        <span class="kw">if </span>drop &gt;= PCM_CLIFF_DB &amp;&amp; best.map_or(<span class="bool-val">true</span>, |b| drop &gt; b.drop_db) {
+<a href=#82 id=82 data-nosnippet>82</a>        <span class="kw">if </span>drop &gt;= PCM_CLIFF_DB &amp;&amp; best.is_none_or(|b| drop &gt; b.drop_db) {
 <a href=#83 id=83 data-nosnippet>83</a>            best = <span class="prelude-val">Some</span>(PcmSourceCheck {
 <a href=#84 id=84 data-nosnippet>84</a>                boundary_hz: boundary,
 <a href=#85 id=85 data-nosnippet>85</a>                drop_db: drop,

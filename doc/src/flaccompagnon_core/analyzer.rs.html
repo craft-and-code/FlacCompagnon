@@ -299,8 +299,8 @@
 <a href=#299 id=299 data-nosnippet>299</a>            <span class="self">self</span>.mdct_hop += <span class="number">1</span>;
 <a href=#300 id=300 data-nosnippet>300</a>            <span class="kw">if </span><span class="self">self</span>.mdct_have_prev
 <a href=#301 id=301 data-nosnippet>301</a>                &amp;&amp; <span class="self">self</span>.mdct_frames &lt; MDCT_MAX_FRAMES
-<a href=#302 id=302 data-nosnippet>302</a>                &amp;&amp; <span class="self">self</span>.mdct_hop % MDCT_STRIDE == <span class="number">0
-<a href=#303 id=303 data-nosnippet>303</a>            </span>{
+<a href=#302 id=302 data-nosnippet>302</a>                &amp;&amp; <span class="self">self</span>.mdct_hop.is_multiple_of(MDCT_STRIDE)
+<a href=#303 id=303 data-nosnippet>303</a>            {
 <a href=#304 id=304 data-nosnippet>304</a>                <span class="self">self</span>.process_mdct();
 <a href=#305 id=305 data-nosnippet>305</a>            }
 <a href=#306 id=306 data-nosnippet>306</a>            std::mem::swap(<span class="kw-2">&amp;mut </span><span class="self">self</span>.mdct_prev, <span class="kw-2">&amp;mut </span><span class="self">self</span>.mdct_fill);

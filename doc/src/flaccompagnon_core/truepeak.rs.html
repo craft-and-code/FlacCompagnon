@@ -23,18 +23,18 @@
 <a href=#23 id=23 data-nosnippet>23</a><span class="doccomment">/// 48-tap windowed-sinc lowpass, generated and validated in NumPy
 <a href=#24 id=24 data-nosnippet>24</a>/// (`sinc(n/4) * blackman(48)`, normalized to unity DC gain per phase).
 <a href=#25 id=25 data-nosnippet>25</a></span><span class="kw">const </span>TP_TAPS: [f32; <span class="number">48</span>] = [
-<a href=#26 id=26 data-nosnippet>26</a>    <span class="number">2.8770393805e-19</span>, -<span class="number">8.4620792140e-05</span>, -<span class="number">3.6092137667e-04</span>, -<span class="number">3.6337902617e-04</span>,
-<a href=#27 id=27 data-nosnippet>27</a>    <span class="number">7.0568670835e-04</span>, <span class="number">2.9338012272e-03</span>, <span class="number">4.6865622501e-03</span>, <span class="number">2.9440137922e-03</span>,
-<a href=#28 id=28 data-nosnippet>28</a>    -<span class="number">4.2954750165e-03</span>, -<span class="number">1.4678888264e-02</span>, -<span class="number">2.0272630732e-02</span>, -<span class="number">1.1363293682e-02</span>,
-<a href=#29 id=29 data-nosnippet>29</a>    <span class="number">1.5119076534e-02</span>, <span class="number">4.7897022893e-02</span>, <span class="number">6.2173748295e-02</span>, <span class="number">3.3175379005e-02</span>,
-<a href=#30 id=30 data-nosnippet>30</a>    -<span class="number">4.2571243044e-02</span>, -<span class="number">1.3200353510e-01</span>, -<span class="number">1.7082947420e-01</span>, -<span class="number">9.3211746888e-02</span>,
-<a href=#31 id=31 data-nosnippet>31</a>    <span class="number">1.2718490344e-01</span>, <span class="number">4.4935166808e-01</span>, <span class="number">7.7127787555e-01</span>, <span class="number">9.7258547035e-01</span>,
-<a href=#32 id=32 data-nosnippet>32</a>    <span class="number">9.7258547035e-01</span>, <span class="number">7.7127787555e-01</span>, <span class="number">4.4935166808e-01</span>, <span class="number">1.2718490344e-01</span>,
-<a href=#33 id=33 data-nosnippet>33</a>    -<span class="number">9.3211746888e-02</span>, -<span class="number">1.7082947420e-01</span>, -<span class="number">1.3200353510e-01</span>, -<span class="number">4.2571243044e-02</span>,
-<a href=#34 id=34 data-nosnippet>34</a>    <span class="number">3.3175379005e-02</span>, <span class="number">6.2173748295e-02</span>, <span class="number">4.7897022893e-02</span>, <span class="number">1.5119076534e-02</span>,
-<a href=#35 id=35 data-nosnippet>35</a>    -<span class="number">1.1363293682e-02</span>, -<span class="number">2.0272630732e-02</span>, -<span class="number">1.4678888264e-02</span>, -<span class="number">4.2954750165e-03</span>,
-<a href=#36 id=36 data-nosnippet>36</a>    <span class="number">2.9440137922e-03</span>, <span class="number">4.6865622501e-03</span>, <span class="number">2.9338012272e-03</span>, <span class="number">7.0568670835e-04</span>,
-<a href=#37 id=37 data-nosnippet>37</a>    -<span class="number">3.6337902617e-04</span>, -<span class="number">3.6092137667e-04</span>, -<span class="number">8.4620792140e-05</span>, <span class="number">2.8770393805e-19</span>,
+<a href=#26 id=26 data-nosnippet>26</a>    <span class="number">2.8770394e-19</span>, -<span class="number">8.462079e-5</span>, -<span class="number">3.6092138e-4</span>, -<span class="number">3.6337903e-4</span>,
+<a href=#27 id=27 data-nosnippet>27</a>    <span class="number">7.056867e-4</span>, <span class="number">2.9338012e-3</span>, <span class="number">4.6865623e-3</span>, <span class="number">2.9440138e-3</span>,
+<a href=#28 id=28 data-nosnippet>28</a>    -<span class="number">4.295475e-3</span>, -<span class="number">1.4678888e-2</span>, -<span class="number">2.0272631e-2</span>, -<span class="number">1.1363294e-2</span>,
+<a href=#29 id=29 data-nosnippet>29</a>    <span class="number">1.5119077e-2</span>, <span class="number">4.7897023e-2</span>, <span class="number">6.2173748e-2</span>, <span class="number">3.317538e-2</span>,
+<a href=#30 id=30 data-nosnippet>30</a>    -<span class="number">4.2571243e-2</span>, -<span class="number">1.3200353e-1</span>, -<span class="number">1.7082947e-1</span>, -<span class="number">9.321175e-2</span>,
+<a href=#31 id=31 data-nosnippet>31</a>    <span class="number">1.271849e-1</span>, <span class="number">4.4935167e-1</span>, <span class="number">7.712779e-1</span>, <span class="number">9.725855e-1</span>,
+<a href=#32 id=32 data-nosnippet>32</a>    <span class="number">9.725855e-1</span>, <span class="number">7.712779e-1</span>, <span class="number">4.4935167e-1</span>, <span class="number">1.271849e-1</span>,
+<a href=#33 id=33 data-nosnippet>33</a>    -<span class="number">9.321175e-2</span>, -<span class="number">1.7082947e-1</span>, -<span class="number">1.3200353e-1</span>, -<span class="number">4.2571243e-2</span>,
+<a href=#34 id=34 data-nosnippet>34</a>    <span class="number">3.317538e-2</span>, <span class="number">6.2173748e-2</span>, <span class="number">4.7897023e-2</span>, <span class="number">1.5119077e-2</span>,
+<a href=#35 id=35 data-nosnippet>35</a>    -<span class="number">1.1363294e-2</span>, -<span class="number">2.0272631e-2</span>, -<span class="number">1.4678888e-2</span>, -<span class="number">4.295475e-3</span>,
+<a href=#36 id=36 data-nosnippet>36</a>    <span class="number">2.9440138e-3</span>, <span class="number">4.6865623e-3</span>, <span class="number">2.9338012e-3</span>, <span class="number">7.056867e-4</span>,
+<a href=#37 id=37 data-nosnippet>37</a>    -<span class="number">3.6337903e-4</span>, -<span class="number">3.6092138e-4</span>, -<span class="number">8.462079e-5</span>, <span class="number">2.8770394e-19</span>,
 <a href=#38 id=38 data-nosnippet>38</a>];
 <a href=#39 id=39 data-nosnippet>39</a>
 <a href=#40 id=40 data-nosnippet>40</a><span class="doccomment">/// One channel's delay line.
