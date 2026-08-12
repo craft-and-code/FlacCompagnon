@@ -6,9 +6,9 @@
     <title>FlacCompagnon — Is your lossless actually lossless?</title>
     <meta
       name="description"
-      content="FlacCompagnon detects fake lossless audio: upscaling, upsampling and transcoding (including AAC at every bitrate). Also edits tags and cover art and exports M3U playlists. A free, open-source, native app for macOS, Windows and Linux."
+      content="FlacCompagnon detects fake lossless audio: upscaling, upsampling and transcoding (including AAC at every bitrate). Also edits tags and cover art, converts to FLAC, Opus, MP3 or WAV, and exports M3U playlists. A free, open-source, native app for macOS, Windows and Linux."
     />
-    <meta name="keywords" content="FlacCompagnon, FLAC checker, fake lossless, upscaled FLAC, upsampled FLAC, transcoded FLAC, AAC detection, lossless audio checker, spectrogram, DSD, Hi-Res Audio, audio integrity, tag editor, cover art, MusicBrainz, Discogs, M3U playlist" />
+    <meta name="keywords" content="FlacCompagnon, FLAC checker, fake lossless, upscaled FLAC, upsampled FLAC, transcoded FLAC, AAC detection, lossless audio checker, spectrogram, DSD, Hi-Res Audio, audio integrity, tag editor, cover art, MusicBrainz, Discogs, M3U playlist, audio converter, FLAC to Opus, FLAC to MP3, batch convert" />
     <meta name="author" content="craft-and-code" />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://craft-and-code.github.io/FlacCompagnon/" />
@@ -20,7 +20,7 @@
     <meta property="og:title" content="FlacCompagnon — Is your lossless actually lossless?" />
     <meta
       property="og:description"
-      content="Detects fake lossless audio: upscaling, upsampling and transcoding (including AAC at every bitrate). Plus tag and cover-art editing, MusicBrainz lookup and M3U export. Free, open-source, native app for macOS, Windows and Linux."
+      content="Detects fake lossless audio: upscaling, upsampling and transcoding (including AAC at every bitrate). Plus tag and cover-art editing, MusicBrainz lookup, conversion to FLAC/Opus/MP3/WAV and M3U export. Free, open-source, native app for macOS, Windows and Linux."
     />
     <meta property="og:image" content="https://craft-and-code.github.io/FlacCompagnon/assets/og-image.png" />
     <meta property="og:image:width" content="1200" />
@@ -54,7 +54,7 @@
         "@type": "SoftwareApplication",
         "name": "FlacCompagnon",
         "url": "https://craft-and-code.github.io/FlacCompagnon/",
-        "description": "Detects fake lossless audio files: upscaling, upsampling and transcoding, including AAC transcodes at every bitrate. Also a tag and cover-art editor with MusicBrainz/Discogs lookup, and M3U playlist export. Free, open-source, native app for macOS, Windows and Linux.",
+        "description": "Detects fake lossless audio files: upscaling, upsampling and transcoding, including AAC transcodes at every bitrate. Also a tag and cover-art editor with MusicBrainz/Discogs lookup, a batch converter to FLAC, Opus, MP3 or WAV that mirrors the source folder structure, and M3U playlist export. Free, open-source, native app for macOS, Windows and Linux.",
         "applicationCategory": "MultimediaApplication",
         "operatingSystem": "macOS, Windows, Linux",
         "offers": {
@@ -69,7 +69,7 @@
         },
         "license": "https://github.com/craft-and-code/FlacCompagnon/blob/main/LICENSE",
         "downloadUrl": "https://github.com/craft-and-code/FlacCompagnon/releases/latest",
-        "softwareVersion": "0.9.3"
+        "softwareVersion": "0.9.4"
       }
     </script>
   </head>
@@ -88,6 +88,7 @@
         <a href="#integrite" data-i18n="nInt">Intégrité</a>
         <a href="#spectrogrammes" data-i18n="nSpec">Spectrogrammes</a>
         <a href="#tags" data-i18n="nTags">Tags</a>
+        <a href="#conversion" data-i18n="nConv">Conversion</a>
         <a href="#export" data-i18n="nExp">Export</a>
         <a href="#pipeline" data-i18n="nPipe">Pipeline</a>
         <a href="https://craft-and-code.github.io/FlacCompagnon/doc/" target="_blank" rel="noopener" data-i18n="nDoc">Docs</a>
@@ -260,6 +261,7 @@
             <p class="lead" data-i18n="s4p"></p>
             <p class="note-inline" data-i18n="s4n1"></p>
             <p class="note-inline" data-i18n-html="s4n2"></p>
+            <p class="note-inline" data-i18n-html="s4n3"></p>
           </div>
           <canvas id="gSpec" class="spec-canvas" aria-hidden="true"></canvas>
         </div>
@@ -285,6 +287,28 @@
           </article>
         </div>
         <p class="note-box" data-i18n-html="s8note"></p>
+      </section>
+
+      <!-- Conversion -->
+      <section id="conversion" class="section">
+        <p class="kicker" data-i18n="s9k">Conversion</p>
+        <h2 data-i18n="s9t">Convertir sans casser le rangement</h2>
+        <p class="lead" data-i18n-html="s9p"></p>
+
+        <div class="conv-grid">
+          <div>
+            <div class="conv-formats">
+              <span class="fmt"><strong>FLAC</strong><em data-i18n="cf1">sans perte</em></span>
+              <span class="fmt"><strong>Opus</strong><em data-i18n="cf2">libre de droits</em></span>
+              <span class="fmt"><strong>MP3</strong><em data-i18n="cf3">compatible partout</em></span>
+              <span class="fmt"><strong>WAV</strong><em data-i18n="cf4">PCM 16 bits</em></span>
+            </div>
+            <p class="note-inline" data-i18n-html="s9n1"></p>
+            <p class="note-inline" data-i18n-html="s9n2"></p>
+          </div>
+          <canvas id="gConv" class="conv-canvas" aria-hidden="true"></canvas>
+        </div>
+        <p class="note-box" data-i18n-html="s9note"></p>
       </section>
 
       <!-- Export -->

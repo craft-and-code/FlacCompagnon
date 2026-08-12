@@ -3,7 +3,7 @@
 
 const DICT = {
   fr: {
-    nPrev: "Aperçu", nDet: "Détections", nInt: "Intégrité", nSpec: "Spectrogrammes", nTags: "Tags", nExp: "Export", nPipe: "Pipeline", nDl: "Télécharger", nDoc: "Docs",
+    nPrev: "Aperçu", nDet: "Détections", nInt: "Intégrité", nSpec: "Spectrogrammes", nTags: "Tags", nConv: "Conversion", nExp: "Export", nPipe: "Pipeline", nDl: "Télécharger", nDoc: "Docs",
     kick: "Open source · Rust + Tauri · macOS · Windows · Linux",
     h1a: "Votre lossless est-il", h1b: "vraiment lossless ?",
     sub: "FlacCompagnon analyse vos fichiers audio et démasque les faux FLAC : upscaling, upsampling et transcodage — y compris les transcodes AAC, à tous les débits. Déposez un dossier, l'analyse fait le reste.",
@@ -49,6 +49,7 @@ const DICT = {
     s4p: "Un clic génère un spectrogramme haute résolution par piste, avec axe de fréquences gradué jusqu'à la fréquence de Nyquist (la moitié de l'échantillonnage, soit 22,05 kHz pour un CD à 44,1 kHz). Le cut-off se voit à l'œil nu.",
     s4n1: "Rendu via ffmpeg, détecté automatiquement sur votre système.",
     s4n2: "Un dossier <code>spectres/</code> est créé dans chaque dossier contenant des fichiers audio, et un PNG est généré par piste — uniquement si vous cliquez sur le bouton « Generate spectrograms ».",
+    s4n3: "Plus rapide encore : <strong>écoutez</strong>. Un clic sur la vignette d'une ligne lance la lecture, avec une barre de transport en pied de liste. Ce n'est pas un lecteur audio à proprement parler — juste de quoi confronter un verdict à votre oreille sans quitter l'application.",
     s5k: "Pipeline", s5t: "Comment ça marche",
     s5p: "Glissez-déposez un dossier ou des fichiers — ou choisissez-les avec le bouton d'import. Chaque piste est décodée, puis passée en revue par une batterie d'analyses, et le verdict s'affiche.",
     p1: "dossier déposé", p2: "décodage · symphonia", p3: "analyse streaming",
@@ -65,13 +66,19 @@ const DICT = {
     t1t: "Édition par lot",
     t1p: "Sélectionnez tout un album : chaque champ affiche la valeur commune ou un badge « plusieurs valeurs ». Seuls les champs que vous modifiez sont écrits — corriger l'album de 12 pistes n'écrase jamais leurs titres respectifs. Un bouton dédié renumérote la sélection de 1 à N d’un coup, dans l’ordre du tableau.",
     t2t: "Pochettes",
-    t2p: "La pochette garde ses proportions d'origine, quelle que soit sa taille. Plusieurs images dans la sélection : un carousel permet de les parcourir. Un clic l'ouvre en grand avec son rôle (<em>Front cover</em>…), et un glisser-déposer d'image la remplace sur toutes les pistes sélectionnées.",
+    t2p: "La pochette s'affiche dans un cadre carré de taille fixe — la hauteur du volet ne bouge donc pas d'une piste à l'autre. Plusieurs images dans la sélection : un carousel permet de les parcourir. Un clic l'ouvre en grand, à ses proportions réelles et avec son rôle (<em>Front cover</em>…), et un glisser-déposer d'image sur le carré la remplace sur toutes les pistes sélectionnées.",
     t3t: "Recherche en ligne",
     t3p: "Le bouton <strong>Search online</strong> interroge <strong>MusicBrainz</strong> et, si vous fournissez votre jeton personnel, <strong>Discogs</strong>. Si le fichier porte déjà un identifiant MusicBrainz (tagué par Picard), la bonne release est trouvée directement, sans recherche approximative.",
     s8note: "Les résultats en ligne <strong>pré-remplissent</strong> le volet : rien n'est écrit tant que vous n'avez pas relu et cliqué sur Save — et <strong>Reset</strong> annule tout. C'est la seule fonction qui utilise le réseau, et jamais sans un clic de votre part.",
+    s9k: "Conversion", s9t: "Convertir sans casser le rangement",
+    s9p: "Un volet dédié, symétrique de celui des tags : déposez-y des pistes ou des dossiers, choisissez un format, et l'arborescence d'origine est <strong>reproduite à l'identique</strong> sous le dossier de destination. Les fichiers importés pour la conversion ne rejoignent jamais le tableau d'analyse — les deux listes sont indépendantes.",
+    cf1: "sans perte", cf2: "libre de droits", cf3: "compatible partout", cf4: "PCM 16 bits",
+    s9n1: "Opus et MP3 proposent un débit ; FLAC et WAV n'en ont pas à choisir. Le WAV produit est fixé en 16 bits, quelle que soit la profondeur de la source.",
+    s9n2: "Une case à cocher copie aussi tout ce qui n'est pas de l'audio — pochettes, playlists, spectrogrammes déjà générés — à la même place dans l'arborescence copiée.",
+    s9note: "Vos fichiers d'origine ne sont ni déplacés ni modifiés : la conversion écrit ailleurs, toujours. La lecture en cours se met en pause pendant le traitement (les encodeurs occupent tous les cœurs) et reprend ensuite toute seule. <strong>Cancel</strong> arrête le lot et efface les fichiers déjà écrits par celui-ci — sans toucher à ce que le dossier contenait avant.",
     s7k: "Export", s7t: "Emportez vos résultats",
     s7p: "Un clic sur <strong>Save…</strong> écrit deux fichiers, même nom, même dossier : un <code>.csv</code> — une ligne par piste, toutes les colonnes de l'analyse, prêt pour un tableur — et un <code>.json</code> qui conserve l'analyse complète, y compris le détail de chaque détection. Le nom et l'emplacement proposés reprennent le dossier analysé.",
-    s7n2: "Déposez un <code>.json</code> déjà exporté sur la fenêtre pour recharger le tableau tel quel — aucun fichier audio n'est redécodé. Pas de bouton dédié : c'est le même geste que déposer un dossier.",
+    s7n2: "Déposez un <code>.json</code> déjà exporté sur la liste pour recharger le tableau tel quel — aucun fichier audio n'est redécodé. Pas de bouton dédié : c'est le même geste que déposer un dossier.",
     s7m3u: "<strong>Export playlist…</strong> écrit une playlist <strong>M3U</strong> dans l'ordre affiché à l'écran — y compris après avoir réorganisé les lignes à la souris. Au choix : M3U étendu (<code>.m3u8</code>, avec les durées et « Artiste — Titre ») par défaut, ou M3U simple (<code>.m3u</code>, les chemins seuls).",
     s7n1: "Astuce : la corbeille en bout de ligne écarte un fichier de la liste — il ne figurera dans aucun des deux fichiers exportés.",
     refT: "Références",
@@ -81,7 +88,7 @@ const DICT = {
     ftLeft: "© 2026 FlacCompagnon · Licence MIT · Construit en Rust + Tauri",
   },
   en: {
-    nPrev: "Preview", nDet: "Detections", nInt: "Integrity", nSpec: "Spectrograms", nTags: "Tags", nExp: "Export", nPipe: "Pipeline", nDl: "Download", nDoc: "Docs",
+    nPrev: "Preview", nDet: "Detections", nInt: "Integrity", nSpec: "Spectrograms", nTags: "Tags", nConv: "Conversion", nExp: "Export", nPipe: "Pipeline", nDl: "Download", nDoc: "Docs",
     kick: "Open source · Rust + Tauri · macOS · Windows · Linux",
     h1a: "Is your lossless", h1b: "actually lossless?",
     sub: "FlacCompagnon analyzes your audio files and exposes fake FLACs: upscaling, upsampling and transcoding — including AAC transcodes at every bitrate. Drop a folder, the analysis does the rest.",
@@ -127,6 +134,7 @@ const DICT = {
     s4p: "One click renders a high-resolution spectrogram per track, with a labelled frequency axis up to the Nyquist frequency (half the sample rate, e.g. 22.05 kHz for a 44.1 kHz CD). The cut-off is visible to the naked eye.",
     s4n1: "Rendered via ffmpeg, located automatically on your system.",
     s4n2: "A <code>spectres/</code> folder is created inside each folder that holds audio files, and one PNG per track is generated — only when you click the “Generate spectrograms” button.",
+    s4n3: "Quicker still: <strong>listen</strong>. Clicking a row's thumbnail starts playback, with a transport bar under the list. This is not really an audio player — just enough to hold a verdict up against your own ears without leaving the app.",
     s5k: "Pipeline", s5t: "How it works",
     s5p: "Drag and drop a folder or files — or pick them with the import button. Each track is decoded, then run through a battery of analyses, and the verdict appears.",
     p1: "dropped folder", p2: "decode · symphonia", p3: "streaming analyzer",
@@ -147,9 +155,15 @@ const DICT = {
     t3t: "Online lookup",
     t3p: "The <strong>Search online</strong> button queries <strong>MusicBrainz</strong> and, if you supply your own personal token, <strong>Discogs</strong>. When the file already carries a MusicBrainz ID (tagged with Picard), the right release is found directly — no fuzzy searching.",
     s8note: "Online results <strong>pre-fill</strong> the panel: nothing is written until you have reviewed it and pressed Save — and <strong>Reset</strong> discards everything. This is the only feature that uses the network, and never without a click from you.",
+    s9k: "Conversion", s9t: "Convert without wrecking your filing",
+    s9p: "A dedicated panel, mirroring the tag one: drop tracks or folders into it, pick a format, and the source folder structure is <strong>reproduced exactly</strong> under the destination you choose. Files imported for conversion never join the analysis table — the two lists are independent.",
+    cf1: "lossless", cf2: "royalty-free", cf3: "plays everywhere", cf4: "16-bit PCM",
+    s9n1: "Opus and MP3 offer a bitrate; FLAC and WAV have none to choose. The WAV written is fixed at 16-bit, whatever the source depth.",
+    s9n2: "A checkbox also copies everything that is not audio — covers, playlists, spectrograms you already generated — to the same place in the copied tree.",
+    s9note: "Your originals are neither moved nor modified: conversion always writes somewhere else. Playback pauses for the duration (the encoders take every core) and resumes on its own afterwards. <strong>Cancel</strong> stops the batch and deletes the files it had already written — leaving whatever the folder held beforehand untouched.",
     s7k: "Export", s7t: "Take your results with you",
     s7p: "Clicking <strong>Save…</strong> writes two files, same name, same folder: a <code>.csv</code> — one row per track, every analysis column, ready for a spreadsheet — and a <code>.json</code> that keeps the full analysis, including each detection's detail. The suggested name and location follow the analyzed folder.",
-    s7n2: "Drop a previously-exported <code>.json</code> onto the window to reload the table as-is — no audio is re-decoded. No dedicated button: same gesture as dropping a folder.",
+    s7n2: "Drop a previously-exported <code>.json</code> onto the list to reload the table as-is — no audio is re-decoded. No dedicated button: same gesture as dropping a folder.",
     s7m3u: "<strong>Export playlist…</strong> writes an <strong>M3U</strong> playlist in the order shown on screen — including any manual reordering you did by dragging rows. Your choice of Extended M3U (<code>.m3u8</code>, with durations and “Artist — Title”) by default, or Simple M3U (<code>.m3u</code>, paths only).",
     s7n1: "Tip: the trash icon at the end of a row removes a file from the list — it will not appear in either exported file.",
     refT: "References",
@@ -243,10 +257,20 @@ function sizeCanvas(c, dpr) {
 const ANIM_START_VH = 0.95;
 const ANIM_END_VH = 0.52;
 
-function progress(c) {
+// The conversion diagram gets a longer window than the detection ones. Those
+// draw a single continuous picture, so 0.43 vh of scrolling is enough to read
+// them; this one has six tree rows arriving in sequence, and over the same
+// distance the whole sequence was over before the reader had settled on the
+// section. Starting at 1.0 (the canvas has not quite entered yet) and ending
+// at 0.18 (it is near the top of the viewport, still fully visible) roughly
+// doubles the travel, so each row gets its own moment.
+const CONV_START_VH = 1.0;
+const CONV_END_VH = 0.18;
+
+function progress(c, startVh, endVh) {
   const r = c.getBoundingClientRect(), vh = window.innerHeight;
-  const start = vh * ANIM_START_VH;
-  const end = vh * ANIM_END_VH;
+  const start = vh * (startVh === undefined ? ANIM_START_VH : startVh);
+  const end = vh * (endVh === undefined ? ANIM_END_VH : endVh);
   return Math.max(0, Math.min(1, (start - r.top) / (start - end)));
 }
 function visible(c) {
@@ -373,6 +397,98 @@ function drawGrid(c, p) {
   ctx.fillText("on-grid: " + Math.round(ease * 93) + "%", w - 108 * s, 28 * s);
 }
 
+/* ---- conversion: source tree -> mirrored output tree ----
+   Scroll-driven like the detection diagrams. The point it has to make in one
+   glance is that the *shape* of the folder survives: same nesting, same
+   ordering, same non-audio files sitting where they were — only the leaf
+   extensions change. So the two trees are drawn side by side with the output
+   filling in row by row as `p` advances, rather than as an abstract
+   "encoder" box that would say nothing about the layout. */
+const CONV_TREE = [
+  { depth: 0, name: "Kind of Blue", dir: true },
+  { depth: 1, name: "cover.jpg", audio: false },
+  { depth: 1, name: "01 So What", audio: true },
+  { depth: 1, name: "02 Freddie Freeloader", audio: true },
+  { depth: 1, name: "Disc 2", dir: true },
+  { depth: 2, name: "03 Blue in Green", audio: true },
+];
+
+function drawConv(c, p, ts) {
+  const ctx = c.getContext("2d"), w = c.width, h = c.height, s = w / c.clientWidth;
+  ctx.clearRect(0, 0, w, h);
+
+  const colW = (w - 30 * s) / 2;
+  const leftX = 14 * s, rightX = leftX + colW + 2 * s;
+  const top = 40 * s, rowH = (h - top - 22 * s) / CONV_TREE.length;
+  const ease = p * p * (3 - 2 * p);
+
+  ctx.font = 10 * s + "px 'IBM Plex Mono',monospace";
+  ctx.fillStyle = "#6b7387";
+  ctx.fillText(lang === "fr" ? "SOURCE" : "SOURCE", leftX, 20 * s);
+  ctx.fillStyle = "#8fb0f5";
+  ctx.fillText(lang === "fr" ? "DESTINATION · Opus" : "DESTINATION · Opus", rightX, 20 * s);
+
+  // Divider between the two trees, drawn first so rows sit on top of it.
+  ctx.strokeStyle = "rgba(139,147,167,0.18)"; ctx.lineWidth = s;
+  ctx.beginPath();
+  ctx.moveTo(leftX + colW + s, top - 12 * s);
+  ctx.lineTo(leftX + colW + s, h - 12 * s);
+  ctx.stroke();
+
+  CONV_TREE.forEach((row, i) => {
+    const y = top + i * rowH;
+    const indent = row.depth * 11 * s;
+    // Each row lands after the one above it. The two numbers are tied
+    // together: the last row starts at (n-1)/n · SPREAD, so the fade rate has
+    // to be at least 1 / (1 − that) or the bottom of the tree never finishes
+    // arriving — which is exactly what a first pass at 0.78 / 1.9 did, leaving
+    // the last two rows stuck at 91% and 66% with the scroll already spent.
+    // 0.7 / 2.6 clears it with a little slack to spare.
+    const SPREAD = 0.7, RATE = 2.6;
+    const t = Math.max(0, Math.min(1, (ease - (i / CONV_TREE.length) * SPREAD) * RATE));
+
+    ctx.font = 11 * s + "px 'IBM Plex Mono',monospace";
+    ctx.fillStyle = row.dir ? "#c9cede" : "#8b93a7";
+    const label = (row.dir ? "▸ " : "") + row.name + (row.audio ? ".flac" : "");
+    ctx.fillText(label, leftX + indent, y + 11 * s);
+
+    if (t <= 0) return;
+
+    // The connector, then the mirrored row. Dashes travel left to right so
+    // the diagram still reads as *doing* something when the reader stops
+    // scrolling — the scroll only decides how many rows exist, not whether
+    // anything moves. `ts` is frozen at 0 under reduced motion (see
+    // renderFrame's callers), which parks the dashes without a special case.
+    // Each row is offset by its own index so the lines don't march in step,
+    // which would read as one wide moving band rather than several files.
+    ctx.globalAlpha = t * 0.5;
+    ctx.strokeStyle = "rgba(123,79,240,0.7)";
+    ctx.setLineDash([4 * s, 5 * s]);
+    ctx.lineDashOffset = -(((ts || 0) * 0.03 + i * 5) % (9 * s));
+    ctx.beginPath();
+    ctx.moveTo(leftX + colW - 12 * s, y + 7 * s);
+    ctx.lineTo(rightX + indent - 4 * s, y + 7 * s);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.globalAlpha = t;
+    // Converted leaves take the accent; a folder or a copied file stays
+    // muted — that contrast is the whole message, so it must not be subtle.
+    ctx.fillStyle = row.audio ? "#a078fa" : row.dir ? "#c9cede" : "#6b7387";
+    const outLabel = (row.dir ? "▸ " : "") + row.name + (row.audio ? ".opus" : "");
+    ctx.fillText(outLabel, rightX + indent, y + 11 * s);
+    ctx.globalAlpha = 1;
+  });
+
+  ctx.font = 10 * s + "px 'IBM Plex Mono',monospace";
+  ctx.fillStyle = "#6b7387";
+  ctx.fillText(
+    lang === "fr" ? "cover.jpg copiée telle quelle" : "cover.jpg copied verbatim",
+    leftX,
+    h - 5 * s,
+  );
+}
+
 /* ---- realistic streaming spectrogram (inferno colormap) ---- */
 const INFERNO = [
   [4, 4, 18], [22, 20, 74], [58, 30, 120], [120, 34, 120],
@@ -483,6 +599,11 @@ function renderFrame(ts) {
     if (gWall && visible(gWall)) { sizeCanvas(gWall, dpr); drawWall(gWall, progress(gWall), t); }
     const gGrid = document.getElementById("gGrid");
     if (gGrid && visible(gGrid)) { sizeCanvas(gGrid, dpr); drawGrid(gGrid, progress(gGrid)); }
+    const gConv = document.getElementById("gConv");
+    if (gConv && visible(gConv)) {
+      sizeCanvas(gConv, dpr);
+      drawConv(gConv, progress(gConv, CONV_START_VH, CONV_END_VH), ts);
+    }
     const gSpec = document.getElementById("gSpec");
     if (gSpec && visible(gSpec)) { sizeCanvas(gSpec, dpr); drawSpec(gSpec, ts); }
   } catch (e) {
@@ -523,6 +644,35 @@ function startMotion() {
     requestAnimationFrame(frame);
   }
 }
+
+// Scroll reveal. The hiding class is only ever applied here, and only when
+// animations are allowed and the browser can tell us when a section arrives —
+// so no JS, no IntersectionObserver, or reduced-motion all leave the page
+// fully visible rather than blank. `once: true` in spirit: each section is
+// unobserved as soon as it has been seen, so scrolling back up doesn't
+// re-play anything (a section fading out again while you scroll away is the
+// most common way this pattern turns annoying).
+function setupReveal() {
+  if (motionQuery.matches || !("IntersectionObserver" in window)) return;
+  const sections = document.querySelectorAll("main .section");
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        e.target.classList.add("seen");
+        io.unobserve(e.target);
+      }
+    },
+    // A slight bottom inset means a section starts arriving just before it is
+    // fully on screen, rather than after the reader is already looking at it.
+    { rootMargin: "0px 0px -12% 0px", threshold: 0.05 },
+  );
+  for (const el of sections) {
+    el.classList.add("reveal");
+    io.observe(el);
+  }
+}
+setupReveal();
 
 window.addEventListener("resize", () => {
   specState.key = "";
