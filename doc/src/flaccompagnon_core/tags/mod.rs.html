@@ -124,472 +124,484 @@
 <a href=#124 id=124 data-nosnippet>124</a>    /// a fuzzy text search — still surfaced under its raw tag name in
 <a href=#125 id=125 data-nosnippet>125</a>    /// `extra` too, so it's visible in the extended-tags viewer.
 <a href=#126 id=126 data-nosnippet>126</a>    </span><span class="kw">pub </span>musicbrainz_release_id: <span class="prelude-ty">Option</span>&lt;String&gt;,
-<a href=#127 id=127 data-nosnippet>127</a>}
-<a href=#128 id=128 data-nosnippet>128</a>
-<a href=#129 id=129 data-nosnippet>129</a><span class="doccomment">/// A single field's edit instruction for a batch write.
-<a href=#130 id=130 data-nosnippet>130</a>///
-<a href=#131 id=131 data-nosnippet>131</a>/// `Unset` is the default so a [`TagEdits`] built from "only the fields the
-<a href=#132 id=132 data-nosnippet>132</a>/// user actually typed into" naturally leaves everything else untouched.
-<a href=#133 id=133 data-nosnippet>133</a></span><span class="attr">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-<a href=#134 id=134 data-nosnippet>134</a></span><span class="kw">pub enum </span>FieldEdit {
-<a href=#135 id=135 data-nosnippet>135</a>    <span class="doccomment">/// Leave this field untouched.
-<a href=#136 id=136 data-nosnippet>136</a>    </span><span class="attr">#[default]
-<a href=#137 id=137 data-nosnippet>137</a>    </span>Unset,
-<a href=#138 id=138 data-nosnippet>138</a>    <span class="doccomment">/// Remove this field's tag entirely.
-<a href=#139 id=139 data-nosnippet>139</a>    </span>Clear,
-<a href=#140 id=140 data-nosnippet>140</a>    <span class="doccomment">/// Write this value.
-<a href=#141 id=141 data-nosnippet>141</a>    </span>Set(String),
-<a href=#142 id=142 data-nosnippet>142</a>}
-<a href=#143 id=143 data-nosnippet>143</a>
-<a href=#144 id=144 data-nosnippet>144</a><span class="doccomment">/// A batch of edits to apply to every file in a selection. See the module
-<a href=#145 id=145 data-nosnippet>145</a>/// docs for why fields aren't plain `Option&lt;String&gt;`.
-<a href=#146 id=146 data-nosnippet>146</a></span><span class="attr">#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-<a href=#147 id=147 data-nosnippet>147</a></span><span class="kw">pub struct </span>TagEdits {
-<a href=#148 id=148 data-nosnippet>148</a>    <span class="doccomment">/// Edit instruction for [`TagSet::title`].
-<a href=#149 id=149 data-nosnippet>149</a>    </span><span class="kw">pub </span>title: FieldEdit,
-<a href=#150 id=150 data-nosnippet>150</a>    <span class="doccomment">/// Edit instruction for [`TagSet::artist`].
-<a href=#151 id=151 data-nosnippet>151</a>    </span><span class="kw">pub </span>artist: FieldEdit,
-<a href=#152 id=152 data-nosnippet>152</a>    <span class="doccomment">/// Edit instruction for [`TagSet::album`].
-<a href=#153 id=153 data-nosnippet>153</a>    </span><span class="kw">pub </span>album: FieldEdit,
-<a href=#154 id=154 data-nosnippet>154</a>    <span class="doccomment">/// Edit instruction for [`TagSet::album_artist`].
-<a href=#155 id=155 data-nosnippet>155</a>    </span><span class="kw">pub </span>album_artist: FieldEdit,
-<a href=#156 id=156 data-nosnippet>156</a>    <span class="doccomment">/// Edit instruction for [`TagSet::composer`].
-<a href=#157 id=157 data-nosnippet>157</a>    </span><span class="kw">pub </span>composer: FieldEdit,
-<a href=#158 id=158 data-nosnippet>158</a>    <span class="doccomment">/// Edit instruction for [`TagSet::year`].
-<a href=#159 id=159 data-nosnippet>159</a>    </span><span class="kw">pub </span>year: FieldEdit,
-<a href=#160 id=160 data-nosnippet>160</a>    <span class="doccomment">/// Edit instruction for [`TagSet::track`].
-<a href=#161 id=161 data-nosnippet>161</a>    </span><span class="kw">pub </span>track: FieldEdit,
-<a href=#162 id=162 data-nosnippet>162</a>    <span class="doccomment">/// Edit instruction for [`TagSet::track_total`].
-<a href=#163 id=163 data-nosnippet>163</a>    </span><span class="kw">pub </span>track_total: FieldEdit,
-<a href=#164 id=164 data-nosnippet>164</a>    <span class="doccomment">/// Edit instruction for [`TagSet::disc`].
-<a href=#165 id=165 data-nosnippet>165</a>    </span><span class="kw">pub </span>disc: FieldEdit,
-<a href=#166 id=166 data-nosnippet>166</a>    <span class="doccomment">/// Edit instruction for [`TagSet::disc_total`].
-<a href=#167 id=167 data-nosnippet>167</a>    </span><span class="kw">pub </span>disc_total: FieldEdit,
-<a href=#168 id=168 data-nosnippet>168</a>    <span class="doccomment">/// Edit instruction for [`TagSet::genre`].
-<a href=#169 id=169 data-nosnippet>169</a>    </span><span class="kw">pub </span>genre: FieldEdit,
-<a href=#170 id=170 data-nosnippet>170</a>    <span class="doccomment">/// Edit instruction for [`TagSet::comment`].
-<a href=#171 id=171 data-nosnippet>171</a>    </span><span class="kw">pub </span>comment: FieldEdit,
-<a href=#172 id=172 data-nosnippet>172</a>    <span class="doccomment">/// `None` leaves the compilation flag untouched.
-<a href=#173 id=173 data-nosnippet>173</a>    </span><span class="kw">pub </span>compilation: <span class="prelude-ty">Option</span>&lt;bool&gt;,
-<a href=#174 id=174 data-nosnippet>174</a>    <span class="doccomment">/// Edit instruction for the embedded cover art.
-<a href=#175 id=175 data-nosnippet>175</a>    </span><span class="kw">pub </span>cover: CoverEdit,
-<a href=#176 id=176 data-nosnippet>176</a>    <span class="doccomment">/// Sparse add/edit/remove instructions for extended tags, keyed by the
-<a href=#177 id=177 data-nosnippet>177</a>    /// same raw format-specific tag name [`TagSet::extra`] pairs use (e.g.
-<a href=#178 id=178 data-nosnippet>178</a>    /// `"BPM"` in a FLAC's Vorbis comments, `"TBPM"` in an MP3's ID3v2
-<a href=#179 id=179 data-nosnippet>179</a>    /// frames) — only the keys the extended-tags pop-in actually touched are
-<a href=#180 id=180 data-nosnippet>180</a>    /// present, same sparse convention as the named fields above and for the
-<a href=#181 id=181 data-nosnippet>181</a>    /// same reason: an untouched key must not clobber a file whose value
-<a href=#182 id=182 data-nosnippet>182</a>    /// differed from what the panel showed.
-<a href=#183 id=183 data-nosnippet>183</a>    </span><span class="kw">pub </span>extra: Vec&lt;(String, FieldEdit)&gt;,
-<a href=#184 id=184 data-nosnippet>184</a>}
-<a href=#185 id=185 data-nosnippet>185</a>
-<a href=#186 id=186 data-nosnippet>186</a><span class="doccomment">/// Every [`ItemKey`] already surfaced as a named [`TagSet`] field — excluded
-<a href=#187 id=187 data-nosnippet>187</a>/// from `TagSet::extra` so the extended-tags panel doesn't duplicate them.
-<a href=#188 id=188 data-nosnippet>188</a></span><span class="kw">const </span>KNOWN_KEYS: <span class="kw-2">&amp;</span>[ItemKey] = <span class="kw-2">&amp;</span>[
-<a href=#189 id=189 data-nosnippet>189</a>    ItemKey::TrackTitle,
-<a href=#190 id=190 data-nosnippet>190</a>    ItemKey::TrackArtist,
-<a href=#191 id=191 data-nosnippet>191</a>    ItemKey::AlbumTitle,
-<a href=#192 id=192 data-nosnippet>192</a>    ItemKey::Genre,
-<a href=#193 id=193 data-nosnippet>193</a>    ItemKey::Comment,
-<a href=#194 id=194 data-nosnippet>194</a>    ItemKey::AlbumArtist,
-<a href=#195 id=195 data-nosnippet>195</a>    ItemKey::Composer,
-<a href=#196 id=196 data-nosnippet>196</a>    ItemKey::Year,
-<a href=#197 id=197 data-nosnippet>197</a>    ItemKey::RecordingDate,
-<a href=#198 id=198 data-nosnippet>198</a>    ItemKey::TrackNumber,
-<a href=#199 id=199 data-nosnippet>199</a>    ItemKey::TrackTotal,
-<a href=#200 id=200 data-nosnippet>200</a>    ItemKey::DiscNumber,
-<a href=#201 id=201 data-nosnippet>201</a>    ItemKey::DiscTotal,
-<a href=#202 id=202 data-nosnippet>202</a>    ItemKey::FlagCompilation,
-<a href=#203 id=203 data-nosnippet>203</a>];
-<a href=#204 id=204 data-nosnippet>204</a>
-<a href=#205 id=205 data-nosnippet>205</a><span class="kw">fn </span>parse_err(path: <span class="kw-2">&amp;</span>Path, e: <span class="kw">impl </span>std::fmt::Display) -&gt; TagError {
-<a href=#206 id=206 data-nosnippet>206</a>    TagError::Parse(path.display().to_string(), e.to_string())
-<a href=#207 id=207 data-nosnippet>207</a>}
-<a href=#208 id=208 data-nosnippet>208</a>
-<a href=#209 id=209 data-nosnippet>209</a><span class="doccomment">/// Read every tag FlacCompagnon knows how to show from `path`'s primary tag
-<a href=#210 id=210 data-nosnippet>210</a>/// (the tag type a player would actually look at — see
-<a href=#211 id=211 data-nosnippet>211</a>/// [`lofty::file::FileType::primary_tag_type`]).
-<a href=#212 id=212 data-nosnippet>212</a></span><span class="kw">pub fn </span>read_tags(path: <span class="kw-2">&amp;</span>Path) -&gt; <span class="prelude-ty">Result</span>&lt;TagSet, TagError&gt; {
-<a href=#213 id=213 data-nosnippet>213</a>    <span class="kw">let </span>tagged = read_from_path(path).map_err(|e| parse_err(path, e))<span class="question-mark">?</span>;
-<a href=#214 id=214 data-nosnippet>214</a>    <span class="kw">let </span><span class="kw-2">mut </span>out = TagSet::default();
-<a href=#215 id=215 data-nosnippet>215</a>
-<a href=#216 id=216 data-nosnippet>216</a>    <span class="kw">let </span><span class="prelude-val">Some</span>(tag) = tagged.primary_tag() <span class="kw">else </span>{
-<a href=#217 id=217 data-nosnippet>217</a>        <span class="kw">return </span><span class="prelude-val">Ok</span>(out);
-<a href=#218 id=218 data-nosnippet>218</a>    };
-<a href=#219 id=219 data-nosnippet>219</a>
-<a href=#220 id=220 data-nosnippet>220</a>    out.title = tag.title().map(|c| c.into_owned());
-<a href=#221 id=221 data-nosnippet>221</a>    out.artist = tag.artist().map(|c| c.into_owned());
-<a href=#222 id=222 data-nosnippet>222</a>    out.album = tag.album().map(|c| c.into_owned());
-<a href=#223 id=223 data-nosnippet>223</a>    out.genre = tag.genre().map(|c| c.into_owned());
-<a href=#224 id=224 data-nosnippet>224</a>    out.comment = tag.comment().map(|c| c.into_owned());
-<a href=#225 id=225 data-nosnippet>225</a>    out.album_artist = tag.get_string(ItemKey::AlbumArtist).map(str::to_string);
-<a href=#226 id=226 data-nosnippet>226</a>    out.composer = tag.get_string(ItemKey::Composer).map(str::to_string);
-<a href=#227 id=227 data-nosnippet>227</a>    out.year = tag
-<a href=#228 id=228 data-nosnippet>228</a>        .get_string(ItemKey::Year)
-<a href=#229 id=229 data-nosnippet>229</a>        .or_else(|| tag.get_string(ItemKey::RecordingDate))
-<a href=#230 id=230 data-nosnippet>230</a>        .map(str::to_string);
-<a href=#231 id=231 data-nosnippet>231</a>    out.track = tag.get_string(ItemKey::TrackNumber).map(str::to_string);
-<a href=#232 id=232 data-nosnippet>232</a>    out.track_total = tag.get_string(ItemKey::TrackTotal).map(str::to_string);
-<a href=#233 id=233 data-nosnippet>233</a>    out.disc = tag.get_string(ItemKey::DiscNumber).map(str::to_string);
-<a href=#234 id=234 data-nosnippet>234</a>    out.disc_total = tag.get_string(ItemKey::DiscTotal).map(str::to_string);
-<a href=#235 id=235 data-nosnippet>235</a>    out.compilation = tag.get_string(ItemKey::FlagCompilation) == <span class="prelude-val">Some</span>(<span class="string">"1"</span>);
-<a href=#236 id=236 data-nosnippet>236</a>    out.musicbrainz_release_id = tag
-<a href=#237 id=237 data-nosnippet>237</a>        .get_string(ItemKey::MusicBrainzReleaseId)
-<a href=#238 id=238 data-nosnippet>238</a>        .map(str::to_string)
-<a href=#239 id=239 data-nosnippet>239</a>        .filter(|s| !s.is_empty());
-<a href=#240 id=240 data-nosnippet>240</a>
-<a href=#241 id=241 data-nosnippet>241</a>    <span class="kw">for </span>item <span class="kw">in </span>tag.items() {
-<a href=#242 id=242 data-nosnippet>242</a>        <span class="kw">if </span>KNOWN_KEYS.contains(<span class="kw-2">&amp;</span>item.key()) {
-<a href=#243 id=243 data-nosnippet>243</a>            <span class="kw">continue</span>;
-<a href=#244 id=244 data-nosnippet>244</a>        }
-<a href=#245 id=245 data-nosnippet>245</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(text) = item.value().text() {
-<a href=#246 id=246 data-nosnippet>246</a>            <span class="kw">if </span>text.is_empty() {
-<a href=#247 id=247 data-nosnippet>247</a>                <span class="kw">continue</span>;
-<a href=#248 id=248 data-nosnippet>248</a>            }
-<a href=#249 id=249 data-nosnippet>249</a>            <span class="kw">let </span>label = item
-<a href=#250 id=250 data-nosnippet>250</a>                .key()
-<a href=#251 id=251 data-nosnippet>251</a>                .map_key(tag.tag_type())
-<a href=#252 id=252 data-nosnippet>252</a>                .unwrap_or(<span class="string">"?"</span>)
-<a href=#253 id=253 data-nosnippet>253</a>                .to_string();
-<a href=#254 id=254 data-nosnippet>254</a>            out.extra.push((label, text.to_string()));
-<a href=#255 id=255 data-nosnippet>255</a>        }
-<a href=#256 id=256 data-nosnippet>256</a>    }
-<a href=#257 id=257 data-nosnippet>257</a>
-<a href=#258 id=258 data-nosnippet>258</a>    out.cover = cover::extract(tag);
-<a href=#259 id=259 data-nosnippet>259</a>
-<a href=#260 id=260 data-nosnippet>260</a>    <span class="prelude-val">Ok</span>(out)
-<a href=#261 id=261 data-nosnippet>261</a>}
-<a href=#262 id=262 data-nosnippet>262</a>
-<a href=#263 id=263 data-nosnippet>263</a><span class="kw">fn </span>apply_field(tag: <span class="kw-2">&amp;mut </span>Tag, key: ItemKey, edit: <span class="kw-2">&amp;</span>FieldEdit) {
-<a href=#264 id=264 data-nosnippet>264</a>    <span class="kw">match </span>edit {
-<a href=#265 id=265 data-nosnippet>265</a>        FieldEdit::Unset =&gt; {}
-<a href=#266 id=266 data-nosnippet>266</a>        FieldEdit::Clear =&gt; tag.remove_key(key),
-<a href=#267 id=267 data-nosnippet>267</a>        FieldEdit::Set(value) =&gt; {
-<a href=#268 id=268 data-nosnippet>268</a>            tag.insert_text(key, value.clone());
-<a href=#269 id=269 data-nosnippet>269</a>        }
-<a href=#270 id=270 data-nosnippet>270</a>    }
-<a href=#271 id=271 data-nosnippet>271</a>}
-<a href=#272 id=272 data-nosnippet>272</a>
-<a href=#273 id=273 data-nosnippet>273</a><span class="doccomment">/// Apply `edits` to `path`, writing straight to the audio file.
-<a href=#274 id=274 data-nosnippet>274</a>///
-<a href=#275 id=275 data-nosnippet>275</a>/// Reads the file's current primary tag first (so untouched fields, and any
-<a href=#276 id=276 data-nosnippet>276</a>/// tag the panel doesn't know about, survive the round trip), applies only
-<a href=#277 id=277 data-nosnippet>277</a>/// the fields present in `edits`, and saves. A file with no tag yet gets a
-<a href=#278 id=278 data-nosnippet>278</a>/// fresh one of the format's primary [`lofty::tag::TagType`].
-<a href=#279 id=279 data-nosnippet>279</a></span><span class="kw">pub fn </span>write_tags(path: <span class="kw-2">&amp;</span>Path, edits: <span class="kw-2">&amp;</span>TagEdits) -&gt; <span class="prelude-ty">Result</span>&lt;(), TagError&gt; {
-<a href=#280 id=280 data-nosnippet>280</a>    <span class="kw">let </span>tagged = read_from_path(path).map_err(|e| parse_err(path, e))<span class="question-mark">?</span>;
-<a href=#281 id=281 data-nosnippet>281</a>    <span class="kw">let </span>tag_type = tagged.primary_tag_type();
-<a href=#282 id=282 data-nosnippet>282</a>    <span class="kw">let </span><span class="kw-2">mut </span>tag = tagged
-<a href=#283 id=283 data-nosnippet>283</a>        .primary_tag()
-<a href=#284 id=284 data-nosnippet>284</a>        .cloned()
-<a href=#285 id=285 data-nosnippet>285</a>        .unwrap_or_else(|| Tag::new(tag_type));
-<a href=#286 id=286 data-nosnippet>286</a>
-<a href=#287 id=287 data-nosnippet>287</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::TrackTitle, <span class="kw-2">&amp;</span>edits.title);
-<a href=#288 id=288 data-nosnippet>288</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::TrackArtist, <span class="kw-2">&amp;</span>edits.artist);
-<a href=#289 id=289 data-nosnippet>289</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::AlbumTitle, <span class="kw-2">&amp;</span>edits.album);
-<a href=#290 id=290 data-nosnippet>290</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::AlbumArtist, <span class="kw-2">&amp;</span>edits.album_artist);
-<a href=#291 id=291 data-nosnippet>291</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::Composer, <span class="kw-2">&amp;</span>edits.composer);
-<a href=#292 id=292 data-nosnippet>292</a>    <span class="comment">// `ItemKey::Year` has no mapping at all for ID3v2 (only `RecordingDate`
-<a href=#293 id=293 data-nosnippet>293</a>    // does — see lofty's `ID3V2_MAP`), so writing MP3/WAV/AIFF/AAC tags with
-<a href=#294 id=294 data-nosnippet>294</a>    // `Year` silently drops the field. `RecordingDate` round-trips on every
-<a href=#295 id=295 data-nosnippet>295</a>    // format lofty supports (ID3v2 TDRC, Vorbis DATE, MP4 ©day, RIFF ICRD),
-<a href=#296 id=296 data-nosnippet>296</a>    // so the "year" field is always written there; `read_tags` still checks
-<a href=#297 id=297 data-nosnippet>297</a>    // the legacy `Year` key first for files tagged by other tools.
-<a href=#298 id=298 data-nosnippet>298</a>    </span>apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::RecordingDate, <span class="kw-2">&amp;</span>edits.year);
-<a href=#299 id=299 data-nosnippet>299</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::TrackNumber, <span class="kw-2">&amp;</span>edits.track);
-<a href=#300 id=300 data-nosnippet>300</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::TrackTotal, <span class="kw-2">&amp;</span>edits.track_total);
-<a href=#301 id=301 data-nosnippet>301</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::DiscNumber, <span class="kw-2">&amp;</span>edits.disc);
-<a href=#302 id=302 data-nosnippet>302</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::DiscTotal, <span class="kw-2">&amp;</span>edits.disc_total);
-<a href=#303 id=303 data-nosnippet>303</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::Genre, <span class="kw-2">&amp;</span>edits.genre);
-<a href=#304 id=304 data-nosnippet>304</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::Comment, <span class="kw-2">&amp;</span>edits.comment);
-<a href=#305 id=305 data-nosnippet>305</a>
-<a href=#306 id=306 data-nosnippet>306</a>    <span class="kw">if let </span><span class="prelude-val">Some</span>(compilation) = edits.compilation {
-<a href=#307 id=307 data-nosnippet>307</a>        tag.insert_text(
-<a href=#308 id=308 data-nosnippet>308</a>            ItemKey::FlagCompilation,
-<a href=#309 id=309 data-nosnippet>309</a>            <span class="kw">if </span>compilation { <span class="string">"1" </span>} <span class="kw">else </span>{ <span class="string">"0" </span>}.to_string(),
-<a href=#310 id=310 data-nosnippet>310</a>        );
-<a href=#311 id=311 data-nosnippet>311</a>    }
-<a href=#312 id=312 data-nosnippet>312</a>
-<a href=#313 id=313 data-nosnippet>313</a>    <span class="kw">for </span>(key, edit) <span class="kw">in </span><span class="kw-2">&amp;</span>edits.extra {
-<a href=#314 id=314 data-nosnippet>314</a>        <span class="comment">// A key this file's tag type has no mapping for (a Vorbis-only field
-<a href=#315 id=315 data-nosnippet>315</a>        // on an MP3, say) is silently skipped rather than erroring the whole
-<a href=#316 id=316 data-nosnippet>316</a>        // batch — the same mismatch already accepted for `Year` above, and
-<a href=#317 id=317 data-nosnippet>317</a>        // for the same reason: the panel can't know a mixed-format selection
-<a href=#318 id=318 data-nosnippet>318</a>        // supports every field on every file.
-<a href=#319 id=319 data-nosnippet>319</a>        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(item_key) = ItemKey::from_key(tag_type, key) {
-<a href=#320 id=320 data-nosnippet>320</a>            apply_field(<span class="kw-2">&amp;mut </span>tag, item_key, edit);
-<a href=#321 id=321 data-nosnippet>321</a>        }
-<a href=#322 id=322 data-nosnippet>322</a>    }
-<a href=#323 id=323 data-nosnippet>323</a>
-<a href=#324 id=324 data-nosnippet>324</a>    cover::apply_edit(<span class="kw-2">&amp;mut </span>tag, <span class="kw-2">&amp;</span>edits.cover, <span class="kw-2">&amp;</span>path.display().to_string())<span class="question-mark">?</span>;
-<a href=#325 id=325 data-nosnippet>325</a>
-<a href=#326 id=326 data-nosnippet>326</a>    tag.save_to_path(path, WriteOptions::default())
-<a href=#327 id=327 data-nosnippet>327</a>        .map_err(|e| TagError::Write(path.display().to_string(), e.to_string()))
-<a href=#328 id=328 data-nosnippet>328</a>}
-<a href=#329 id=329 data-nosnippet>329</a>
-<a href=#330 id=330 data-nosnippet>330</a><span class="attr">#[cfg(test)]
-<a href=#331 id=331 data-nosnippet>331</a></span><span class="kw">mod </span>tests {
-<a href=#332 id=332 data-nosnippet>332</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
-<a href=#333 id=333 data-nosnippet>333</a>    <span class="kw">use </span>std::io::Write <span class="kw">as _</span>;
-<a href=#334 id=334 data-nosnippet>334</a>
-<a href=#335 id=335 data-nosnippet>335</a>    <span class="doccomment">/// A minimal, silent WAV — same fixture style as the rest of the crate's
-<a href=#336 id=336 data-nosnippet>336</a>    /// tests (`hound`-generated, no real audio content needed).
-<a href=#337 id=337 data-nosnippet>337</a>    </span><span class="kw">fn </span>synth_wav() -&gt; tempfile::TempPath {
-<a href=#338 id=338 data-nosnippet>338</a>        <span class="kw">let </span>file = tempfile::Builder::new().suffix(<span class="string">".wav"</span>).tempfile().unwrap();
-<a href=#339 id=339 data-nosnippet>339</a>        <span class="kw">let </span>path = file.into_temp_path();
-<a href=#340 id=340 data-nosnippet>340</a>        <span class="kw">let </span>spec = hound::WavSpec {
-<a href=#341 id=341 data-nosnippet>341</a>            channels: <span class="number">2</span>,
-<a href=#342 id=342 data-nosnippet>342</a>            sample_rate: <span class="number">44_100</span>,
-<a href=#343 id=343 data-nosnippet>343</a>            bits_per_sample: <span class="number">16</span>,
-<a href=#344 id=344 data-nosnippet>344</a>            sample_format: hound::SampleFormat::Int,
-<a href=#345 id=345 data-nosnippet>345</a>        };
-<a href=#346 id=346 data-nosnippet>346</a>        <span class="kw">let </span><span class="kw-2">mut </span>writer = hound::WavWriter::create(<span class="kw-2">&amp;</span>path, spec).unwrap();
-<a href=#347 id=347 data-nosnippet>347</a>        <span class="kw">for _ in </span><span class="number">0</span>..<span class="number">1000 </span>{
-<a href=#348 id=348 data-nosnippet>348</a>            writer.write_sample(<span class="number">0i16</span>).unwrap();
-<a href=#349 id=349 data-nosnippet>349</a>            writer.write_sample(<span class="number">0i16</span>).unwrap();
-<a href=#350 id=350 data-nosnippet>350</a>        }
-<a href=#351 id=351 data-nosnippet>351</a>        writer.finalize().unwrap();
-<a href=#352 id=352 data-nosnippet>352</a>        path
-<a href=#353 id=353 data-nosnippet>353</a>    }
-<a href=#354 id=354 data-nosnippet>354</a>
-<a href=#355 id=355 data-nosnippet>355</a>    <span class="attr">#[test]
-<a href=#356 id=356 data-nosnippet>356</a>    </span><span class="kw">fn </span>round_trip_basic_fields() {
-<a href=#357 id=357 data-nosnippet>357</a>        <span class="kw">let </span>path = synth_wav();
-<a href=#358 id=358 data-nosnippet>358</a>        <span class="kw">let </span>edits = TagEdits {
-<a href=#359 id=359 data-nosnippet>359</a>            title: FieldEdit::Set(<span class="string">"Title"</span>.into()),
-<a href=#360 id=360 data-nosnippet>360</a>            artist: FieldEdit::Set(<span class="string">"Artist"</span>.into()),
-<a href=#361 id=361 data-nosnippet>361</a>            album: FieldEdit::Set(<span class="string">"Album"</span>.into()),
-<a href=#362 id=362 data-nosnippet>362</a>            album_artist: FieldEdit::Set(<span class="string">"Album Artist"</span>.into()),
-<a href=#363 id=363 data-nosnippet>363</a>            composer: FieldEdit::Set(<span class="string">"Composer"</span>.into()),
-<a href=#364 id=364 data-nosnippet>364</a>            year: FieldEdit::Set(<span class="string">"2026"</span>.into()),
-<a href=#365 id=365 data-nosnippet>365</a>            track: FieldEdit::Set(<span class="string">"3"</span>.into()),
-<a href=#366 id=366 data-nosnippet>366</a>            track_total: FieldEdit::Set(<span class="string">"12"</span>.into()),
-<a href=#367 id=367 data-nosnippet>367</a>            disc: FieldEdit::Set(<span class="string">"1"</span>.into()),
-<a href=#368 id=368 data-nosnippet>368</a>            disc_total: FieldEdit::Set(<span class="string">"2"</span>.into()),
-<a href=#369 id=369 data-nosnippet>369</a>            genre: FieldEdit::Set(<span class="string">"Electronic"</span>.into()),
-<a href=#370 id=370 data-nosnippet>370</a>            comment: FieldEdit::Set(<span class="string">"Test comment"</span>.into()),
-<a href=#371 id=371 data-nosnippet>371</a>            compilation: <span class="prelude-val">Some</span>(<span class="bool-val">true</span>),
-<a href=#372 id=372 data-nosnippet>372</a>            cover: CoverEdit::Unset,
-<a href=#373 id=373 data-nosnippet>373</a>            extra: Vec::new(),
-<a href=#374 id=374 data-nosnippet>374</a>        };
-<a href=#375 id=375 data-nosnippet>375</a>        write_tags(<span class="kw-2">&amp;</span>path, <span class="kw-2">&amp;</span>edits).expect(<span class="string">"write_tags should succeed on a fresh WAV"</span>);
-<a href=#376 id=376 data-nosnippet>376</a>
-<a href=#377 id=377 data-nosnippet>377</a>        <span class="kw">let </span>read = read_tags(<span class="kw-2">&amp;</span>path).expect(<span class="string">"read_tags should succeed after writing"</span>);
-<a href=#378 id=378 data-nosnippet>378</a>        <span class="macro">assert_eq!</span>(read.title.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Title"</span>));
-<a href=#379 id=379 data-nosnippet>379</a>        <span class="macro">assert_eq!</span>(read.artist.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Artist"</span>));
-<a href=#380 id=380 data-nosnippet>380</a>        <span class="macro">assert_eq!</span>(read.album.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Album"</span>));
-<a href=#381 id=381 data-nosnippet>381</a>        <span class="macro">assert_eq!</span>(read.album_artist.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Album Artist"</span>));
-<a href=#382 id=382 data-nosnippet>382</a>        <span class="macro">assert_eq!</span>(read.composer.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Composer"</span>));
-<a href=#383 id=383 data-nosnippet>383</a>        <span class="macro">assert_eq!</span>(read.year.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"2026"</span>));
-<a href=#384 id=384 data-nosnippet>384</a>        <span class="macro">assert_eq!</span>(read.track.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"3"</span>));
-<a href=#385 id=385 data-nosnippet>385</a>        <span class="macro">assert_eq!</span>(read.track_total.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"12"</span>));
-<a href=#386 id=386 data-nosnippet>386</a>        <span class="macro">assert_eq!</span>(read.disc.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"1"</span>));
-<a href=#387 id=387 data-nosnippet>387</a>        <span class="macro">assert_eq!</span>(read.disc_total.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"2"</span>));
-<a href=#388 id=388 data-nosnippet>388</a>        <span class="macro">assert_eq!</span>(read.genre.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Electronic"</span>));
-<a href=#389 id=389 data-nosnippet>389</a>        <span class="macro">assert_eq!</span>(read.comment.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Test comment"</span>));
-<a href=#390 id=390 data-nosnippet>390</a>        <span class="macro">assert!</span>(read.compilation);
-<a href=#391 id=391 data-nosnippet>391</a>    }
-<a href=#392 id=392 data-nosnippet>392</a>
-<a href=#393 id=393 data-nosnippet>393</a>    <span class="attr">#[test]
-<a href=#394 id=394 data-nosnippet>394</a>    </span><span class="kw">fn </span>unset_field_does_not_touch_existing_value() {
-<a href=#395 id=395 data-nosnippet>395</a>        <span class="kw">let </span>path = synth_wav();
-<a href=#396 id=396 data-nosnippet>396</a>        write_tags(
-<a href=#397 id=397 data-nosnippet>397</a>            <span class="kw-2">&amp;</span>path,
-<a href=#398 id=398 data-nosnippet>398</a>            <span class="kw-2">&amp;</span>TagEdits {
-<a href=#399 id=399 data-nosnippet>399</a>                title: FieldEdit::Set(<span class="string">"Kept"</span>.into()),
-<a href=#400 id=400 data-nosnippet>400</a>                artist: FieldEdit::Set(<span class="string">"Also kept"</span>.into()),
-<a href=#401 id=401 data-nosnippet>401</a>                ..Default::default()
-<a href=#402 id=402 data-nosnippet>402</a>            },
-<a href=#403 id=403 data-nosnippet>403</a>        )
-<a href=#404 id=404 data-nosnippet>404</a>        .unwrap();
-<a href=#405 id=405 data-nosnippet>405</a>
-<a href=#406 id=406 data-nosnippet>406</a>        <span class="comment">// Second write only touches `album`; `title`/`artist` are `Unset` by
-<a href=#407 id=407 data-nosnippet>407</a>        // `Default` and must survive untouched — this is the batch-edit
-<a href=#408 id=408 data-nosnippet>408</a>        // guarantee the tag panel relies on.
-<a href=#409 id=409 data-nosnippet>409</a>        </span>write_tags(
-<a href=#410 id=410 data-nosnippet>410</a>            <span class="kw-2">&amp;</span>path,
-<a href=#411 id=411 data-nosnippet>411</a>            <span class="kw-2">&amp;</span>TagEdits {
-<a href=#412 id=412 data-nosnippet>412</a>                album: FieldEdit::Set(<span class="string">"New album"</span>.into()),
+<a href=#127 id=127 data-nosnippet>127</a>    <span class="doccomment">/// The tool (and often its version) that produced this file, when it left
+<a href=#128 id=128 data-nosnippet>128</a>    /// one behind — FLAC's Vorbis comment vendor string, an MP3's ID3v2
+<a href=#129 id=129 data-nosnippet>129</a>    /// `TSSE` frame, and so on (`ItemKey::EncoderSoftware`). Read-only: this
+<a href=#130 id=130 data-nosnippet>130</a>    /// is diagnostic information about the file's own history, not something
+<a href=#131 id=131 data-nosnippet>131</a>    /// the tag panel offers to edit, so it has no `TagEdits` counterpart.
+<a href=#132 id=132 data-nosnippet>132</a>    </span><span class="attr">#[serde(default)]
+<a href=#133 id=133 data-nosnippet>133</a>    </span><span class="kw">pub </span>encoder: <span class="prelude-ty">Option</span>&lt;String&gt;,
+<a href=#134 id=134 data-nosnippet>134</a>}
+<a href=#135 id=135 data-nosnippet>135</a>
+<a href=#136 id=136 data-nosnippet>136</a><span class="doccomment">/// A single field's edit instruction for a batch write.
+<a href=#137 id=137 data-nosnippet>137</a>///
+<a href=#138 id=138 data-nosnippet>138</a>/// `Unset` is the default so a [`TagEdits`] built from "only the fields the
+<a href=#139 id=139 data-nosnippet>139</a>/// user actually typed into" naturally leaves everything else untouched.
+<a href=#140 id=140 data-nosnippet>140</a></span><span class="attr">#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+<a href=#141 id=141 data-nosnippet>141</a></span><span class="kw">pub enum </span>FieldEdit {
+<a href=#142 id=142 data-nosnippet>142</a>    <span class="doccomment">/// Leave this field untouched.
+<a href=#143 id=143 data-nosnippet>143</a>    </span><span class="attr">#[default]
+<a href=#144 id=144 data-nosnippet>144</a>    </span>Unset,
+<a href=#145 id=145 data-nosnippet>145</a>    <span class="doccomment">/// Remove this field's tag entirely.
+<a href=#146 id=146 data-nosnippet>146</a>    </span>Clear,
+<a href=#147 id=147 data-nosnippet>147</a>    <span class="doccomment">/// Write this value.
+<a href=#148 id=148 data-nosnippet>148</a>    </span>Set(String),
+<a href=#149 id=149 data-nosnippet>149</a>}
+<a href=#150 id=150 data-nosnippet>150</a>
+<a href=#151 id=151 data-nosnippet>151</a><span class="doccomment">/// A batch of edits to apply to every file in a selection. See the module
+<a href=#152 id=152 data-nosnippet>152</a>/// docs for why fields aren't plain `Option&lt;String&gt;`.
+<a href=#153 id=153 data-nosnippet>153</a></span><span class="attr">#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+<a href=#154 id=154 data-nosnippet>154</a></span><span class="kw">pub struct </span>TagEdits {
+<a href=#155 id=155 data-nosnippet>155</a>    <span class="doccomment">/// Edit instruction for [`TagSet::title`].
+<a href=#156 id=156 data-nosnippet>156</a>    </span><span class="kw">pub </span>title: FieldEdit,
+<a href=#157 id=157 data-nosnippet>157</a>    <span class="doccomment">/// Edit instruction for [`TagSet::artist`].
+<a href=#158 id=158 data-nosnippet>158</a>    </span><span class="kw">pub </span>artist: FieldEdit,
+<a href=#159 id=159 data-nosnippet>159</a>    <span class="doccomment">/// Edit instruction for [`TagSet::album`].
+<a href=#160 id=160 data-nosnippet>160</a>    </span><span class="kw">pub </span>album: FieldEdit,
+<a href=#161 id=161 data-nosnippet>161</a>    <span class="doccomment">/// Edit instruction for [`TagSet::album_artist`].
+<a href=#162 id=162 data-nosnippet>162</a>    </span><span class="kw">pub </span>album_artist: FieldEdit,
+<a href=#163 id=163 data-nosnippet>163</a>    <span class="doccomment">/// Edit instruction for [`TagSet::composer`].
+<a href=#164 id=164 data-nosnippet>164</a>    </span><span class="kw">pub </span>composer: FieldEdit,
+<a href=#165 id=165 data-nosnippet>165</a>    <span class="doccomment">/// Edit instruction for [`TagSet::year`].
+<a href=#166 id=166 data-nosnippet>166</a>    </span><span class="kw">pub </span>year: FieldEdit,
+<a href=#167 id=167 data-nosnippet>167</a>    <span class="doccomment">/// Edit instruction for [`TagSet::track`].
+<a href=#168 id=168 data-nosnippet>168</a>    </span><span class="kw">pub </span>track: FieldEdit,
+<a href=#169 id=169 data-nosnippet>169</a>    <span class="doccomment">/// Edit instruction for [`TagSet::track_total`].
+<a href=#170 id=170 data-nosnippet>170</a>    </span><span class="kw">pub </span>track_total: FieldEdit,
+<a href=#171 id=171 data-nosnippet>171</a>    <span class="doccomment">/// Edit instruction for [`TagSet::disc`].
+<a href=#172 id=172 data-nosnippet>172</a>    </span><span class="kw">pub </span>disc: FieldEdit,
+<a href=#173 id=173 data-nosnippet>173</a>    <span class="doccomment">/// Edit instruction for [`TagSet::disc_total`].
+<a href=#174 id=174 data-nosnippet>174</a>    </span><span class="kw">pub </span>disc_total: FieldEdit,
+<a href=#175 id=175 data-nosnippet>175</a>    <span class="doccomment">/// Edit instruction for [`TagSet::genre`].
+<a href=#176 id=176 data-nosnippet>176</a>    </span><span class="kw">pub </span>genre: FieldEdit,
+<a href=#177 id=177 data-nosnippet>177</a>    <span class="doccomment">/// Edit instruction for [`TagSet::comment`].
+<a href=#178 id=178 data-nosnippet>178</a>    </span><span class="kw">pub </span>comment: FieldEdit,
+<a href=#179 id=179 data-nosnippet>179</a>    <span class="doccomment">/// `None` leaves the compilation flag untouched.
+<a href=#180 id=180 data-nosnippet>180</a>    </span><span class="kw">pub </span>compilation: <span class="prelude-ty">Option</span>&lt;bool&gt;,
+<a href=#181 id=181 data-nosnippet>181</a>    <span class="doccomment">/// Edit instruction for the embedded cover art.
+<a href=#182 id=182 data-nosnippet>182</a>    </span><span class="kw">pub </span>cover: CoverEdit,
+<a href=#183 id=183 data-nosnippet>183</a>    <span class="doccomment">/// Sparse add/edit/remove instructions for extended tags, keyed by the
+<a href=#184 id=184 data-nosnippet>184</a>    /// same raw format-specific tag name [`TagSet::extra`] pairs use (e.g.
+<a href=#185 id=185 data-nosnippet>185</a>    /// `"BPM"` in a FLAC's Vorbis comments, `"TBPM"` in an MP3's ID3v2
+<a href=#186 id=186 data-nosnippet>186</a>    /// frames) — only the keys the extended-tags pop-in actually touched are
+<a href=#187 id=187 data-nosnippet>187</a>    /// present, same sparse convention as the named fields above and for the
+<a href=#188 id=188 data-nosnippet>188</a>    /// same reason: an untouched key must not clobber a file whose value
+<a href=#189 id=189 data-nosnippet>189</a>    /// differed from what the panel showed.
+<a href=#190 id=190 data-nosnippet>190</a>    </span><span class="kw">pub </span>extra: Vec&lt;(String, FieldEdit)&gt;,
+<a href=#191 id=191 data-nosnippet>191</a>}
+<a href=#192 id=192 data-nosnippet>192</a>
+<a href=#193 id=193 data-nosnippet>193</a><span class="doccomment">/// Every [`ItemKey`] already surfaced as a named [`TagSet`] field — excluded
+<a href=#194 id=194 data-nosnippet>194</a>/// from `TagSet::extra` so the extended-tags panel doesn't duplicate them.
+<a href=#195 id=195 data-nosnippet>195</a></span><span class="kw">const </span>KNOWN_KEYS: <span class="kw-2">&amp;</span>[ItemKey] = <span class="kw-2">&amp;</span>[
+<a href=#196 id=196 data-nosnippet>196</a>    ItemKey::TrackTitle,
+<a href=#197 id=197 data-nosnippet>197</a>    ItemKey::TrackArtist,
+<a href=#198 id=198 data-nosnippet>198</a>    ItemKey::AlbumTitle,
+<a href=#199 id=199 data-nosnippet>199</a>    ItemKey::Genre,
+<a href=#200 id=200 data-nosnippet>200</a>    ItemKey::Comment,
+<a href=#201 id=201 data-nosnippet>201</a>    ItemKey::AlbumArtist,
+<a href=#202 id=202 data-nosnippet>202</a>    ItemKey::Composer,
+<a href=#203 id=203 data-nosnippet>203</a>    ItemKey::Year,
+<a href=#204 id=204 data-nosnippet>204</a>    ItemKey::RecordingDate,
+<a href=#205 id=205 data-nosnippet>205</a>    ItemKey::TrackNumber,
+<a href=#206 id=206 data-nosnippet>206</a>    ItemKey::TrackTotal,
+<a href=#207 id=207 data-nosnippet>207</a>    ItemKey::DiscNumber,
+<a href=#208 id=208 data-nosnippet>208</a>    ItemKey::DiscTotal,
+<a href=#209 id=209 data-nosnippet>209</a>    ItemKey::FlagCompilation,
+<a href=#210 id=210 data-nosnippet>210</a>    ItemKey::EncoderSoftware,
+<a href=#211 id=211 data-nosnippet>211</a>];
+<a href=#212 id=212 data-nosnippet>212</a>
+<a href=#213 id=213 data-nosnippet>213</a><span class="kw">fn </span>parse_err(path: <span class="kw-2">&amp;</span>Path, e: <span class="kw">impl </span>std::fmt::Display) -&gt; TagError {
+<a href=#214 id=214 data-nosnippet>214</a>    TagError::Parse(path.display().to_string(), e.to_string())
+<a href=#215 id=215 data-nosnippet>215</a>}
+<a href=#216 id=216 data-nosnippet>216</a>
+<a href=#217 id=217 data-nosnippet>217</a><span class="doccomment">/// Read every tag FlacCompagnon knows how to show from `path`'s primary tag
+<a href=#218 id=218 data-nosnippet>218</a>/// (the tag type a player would actually look at — see
+<a href=#219 id=219 data-nosnippet>219</a>/// [`lofty::file::FileType::primary_tag_type`]).
+<a href=#220 id=220 data-nosnippet>220</a></span><span class="kw">pub fn </span>read_tags(path: <span class="kw-2">&amp;</span>Path) -&gt; <span class="prelude-ty">Result</span>&lt;TagSet, TagError&gt; {
+<a href=#221 id=221 data-nosnippet>221</a>    <span class="kw">let </span>tagged = read_from_path(path).map_err(|e| parse_err(path, e))<span class="question-mark">?</span>;
+<a href=#222 id=222 data-nosnippet>222</a>    <span class="kw">let </span><span class="kw-2">mut </span>out = TagSet::default();
+<a href=#223 id=223 data-nosnippet>223</a>
+<a href=#224 id=224 data-nosnippet>224</a>    <span class="kw">let </span><span class="prelude-val">Some</span>(tag) = tagged.primary_tag() <span class="kw">else </span>{
+<a href=#225 id=225 data-nosnippet>225</a>        <span class="kw">return </span><span class="prelude-val">Ok</span>(out);
+<a href=#226 id=226 data-nosnippet>226</a>    };
+<a href=#227 id=227 data-nosnippet>227</a>
+<a href=#228 id=228 data-nosnippet>228</a>    out.title = tag.title().map(|c| c.into_owned());
+<a href=#229 id=229 data-nosnippet>229</a>    out.artist = tag.artist().map(|c| c.into_owned());
+<a href=#230 id=230 data-nosnippet>230</a>    out.album = tag.album().map(|c| c.into_owned());
+<a href=#231 id=231 data-nosnippet>231</a>    out.genre = tag.genre().map(|c| c.into_owned());
+<a href=#232 id=232 data-nosnippet>232</a>    out.comment = tag.comment().map(|c| c.into_owned());
+<a href=#233 id=233 data-nosnippet>233</a>    out.album_artist = tag.get_string(ItemKey::AlbumArtist).map(str::to_string);
+<a href=#234 id=234 data-nosnippet>234</a>    out.composer = tag.get_string(ItemKey::Composer).map(str::to_string);
+<a href=#235 id=235 data-nosnippet>235</a>    out.year = tag
+<a href=#236 id=236 data-nosnippet>236</a>        .get_string(ItemKey::Year)
+<a href=#237 id=237 data-nosnippet>237</a>        .or_else(|| tag.get_string(ItemKey::RecordingDate))
+<a href=#238 id=238 data-nosnippet>238</a>        .map(str::to_string);
+<a href=#239 id=239 data-nosnippet>239</a>    out.track = tag.get_string(ItemKey::TrackNumber).map(str::to_string);
+<a href=#240 id=240 data-nosnippet>240</a>    out.track_total = tag.get_string(ItemKey::TrackTotal).map(str::to_string);
+<a href=#241 id=241 data-nosnippet>241</a>    out.disc = tag.get_string(ItemKey::DiscNumber).map(str::to_string);
+<a href=#242 id=242 data-nosnippet>242</a>    out.disc_total = tag.get_string(ItemKey::DiscTotal).map(str::to_string);
+<a href=#243 id=243 data-nosnippet>243</a>    out.compilation = tag.get_string(ItemKey::FlagCompilation) == <span class="prelude-val">Some</span>(<span class="string">"1"</span>);
+<a href=#244 id=244 data-nosnippet>244</a>    out.musicbrainz_release_id = tag
+<a href=#245 id=245 data-nosnippet>245</a>        .get_string(ItemKey::MusicBrainzReleaseId)
+<a href=#246 id=246 data-nosnippet>246</a>        .map(str::to_string)
+<a href=#247 id=247 data-nosnippet>247</a>        .filter(|s| !s.is_empty());
+<a href=#248 id=248 data-nosnippet>248</a>    out.encoder = tag
+<a href=#249 id=249 data-nosnippet>249</a>        .get_string(ItemKey::EncoderSoftware)
+<a href=#250 id=250 data-nosnippet>250</a>        .map(str::to_string)
+<a href=#251 id=251 data-nosnippet>251</a>        .filter(|s| !s.is_empty());
+<a href=#252 id=252 data-nosnippet>252</a>
+<a href=#253 id=253 data-nosnippet>253</a>    <span class="kw">for </span>item <span class="kw">in </span>tag.items() {
+<a href=#254 id=254 data-nosnippet>254</a>        <span class="kw">if </span>KNOWN_KEYS.contains(<span class="kw-2">&amp;</span>item.key()) {
+<a href=#255 id=255 data-nosnippet>255</a>            <span class="kw">continue</span>;
+<a href=#256 id=256 data-nosnippet>256</a>        }
+<a href=#257 id=257 data-nosnippet>257</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(text) = item.value().text() {
+<a href=#258 id=258 data-nosnippet>258</a>            <span class="kw">if </span>text.is_empty() {
+<a href=#259 id=259 data-nosnippet>259</a>                <span class="kw">continue</span>;
+<a href=#260 id=260 data-nosnippet>260</a>            }
+<a href=#261 id=261 data-nosnippet>261</a>            <span class="kw">let </span>label = item
+<a href=#262 id=262 data-nosnippet>262</a>                .key()
+<a href=#263 id=263 data-nosnippet>263</a>                .map_key(tag.tag_type())
+<a href=#264 id=264 data-nosnippet>264</a>                .unwrap_or(<span class="string">"?"</span>)
+<a href=#265 id=265 data-nosnippet>265</a>                .to_string();
+<a href=#266 id=266 data-nosnippet>266</a>            out.extra.push((label, text.to_string()));
+<a href=#267 id=267 data-nosnippet>267</a>        }
+<a href=#268 id=268 data-nosnippet>268</a>    }
+<a href=#269 id=269 data-nosnippet>269</a>
+<a href=#270 id=270 data-nosnippet>270</a>    out.cover = cover::extract(tag);
+<a href=#271 id=271 data-nosnippet>271</a>
+<a href=#272 id=272 data-nosnippet>272</a>    <span class="prelude-val">Ok</span>(out)
+<a href=#273 id=273 data-nosnippet>273</a>}
+<a href=#274 id=274 data-nosnippet>274</a>
+<a href=#275 id=275 data-nosnippet>275</a><span class="kw">fn </span>apply_field(tag: <span class="kw-2">&amp;mut </span>Tag, key: ItemKey, edit: <span class="kw-2">&amp;</span>FieldEdit) {
+<a href=#276 id=276 data-nosnippet>276</a>    <span class="kw">match </span>edit {
+<a href=#277 id=277 data-nosnippet>277</a>        FieldEdit::Unset =&gt; {}
+<a href=#278 id=278 data-nosnippet>278</a>        FieldEdit::Clear =&gt; tag.remove_key(key),
+<a href=#279 id=279 data-nosnippet>279</a>        FieldEdit::Set(value) =&gt; {
+<a href=#280 id=280 data-nosnippet>280</a>            tag.insert_text(key, value.clone());
+<a href=#281 id=281 data-nosnippet>281</a>        }
+<a href=#282 id=282 data-nosnippet>282</a>    }
+<a href=#283 id=283 data-nosnippet>283</a>}
+<a href=#284 id=284 data-nosnippet>284</a>
+<a href=#285 id=285 data-nosnippet>285</a><span class="doccomment">/// Apply `edits` to `path`, writing straight to the audio file.
+<a href=#286 id=286 data-nosnippet>286</a>///
+<a href=#287 id=287 data-nosnippet>287</a>/// Reads the file's current primary tag first (so untouched fields, and any
+<a href=#288 id=288 data-nosnippet>288</a>/// tag the panel doesn't know about, survive the round trip), applies only
+<a href=#289 id=289 data-nosnippet>289</a>/// the fields present in `edits`, and saves. A file with no tag yet gets a
+<a href=#290 id=290 data-nosnippet>290</a>/// fresh one of the format's primary [`lofty::tag::TagType`].
+<a href=#291 id=291 data-nosnippet>291</a></span><span class="kw">pub fn </span>write_tags(path: <span class="kw-2">&amp;</span>Path, edits: <span class="kw-2">&amp;</span>TagEdits) -&gt; <span class="prelude-ty">Result</span>&lt;(), TagError&gt; {
+<a href=#292 id=292 data-nosnippet>292</a>    <span class="kw">let </span>tagged = read_from_path(path).map_err(|e| parse_err(path, e))<span class="question-mark">?</span>;
+<a href=#293 id=293 data-nosnippet>293</a>    <span class="kw">let </span>tag_type = tagged.primary_tag_type();
+<a href=#294 id=294 data-nosnippet>294</a>    <span class="kw">let </span><span class="kw-2">mut </span>tag = tagged
+<a href=#295 id=295 data-nosnippet>295</a>        .primary_tag()
+<a href=#296 id=296 data-nosnippet>296</a>        .cloned()
+<a href=#297 id=297 data-nosnippet>297</a>        .unwrap_or_else(|| Tag::new(tag_type));
+<a href=#298 id=298 data-nosnippet>298</a>
+<a href=#299 id=299 data-nosnippet>299</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::TrackTitle, <span class="kw-2">&amp;</span>edits.title);
+<a href=#300 id=300 data-nosnippet>300</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::TrackArtist, <span class="kw-2">&amp;</span>edits.artist);
+<a href=#301 id=301 data-nosnippet>301</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::AlbumTitle, <span class="kw-2">&amp;</span>edits.album);
+<a href=#302 id=302 data-nosnippet>302</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::AlbumArtist, <span class="kw-2">&amp;</span>edits.album_artist);
+<a href=#303 id=303 data-nosnippet>303</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::Composer, <span class="kw-2">&amp;</span>edits.composer);
+<a href=#304 id=304 data-nosnippet>304</a>    <span class="comment">// `ItemKey::Year` has no mapping at all for ID3v2 (only `RecordingDate`
+<a href=#305 id=305 data-nosnippet>305</a>    // does — see lofty's `ID3V2_MAP`), so writing MP3/WAV/AIFF/AAC tags with
+<a href=#306 id=306 data-nosnippet>306</a>    // `Year` silently drops the field. `RecordingDate` round-trips on every
+<a href=#307 id=307 data-nosnippet>307</a>    // format lofty supports (ID3v2 TDRC, Vorbis DATE, MP4 ©day, RIFF ICRD),
+<a href=#308 id=308 data-nosnippet>308</a>    // so the "year" field is always written there; `read_tags` still checks
+<a href=#309 id=309 data-nosnippet>309</a>    // the legacy `Year` key first for files tagged by other tools.
+<a href=#310 id=310 data-nosnippet>310</a>    </span>apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::RecordingDate, <span class="kw-2">&amp;</span>edits.year);
+<a href=#311 id=311 data-nosnippet>311</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::TrackNumber, <span class="kw-2">&amp;</span>edits.track);
+<a href=#312 id=312 data-nosnippet>312</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::TrackTotal, <span class="kw-2">&amp;</span>edits.track_total);
+<a href=#313 id=313 data-nosnippet>313</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::DiscNumber, <span class="kw-2">&amp;</span>edits.disc);
+<a href=#314 id=314 data-nosnippet>314</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::DiscTotal, <span class="kw-2">&amp;</span>edits.disc_total);
+<a href=#315 id=315 data-nosnippet>315</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::Genre, <span class="kw-2">&amp;</span>edits.genre);
+<a href=#316 id=316 data-nosnippet>316</a>    apply_field(<span class="kw-2">&amp;mut </span>tag, ItemKey::Comment, <span class="kw-2">&amp;</span>edits.comment);
+<a href=#317 id=317 data-nosnippet>317</a>
+<a href=#318 id=318 data-nosnippet>318</a>    <span class="kw">if let </span><span class="prelude-val">Some</span>(compilation) = edits.compilation {
+<a href=#319 id=319 data-nosnippet>319</a>        tag.insert_text(
+<a href=#320 id=320 data-nosnippet>320</a>            ItemKey::FlagCompilation,
+<a href=#321 id=321 data-nosnippet>321</a>            <span class="kw">if </span>compilation { <span class="string">"1" </span>} <span class="kw">else </span>{ <span class="string">"0" </span>}.to_string(),
+<a href=#322 id=322 data-nosnippet>322</a>        );
+<a href=#323 id=323 data-nosnippet>323</a>    }
+<a href=#324 id=324 data-nosnippet>324</a>
+<a href=#325 id=325 data-nosnippet>325</a>    <span class="kw">for </span>(key, edit) <span class="kw">in </span><span class="kw-2">&amp;</span>edits.extra {
+<a href=#326 id=326 data-nosnippet>326</a>        <span class="comment">// A key this file's tag type has no mapping for (a Vorbis-only field
+<a href=#327 id=327 data-nosnippet>327</a>        // on an MP3, say) is silently skipped rather than erroring the whole
+<a href=#328 id=328 data-nosnippet>328</a>        // batch — the same mismatch already accepted for `Year` above, and
+<a href=#329 id=329 data-nosnippet>329</a>        // for the same reason: the panel can't know a mixed-format selection
+<a href=#330 id=330 data-nosnippet>330</a>        // supports every field on every file.
+<a href=#331 id=331 data-nosnippet>331</a>        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(item_key) = ItemKey::from_key(tag_type, key) {
+<a href=#332 id=332 data-nosnippet>332</a>            apply_field(<span class="kw-2">&amp;mut </span>tag, item_key, edit);
+<a href=#333 id=333 data-nosnippet>333</a>        }
+<a href=#334 id=334 data-nosnippet>334</a>    }
+<a href=#335 id=335 data-nosnippet>335</a>
+<a href=#336 id=336 data-nosnippet>336</a>    cover::apply_edit(<span class="kw-2">&amp;mut </span>tag, <span class="kw-2">&amp;</span>edits.cover, <span class="kw-2">&amp;</span>path.display().to_string())<span class="question-mark">?</span>;
+<a href=#337 id=337 data-nosnippet>337</a>
+<a href=#338 id=338 data-nosnippet>338</a>    tag.save_to_path(path, WriteOptions::default())
+<a href=#339 id=339 data-nosnippet>339</a>        .map_err(|e| TagError::Write(path.display().to_string(), e.to_string()))
+<a href=#340 id=340 data-nosnippet>340</a>}
+<a href=#341 id=341 data-nosnippet>341</a>
+<a href=#342 id=342 data-nosnippet>342</a><span class="attr">#[cfg(test)]
+<a href=#343 id=343 data-nosnippet>343</a></span><span class="kw">mod </span>tests {
+<a href=#344 id=344 data-nosnippet>344</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href=#345 id=345 data-nosnippet>345</a>    <span class="kw">use </span>std::io::Write <span class="kw">as _</span>;
+<a href=#346 id=346 data-nosnippet>346</a>
+<a href=#347 id=347 data-nosnippet>347</a>    <span class="doccomment">/// A minimal, silent WAV — same fixture style as the rest of the crate's
+<a href=#348 id=348 data-nosnippet>348</a>    /// tests (`hound`-generated, no real audio content needed).
+<a href=#349 id=349 data-nosnippet>349</a>    </span><span class="kw">fn </span>synth_wav() -&gt; tempfile::TempPath {
+<a href=#350 id=350 data-nosnippet>350</a>        <span class="kw">let </span>file = tempfile::Builder::new().suffix(<span class="string">".wav"</span>).tempfile().unwrap();
+<a href=#351 id=351 data-nosnippet>351</a>        <span class="kw">let </span>path = file.into_temp_path();
+<a href=#352 id=352 data-nosnippet>352</a>        <span class="kw">let </span>spec = hound::WavSpec {
+<a href=#353 id=353 data-nosnippet>353</a>            channels: <span class="number">2</span>,
+<a href=#354 id=354 data-nosnippet>354</a>            sample_rate: <span class="number">44_100</span>,
+<a href=#355 id=355 data-nosnippet>355</a>            bits_per_sample: <span class="number">16</span>,
+<a href=#356 id=356 data-nosnippet>356</a>            sample_format: hound::SampleFormat::Int,
+<a href=#357 id=357 data-nosnippet>357</a>        };
+<a href=#358 id=358 data-nosnippet>358</a>        <span class="kw">let </span><span class="kw-2">mut </span>writer = hound::WavWriter::create(<span class="kw-2">&amp;</span>path, spec).unwrap();
+<a href=#359 id=359 data-nosnippet>359</a>        <span class="kw">for _ in </span><span class="number">0</span>..<span class="number">1000 </span>{
+<a href=#360 id=360 data-nosnippet>360</a>            writer.write_sample(<span class="number">0i16</span>).unwrap();
+<a href=#361 id=361 data-nosnippet>361</a>            writer.write_sample(<span class="number">0i16</span>).unwrap();
+<a href=#362 id=362 data-nosnippet>362</a>        }
+<a href=#363 id=363 data-nosnippet>363</a>        writer.finalize().unwrap();
+<a href=#364 id=364 data-nosnippet>364</a>        path
+<a href=#365 id=365 data-nosnippet>365</a>    }
+<a href=#366 id=366 data-nosnippet>366</a>
+<a href=#367 id=367 data-nosnippet>367</a>    <span class="attr">#[test]
+<a href=#368 id=368 data-nosnippet>368</a>    </span><span class="kw">fn </span>round_trip_basic_fields() {
+<a href=#369 id=369 data-nosnippet>369</a>        <span class="kw">let </span>path = synth_wav();
+<a href=#370 id=370 data-nosnippet>370</a>        <span class="kw">let </span>edits = TagEdits {
+<a href=#371 id=371 data-nosnippet>371</a>            title: FieldEdit::Set(<span class="string">"Title"</span>.into()),
+<a href=#372 id=372 data-nosnippet>372</a>            artist: FieldEdit::Set(<span class="string">"Artist"</span>.into()),
+<a href=#373 id=373 data-nosnippet>373</a>            album: FieldEdit::Set(<span class="string">"Album"</span>.into()),
+<a href=#374 id=374 data-nosnippet>374</a>            album_artist: FieldEdit::Set(<span class="string">"Album Artist"</span>.into()),
+<a href=#375 id=375 data-nosnippet>375</a>            composer: FieldEdit::Set(<span class="string">"Composer"</span>.into()),
+<a href=#376 id=376 data-nosnippet>376</a>            year: FieldEdit::Set(<span class="string">"2026"</span>.into()),
+<a href=#377 id=377 data-nosnippet>377</a>            track: FieldEdit::Set(<span class="string">"3"</span>.into()),
+<a href=#378 id=378 data-nosnippet>378</a>            track_total: FieldEdit::Set(<span class="string">"12"</span>.into()),
+<a href=#379 id=379 data-nosnippet>379</a>            disc: FieldEdit::Set(<span class="string">"1"</span>.into()),
+<a href=#380 id=380 data-nosnippet>380</a>            disc_total: FieldEdit::Set(<span class="string">"2"</span>.into()),
+<a href=#381 id=381 data-nosnippet>381</a>            genre: FieldEdit::Set(<span class="string">"Electronic"</span>.into()),
+<a href=#382 id=382 data-nosnippet>382</a>            comment: FieldEdit::Set(<span class="string">"Test comment"</span>.into()),
+<a href=#383 id=383 data-nosnippet>383</a>            compilation: <span class="prelude-val">Some</span>(<span class="bool-val">true</span>),
+<a href=#384 id=384 data-nosnippet>384</a>            cover: CoverEdit::Unset,
+<a href=#385 id=385 data-nosnippet>385</a>            extra: Vec::new(),
+<a href=#386 id=386 data-nosnippet>386</a>        };
+<a href=#387 id=387 data-nosnippet>387</a>        write_tags(<span class="kw-2">&amp;</span>path, <span class="kw-2">&amp;</span>edits).expect(<span class="string">"write_tags should succeed on a fresh WAV"</span>);
+<a href=#388 id=388 data-nosnippet>388</a>
+<a href=#389 id=389 data-nosnippet>389</a>        <span class="kw">let </span>read = read_tags(<span class="kw-2">&amp;</span>path).expect(<span class="string">"read_tags should succeed after writing"</span>);
+<a href=#390 id=390 data-nosnippet>390</a>        <span class="macro">assert_eq!</span>(read.title.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Title"</span>));
+<a href=#391 id=391 data-nosnippet>391</a>        <span class="macro">assert_eq!</span>(read.artist.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Artist"</span>));
+<a href=#392 id=392 data-nosnippet>392</a>        <span class="macro">assert_eq!</span>(read.album.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Album"</span>));
+<a href=#393 id=393 data-nosnippet>393</a>        <span class="macro">assert_eq!</span>(read.album_artist.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Album Artist"</span>));
+<a href=#394 id=394 data-nosnippet>394</a>        <span class="macro">assert_eq!</span>(read.composer.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Composer"</span>));
+<a href=#395 id=395 data-nosnippet>395</a>        <span class="macro">assert_eq!</span>(read.year.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"2026"</span>));
+<a href=#396 id=396 data-nosnippet>396</a>        <span class="macro">assert_eq!</span>(read.track.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"3"</span>));
+<a href=#397 id=397 data-nosnippet>397</a>        <span class="macro">assert_eq!</span>(read.track_total.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"12"</span>));
+<a href=#398 id=398 data-nosnippet>398</a>        <span class="macro">assert_eq!</span>(read.disc.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"1"</span>));
+<a href=#399 id=399 data-nosnippet>399</a>        <span class="macro">assert_eq!</span>(read.disc_total.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"2"</span>));
+<a href=#400 id=400 data-nosnippet>400</a>        <span class="macro">assert_eq!</span>(read.genre.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Electronic"</span>));
+<a href=#401 id=401 data-nosnippet>401</a>        <span class="macro">assert_eq!</span>(read.comment.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Test comment"</span>));
+<a href=#402 id=402 data-nosnippet>402</a>        <span class="macro">assert!</span>(read.compilation);
+<a href=#403 id=403 data-nosnippet>403</a>    }
+<a href=#404 id=404 data-nosnippet>404</a>
+<a href=#405 id=405 data-nosnippet>405</a>    <span class="attr">#[test]
+<a href=#406 id=406 data-nosnippet>406</a>    </span><span class="kw">fn </span>unset_field_does_not_touch_existing_value() {
+<a href=#407 id=407 data-nosnippet>407</a>        <span class="kw">let </span>path = synth_wav();
+<a href=#408 id=408 data-nosnippet>408</a>        write_tags(
+<a href=#409 id=409 data-nosnippet>409</a>            <span class="kw-2">&amp;</span>path,
+<a href=#410 id=410 data-nosnippet>410</a>            <span class="kw-2">&amp;</span>TagEdits {
+<a href=#411 id=411 data-nosnippet>411</a>                title: FieldEdit::Set(<span class="string">"Kept"</span>.into()),
+<a href=#412 id=412 data-nosnippet>412</a>                artist: FieldEdit::Set(<span class="string">"Also kept"</span>.into()),
 <a href=#413 id=413 data-nosnippet>413</a>                ..Default::default()
 <a href=#414 id=414 data-nosnippet>414</a>            },
 <a href=#415 id=415 data-nosnippet>415</a>        )
 <a href=#416 id=416 data-nosnippet>416</a>        .unwrap();
 <a href=#417 id=417 data-nosnippet>417</a>
-<a href=#418 id=418 data-nosnippet>418</a>        <span class="kw">let </span>read = read_tags(<span class="kw-2">&amp;</span>path).unwrap();
-<a href=#419 id=419 data-nosnippet>419</a>        <span class="macro">assert_eq!</span>(read.title.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Kept"</span>));
-<a href=#420 id=420 data-nosnippet>420</a>        <span class="macro">assert_eq!</span>(read.artist.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Also kept"</span>));
-<a href=#421 id=421 data-nosnippet>421</a>        <span class="macro">assert_eq!</span>(read.album.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"New album"</span>));
-<a href=#422 id=422 data-nosnippet>422</a>    }
-<a href=#423 id=423 data-nosnippet>423</a>
-<a href=#424 id=424 data-nosnippet>424</a>    <span class="attr">#[test]
-<a href=#425 id=425 data-nosnippet>425</a>    </span><span class="kw">fn </span>clear_removes_the_field() {
-<a href=#426 id=426 data-nosnippet>426</a>        <span class="kw">let </span>path = synth_wav();
-<a href=#427 id=427 data-nosnippet>427</a>        write_tags(
-<a href=#428 id=428 data-nosnippet>428</a>            <span class="kw-2">&amp;</span>path,
-<a href=#429 id=429 data-nosnippet>429</a>            <span class="kw-2">&amp;</span>TagEdits {
-<a href=#430 id=430 data-nosnippet>430</a>                title: FieldEdit::Set(<span class="string">"Temporary"</span>.into()),
-<a href=#431 id=431 data-nosnippet>431</a>                ..Default::default()
-<a href=#432 id=432 data-nosnippet>432</a>            },
-<a href=#433 id=433 data-nosnippet>433</a>        )
-<a href=#434 id=434 data-nosnippet>434</a>        .unwrap();
-<a href=#435 id=435 data-nosnippet>435</a>        <span class="macro">assert_eq!</span>(read_tags(<span class="kw-2">&amp;</span>path).unwrap().title.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Temporary"</span>));
-<a href=#436 id=436 data-nosnippet>436</a>
-<a href=#437 id=437 data-nosnippet>437</a>        write_tags(
-<a href=#438 id=438 data-nosnippet>438</a>            <span class="kw-2">&amp;</span>path,
-<a href=#439 id=439 data-nosnippet>439</a>            <span class="kw-2">&amp;</span>TagEdits {
-<a href=#440 id=440 data-nosnippet>440</a>                title: FieldEdit::Clear,
-<a href=#441 id=441 data-nosnippet>441</a>                ..Default::default()
-<a href=#442 id=442 data-nosnippet>442</a>            },
-<a href=#443 id=443 data-nosnippet>443</a>        )
-<a href=#444 id=444 data-nosnippet>444</a>        .unwrap();
-<a href=#445 id=445 data-nosnippet>445</a>        <span class="macro">assert_eq!</span>(read_tags(<span class="kw-2">&amp;</span>path).unwrap().title, <span class="prelude-val">None</span>);
-<a href=#446 id=446 data-nosnippet>446</a>    }
-<a href=#447 id=447 data-nosnippet>447</a>
-<a href=#448 id=448 data-nosnippet>448</a>    <span class="doccomment">/// The "already tagged by Picard" shortcut in the tag panel's online
-<a href=#449 id=449 data-nosnippet>449</a>    /// lookup depends on this field being surfaced, so it's read back here
-<a href=#450 id=450 data-nosnippet>450</a>    /// from a tag written directly with lofty (FlacCompagnon itself never
-<a href=#451 id=451 data-nosnippet>451</a>    /// writes the ID — it only ever consumes one that's already there).
-<a href=#452 id=452 data-nosnippet>452</a>    ///
-<a href=#453 id=453 data-nosnippet>453</a>    /// Whether the key survives a write is format-dependent (the same class
-<a href=#454 id=454 data-nosnippet>454</a>    /// of mapping gap documented on `ItemKey::Year` in `write_tags`), so the
-<a href=#455 id=455 data-nosnippet>455</a>    /// assertion is phrased against what lofty itself reports for that key:
-<a href=#456 id=456 data-nosnippet>456</a>    /// this pins down *our* mapping — `read_tags` must surface whatever is
-<a href=#457 id=457 data-nosnippet>457</a>    /// there, and never invent a value — without hard-coding an assumption
-<a href=#458 id=458 data-nosnippet>458</a>    /// about the fixture's tag format.
-<a href=#459 id=459 data-nosnippet>459</a>    </span><span class="attr">#[test]
-<a href=#460 id=460 data-nosnippet>460</a>    </span><span class="kw">fn </span>reads_an_existing_musicbrainz_release_id() {
-<a href=#461 id=461 data-nosnippet>461</a>        <span class="kw">let </span>path = synth_wav();
-<a href=#462 id=462 data-nosnippet>462</a>        <span class="kw">let </span>mbid = <span class="string">"c1a1c5f0-6b1e-4f3a-9b2d-1a2b3c4d5e6f"</span>;
-<a href=#463 id=463 data-nosnippet>463</a>
-<a href=#464 id=464 data-nosnippet>464</a>        <span class="comment">// Same read-clone-modify-save shape `write_tags` itself uses.
-<a href=#465 id=465 data-nosnippet>465</a>        </span><span class="kw">let </span>tagged = read_from_path(<span class="kw-2">&amp;</span>path).unwrap();
-<a href=#466 id=466 data-nosnippet>466</a>        <span class="kw">let </span>tag_type = tagged.primary_tag_type();
-<a href=#467 id=467 data-nosnippet>467</a>        <span class="kw">let </span><span class="kw-2">mut </span>tag = tagged.primary_tag().cloned().unwrap_or_else(|| Tag::new(tag_type));
-<a href=#468 id=468 data-nosnippet>468</a>        tag.insert_text(ItemKey::MusicBrainzReleaseId, mbid.to_string());
-<a href=#469 id=469 data-nosnippet>469</a>        tag.save_to_path(<span class="kw-2">&amp;</span>path, WriteOptions::default()).unwrap();
-<a href=#470 id=470 data-nosnippet>470</a>
-<a href=#471 id=471 data-nosnippet>471</a>        <span class="kw">let </span>reread = read_from_path(<span class="kw-2">&amp;</span>path).unwrap();
-<a href=#472 id=472 data-nosnippet>472</a>        <span class="kw">let </span>stored = reread
-<a href=#473 id=473 data-nosnippet>473</a>            .primary_tag()
-<a href=#474 id=474 data-nosnippet>474</a>            .and_then(|t| t.get_string(ItemKey::MusicBrainzReleaseId))
-<a href=#475 id=475 data-nosnippet>475</a>            .map(str::to_string);
-<a href=#476 id=476 data-nosnippet>476</a>
-<a href=#477 id=477 data-nosnippet>477</a>        <span class="kw">let </span>read = read_tags(<span class="kw-2">&amp;</span>path).unwrap();
-<a href=#478 id=478 data-nosnippet>478</a>        <span class="macro">assert_eq!</span>(read.musicbrainz_release_id, stored);
-<a href=#479 id=479 data-nosnippet>479</a>        <span class="comment">// And when the format did keep it, it's the exact value written.
-<a href=#480 id=480 data-nosnippet>480</a>        </span><span class="kw">if </span>stored.is_some() {
-<a href=#481 id=481 data-nosnippet>481</a>            <span class="macro">assert_eq!</span>(read.musicbrainz_release_id.as_deref(), <span class="prelude-val">Some</span>(mbid));
-<a href=#482 id=482 data-nosnippet>482</a>        }
-<a href=#483 id=483 data-nosnippet>483</a>    }
-<a href=#484 id=484 data-nosnippet>484</a>
-<a href=#485 id=485 data-nosnippet>485</a>    <span class="doccomment">/// A file with no MusicBrainz ID must report `None` rather than an empty
-<a href=#486 id=486 data-nosnippet>486</a>    /// string — the lookup treats "absent" and "present but blank" the same,
-<a href=#487 id=487 data-nosnippet>487</a>    /// and only `None` skips the shortcut.
-<a href=#488 id=488 data-nosnippet>488</a>    </span><span class="attr">#[test]
-<a href=#489 id=489 data-nosnippet>489</a>    </span><span class="kw">fn </span>missing_musicbrainz_release_id_is_none() {
-<a href=#490 id=490 data-nosnippet>490</a>        <span class="kw">let </span>path = synth_wav();
-<a href=#491 id=491 data-nosnippet>491</a>        write_tags(
-<a href=#492 id=492 data-nosnippet>492</a>            <span class="kw-2">&amp;</span>path,
-<a href=#493 id=493 data-nosnippet>493</a>            <span class="kw-2">&amp;</span>TagEdits {
-<a href=#494 id=494 data-nosnippet>494</a>                title: FieldEdit::Set(<span class="string">"Title"</span>.into()),
-<a href=#495 id=495 data-nosnippet>495</a>                ..Default::default()
-<a href=#496 id=496 data-nosnippet>496</a>            },
-<a href=#497 id=497 data-nosnippet>497</a>        )
-<a href=#498 id=498 data-nosnippet>498</a>        .unwrap();
-<a href=#499 id=499 data-nosnippet>499</a>        <span class="macro">assert_eq!</span>(read_tags(<span class="kw-2">&amp;</span>path).unwrap().musicbrainz_release_id, <span class="prelude-val">None</span>);
-<a href=#500 id=500 data-nosnippet>500</a>    }
-<a href=#501 id=501 data-nosnippet>501</a>
-<a href=#502 id=502 data-nosnippet>502</a>    <span class="doccomment">/// An extended tag written through `edits.extra` round-trips through
-<a href=#503 id=503 data-nosnippet>503</a>    /// `read_tags`'s own `extra`, keyed by the same raw format-specific
-<a href=#504 id=504 data-nosnippet>504</a>    /// name — the extended-tags pop-in's "edit" and "add" cases.
-<a href=#505 id=505 data-nosnippet>505</a>    </span><span class="attr">#[test]
-<a href=#506 id=506 data-nosnippet>506</a>    </span><span class="kw">fn </span>extra_tag_round_trips() {
-<a href=#507 id=507 data-nosnippet>507</a>        <span class="kw">let </span>path = synth_wav();
-<a href=#508 id=508 data-nosnippet>508</a>        <span class="kw">let </span>tagged = read_from_path(<span class="kw-2">&amp;</span>path).unwrap();
-<a href=#509 id=509 data-nosnippet>509</a>        <span class="kw">let </span>tag_type = tagged.primary_tag_type();
-<a href=#510 id=510 data-nosnippet>510</a>        <span class="kw">let </span>key = ItemKey::Isrc
-<a href=#511 id=511 data-nosnippet>511</a>            .map_key(tag_type)
-<a href=#512 id=512 data-nosnippet>512</a>            .expect(<span class="string">"ISRC maps on this format"</span>)
-<a href=#513 id=513 data-nosnippet>513</a>            .to_string();
-<a href=#514 id=514 data-nosnippet>514</a>
-<a href=#515 id=515 data-nosnippet>515</a>        write_tags(
-<a href=#516 id=516 data-nosnippet>516</a>            <span class="kw-2">&amp;</span>path,
-<a href=#517 id=517 data-nosnippet>517</a>            <span class="kw-2">&amp;</span>TagEdits {
-<a href=#518 id=518 data-nosnippet>518</a>                extra: <span class="macro">vec!</span>[(key.clone(), FieldEdit::Set(<span class="string">"US-S1Z-99-00001"</span>.into()))],
-<a href=#519 id=519 data-nosnippet>519</a>                ..Default::default()
-<a href=#520 id=520 data-nosnippet>520</a>            },
-<a href=#521 id=521 data-nosnippet>521</a>        )
-<a href=#522 id=522 data-nosnippet>522</a>        .unwrap();
-<a href=#523 id=523 data-nosnippet>523</a>
-<a href=#524 id=524 data-nosnippet>524</a>        <span class="kw">let </span>read = read_tags(<span class="kw-2">&amp;</span>path).unwrap();
-<a href=#525 id=525 data-nosnippet>525</a>        <span class="macro">assert_eq!</span>(
-<a href=#526 id=526 data-nosnippet>526</a>            read.extra
-<a href=#527 id=527 data-nosnippet>527</a>                .iter()
-<a href=#528 id=528 data-nosnippet>528</a>                .find(|(k, <span class="kw">_</span>)| <span class="kw-2">*</span>k == key)
-<a href=#529 id=529 data-nosnippet>529</a>                .map(|(<span class="kw">_</span>, v)| v.as_str()),
-<a href=#530 id=530 data-nosnippet>530</a>            <span class="prelude-val">Some</span>(<span class="string">"US-S1Z-99-00001"</span>)
-<a href=#531 id=531 data-nosnippet>531</a>        );
-<a href=#532 id=532 data-nosnippet>532</a>    }
-<a href=#533 id=533 data-nosnippet>533</a>
-<a href=#534 id=534 data-nosnippet>534</a>    <span class="doccomment">/// The extended-tags pop-in's "−" button, staged as `Clear` — removes the
-<a href=#535 id=535 data-nosnippet>535</a>    /// key entirely rather than leaving it present with an empty value.
-<a href=#536 id=536 data-nosnippet>536</a>    </span><span class="attr">#[test]
-<a href=#537 id=537 data-nosnippet>537</a>    </span><span class="kw">fn </span>extra_tag_clear_removes_it() {
-<a href=#538 id=538 data-nosnippet>538</a>        <span class="kw">let </span>path = synth_wav();
-<a href=#539 id=539 data-nosnippet>539</a>        <span class="kw">let </span>tagged = read_from_path(<span class="kw-2">&amp;</span>path).unwrap();
-<a href=#540 id=540 data-nosnippet>540</a>        <span class="kw">let </span>tag_type = tagged.primary_tag_type();
-<a href=#541 id=541 data-nosnippet>541</a>        <span class="kw">let </span>key = ItemKey::Isrc
-<a href=#542 id=542 data-nosnippet>542</a>            .map_key(tag_type)
-<a href=#543 id=543 data-nosnippet>543</a>            .expect(<span class="string">"ISRC maps on this format"</span>)
-<a href=#544 id=544 data-nosnippet>544</a>            .to_string();
+<a href=#418 id=418 data-nosnippet>418</a>        <span class="comment">// Second write only touches `album`; `title`/`artist` are `Unset` by
+<a href=#419 id=419 data-nosnippet>419</a>        // `Default` and must survive untouched — this is the batch-edit
+<a href=#420 id=420 data-nosnippet>420</a>        // guarantee the tag panel relies on.
+<a href=#421 id=421 data-nosnippet>421</a>        </span>write_tags(
+<a href=#422 id=422 data-nosnippet>422</a>            <span class="kw-2">&amp;</span>path,
+<a href=#423 id=423 data-nosnippet>423</a>            <span class="kw-2">&amp;</span>TagEdits {
+<a href=#424 id=424 data-nosnippet>424</a>                album: FieldEdit::Set(<span class="string">"New album"</span>.into()),
+<a href=#425 id=425 data-nosnippet>425</a>                ..Default::default()
+<a href=#426 id=426 data-nosnippet>426</a>            },
+<a href=#427 id=427 data-nosnippet>427</a>        )
+<a href=#428 id=428 data-nosnippet>428</a>        .unwrap();
+<a href=#429 id=429 data-nosnippet>429</a>
+<a href=#430 id=430 data-nosnippet>430</a>        <span class="kw">let </span>read = read_tags(<span class="kw-2">&amp;</span>path).unwrap();
+<a href=#431 id=431 data-nosnippet>431</a>        <span class="macro">assert_eq!</span>(read.title.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Kept"</span>));
+<a href=#432 id=432 data-nosnippet>432</a>        <span class="macro">assert_eq!</span>(read.artist.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Also kept"</span>));
+<a href=#433 id=433 data-nosnippet>433</a>        <span class="macro">assert_eq!</span>(read.album.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"New album"</span>));
+<a href=#434 id=434 data-nosnippet>434</a>    }
+<a href=#435 id=435 data-nosnippet>435</a>
+<a href=#436 id=436 data-nosnippet>436</a>    <span class="attr">#[test]
+<a href=#437 id=437 data-nosnippet>437</a>    </span><span class="kw">fn </span>clear_removes_the_field() {
+<a href=#438 id=438 data-nosnippet>438</a>        <span class="kw">let </span>path = synth_wav();
+<a href=#439 id=439 data-nosnippet>439</a>        write_tags(
+<a href=#440 id=440 data-nosnippet>440</a>            <span class="kw-2">&amp;</span>path,
+<a href=#441 id=441 data-nosnippet>441</a>            <span class="kw-2">&amp;</span>TagEdits {
+<a href=#442 id=442 data-nosnippet>442</a>                title: FieldEdit::Set(<span class="string">"Temporary"</span>.into()),
+<a href=#443 id=443 data-nosnippet>443</a>                ..Default::default()
+<a href=#444 id=444 data-nosnippet>444</a>            },
+<a href=#445 id=445 data-nosnippet>445</a>        )
+<a href=#446 id=446 data-nosnippet>446</a>        .unwrap();
+<a href=#447 id=447 data-nosnippet>447</a>        <span class="macro">assert_eq!</span>(read_tags(<span class="kw-2">&amp;</span>path).unwrap().title.as_deref(), <span class="prelude-val">Some</span>(<span class="string">"Temporary"</span>));
+<a href=#448 id=448 data-nosnippet>448</a>
+<a href=#449 id=449 data-nosnippet>449</a>        write_tags(
+<a href=#450 id=450 data-nosnippet>450</a>            <span class="kw-2">&amp;</span>path,
+<a href=#451 id=451 data-nosnippet>451</a>            <span class="kw-2">&amp;</span>TagEdits {
+<a href=#452 id=452 data-nosnippet>452</a>                title: FieldEdit::Clear,
+<a href=#453 id=453 data-nosnippet>453</a>                ..Default::default()
+<a href=#454 id=454 data-nosnippet>454</a>            },
+<a href=#455 id=455 data-nosnippet>455</a>        )
+<a href=#456 id=456 data-nosnippet>456</a>        .unwrap();
+<a href=#457 id=457 data-nosnippet>457</a>        <span class="macro">assert_eq!</span>(read_tags(<span class="kw-2">&amp;</span>path).unwrap().title, <span class="prelude-val">None</span>);
+<a href=#458 id=458 data-nosnippet>458</a>    }
+<a href=#459 id=459 data-nosnippet>459</a>
+<a href=#460 id=460 data-nosnippet>460</a>    <span class="doccomment">/// The "already tagged by Picard" shortcut in the tag panel's online
+<a href=#461 id=461 data-nosnippet>461</a>    /// lookup depends on this field being surfaced, so it's read back here
+<a href=#462 id=462 data-nosnippet>462</a>    /// from a tag written directly with lofty (FlacCompagnon itself never
+<a href=#463 id=463 data-nosnippet>463</a>    /// writes the ID — it only ever consumes one that's already there).
+<a href=#464 id=464 data-nosnippet>464</a>    ///
+<a href=#465 id=465 data-nosnippet>465</a>    /// Whether the key survives a write is format-dependent (the same class
+<a href=#466 id=466 data-nosnippet>466</a>    /// of mapping gap documented on `ItemKey::Year` in `write_tags`), so the
+<a href=#467 id=467 data-nosnippet>467</a>    /// assertion is phrased against what lofty itself reports for that key:
+<a href=#468 id=468 data-nosnippet>468</a>    /// this pins down *our* mapping — `read_tags` must surface whatever is
+<a href=#469 id=469 data-nosnippet>469</a>    /// there, and never invent a value — without hard-coding an assumption
+<a href=#470 id=470 data-nosnippet>470</a>    /// about the fixture's tag format.
+<a href=#471 id=471 data-nosnippet>471</a>    </span><span class="attr">#[test]
+<a href=#472 id=472 data-nosnippet>472</a>    </span><span class="kw">fn </span>reads_an_existing_musicbrainz_release_id() {
+<a href=#473 id=473 data-nosnippet>473</a>        <span class="kw">let </span>path = synth_wav();
+<a href=#474 id=474 data-nosnippet>474</a>        <span class="kw">let </span>mbid = <span class="string">"c1a1c5f0-6b1e-4f3a-9b2d-1a2b3c4d5e6f"</span>;
+<a href=#475 id=475 data-nosnippet>475</a>
+<a href=#476 id=476 data-nosnippet>476</a>        <span class="comment">// Same read-clone-modify-save shape `write_tags` itself uses.
+<a href=#477 id=477 data-nosnippet>477</a>        </span><span class="kw">let </span>tagged = read_from_path(<span class="kw-2">&amp;</span>path).unwrap();
+<a href=#478 id=478 data-nosnippet>478</a>        <span class="kw">let </span>tag_type = tagged.primary_tag_type();
+<a href=#479 id=479 data-nosnippet>479</a>        <span class="kw">let </span><span class="kw-2">mut </span>tag = tagged.primary_tag().cloned().unwrap_or_else(|| Tag::new(tag_type));
+<a href=#480 id=480 data-nosnippet>480</a>        tag.insert_text(ItemKey::MusicBrainzReleaseId, mbid.to_string());
+<a href=#481 id=481 data-nosnippet>481</a>        tag.save_to_path(<span class="kw-2">&amp;</span>path, WriteOptions::default()).unwrap();
+<a href=#482 id=482 data-nosnippet>482</a>
+<a href=#483 id=483 data-nosnippet>483</a>        <span class="kw">let </span>reread = read_from_path(<span class="kw-2">&amp;</span>path).unwrap();
+<a href=#484 id=484 data-nosnippet>484</a>        <span class="kw">let </span>stored = reread
+<a href=#485 id=485 data-nosnippet>485</a>            .primary_tag()
+<a href=#486 id=486 data-nosnippet>486</a>            .and_then(|t| t.get_string(ItemKey::MusicBrainzReleaseId))
+<a href=#487 id=487 data-nosnippet>487</a>            .map(str::to_string);
+<a href=#488 id=488 data-nosnippet>488</a>
+<a href=#489 id=489 data-nosnippet>489</a>        <span class="kw">let </span>read = read_tags(<span class="kw-2">&amp;</span>path).unwrap();
+<a href=#490 id=490 data-nosnippet>490</a>        <span class="macro">assert_eq!</span>(read.musicbrainz_release_id, stored);
+<a href=#491 id=491 data-nosnippet>491</a>        <span class="comment">// And when the format did keep it, it's the exact value written.
+<a href=#492 id=492 data-nosnippet>492</a>        </span><span class="kw">if </span>stored.is_some() {
+<a href=#493 id=493 data-nosnippet>493</a>            <span class="macro">assert_eq!</span>(read.musicbrainz_release_id.as_deref(), <span class="prelude-val">Some</span>(mbid));
+<a href=#494 id=494 data-nosnippet>494</a>        }
+<a href=#495 id=495 data-nosnippet>495</a>    }
+<a href=#496 id=496 data-nosnippet>496</a>
+<a href=#497 id=497 data-nosnippet>497</a>    <span class="doccomment">/// A file with no MusicBrainz ID must report `None` rather than an empty
+<a href=#498 id=498 data-nosnippet>498</a>    /// string — the lookup treats "absent" and "present but blank" the same,
+<a href=#499 id=499 data-nosnippet>499</a>    /// and only `None` skips the shortcut.
+<a href=#500 id=500 data-nosnippet>500</a>    </span><span class="attr">#[test]
+<a href=#501 id=501 data-nosnippet>501</a>    </span><span class="kw">fn </span>missing_musicbrainz_release_id_is_none() {
+<a href=#502 id=502 data-nosnippet>502</a>        <span class="kw">let </span>path = synth_wav();
+<a href=#503 id=503 data-nosnippet>503</a>        write_tags(
+<a href=#504 id=504 data-nosnippet>504</a>            <span class="kw-2">&amp;</span>path,
+<a href=#505 id=505 data-nosnippet>505</a>            <span class="kw-2">&amp;</span>TagEdits {
+<a href=#506 id=506 data-nosnippet>506</a>                title: FieldEdit::Set(<span class="string">"Title"</span>.into()),
+<a href=#507 id=507 data-nosnippet>507</a>                ..Default::default()
+<a href=#508 id=508 data-nosnippet>508</a>            },
+<a href=#509 id=509 data-nosnippet>509</a>        )
+<a href=#510 id=510 data-nosnippet>510</a>        .unwrap();
+<a href=#511 id=511 data-nosnippet>511</a>        <span class="macro">assert_eq!</span>(read_tags(<span class="kw-2">&amp;</span>path).unwrap().musicbrainz_release_id, <span class="prelude-val">None</span>);
+<a href=#512 id=512 data-nosnippet>512</a>    }
+<a href=#513 id=513 data-nosnippet>513</a>
+<a href=#514 id=514 data-nosnippet>514</a>    <span class="doccomment">/// An extended tag written through `edits.extra` round-trips through
+<a href=#515 id=515 data-nosnippet>515</a>    /// `read_tags`'s own `extra`, keyed by the same raw format-specific
+<a href=#516 id=516 data-nosnippet>516</a>    /// name — the extended-tags pop-in's "edit" and "add" cases.
+<a href=#517 id=517 data-nosnippet>517</a>    </span><span class="attr">#[test]
+<a href=#518 id=518 data-nosnippet>518</a>    </span><span class="kw">fn </span>extra_tag_round_trips() {
+<a href=#519 id=519 data-nosnippet>519</a>        <span class="kw">let </span>path = synth_wav();
+<a href=#520 id=520 data-nosnippet>520</a>        <span class="kw">let </span>tagged = read_from_path(<span class="kw-2">&amp;</span>path).unwrap();
+<a href=#521 id=521 data-nosnippet>521</a>        <span class="kw">let </span>tag_type = tagged.primary_tag_type();
+<a href=#522 id=522 data-nosnippet>522</a>        <span class="kw">let </span>key = ItemKey::Isrc
+<a href=#523 id=523 data-nosnippet>523</a>            .map_key(tag_type)
+<a href=#524 id=524 data-nosnippet>524</a>            .expect(<span class="string">"ISRC maps on this format"</span>)
+<a href=#525 id=525 data-nosnippet>525</a>            .to_string();
+<a href=#526 id=526 data-nosnippet>526</a>
+<a href=#527 id=527 data-nosnippet>527</a>        write_tags(
+<a href=#528 id=528 data-nosnippet>528</a>            <span class="kw-2">&amp;</span>path,
+<a href=#529 id=529 data-nosnippet>529</a>            <span class="kw-2">&amp;</span>TagEdits {
+<a href=#530 id=530 data-nosnippet>530</a>                extra: <span class="macro">vec!</span>[(key.clone(), FieldEdit::Set(<span class="string">"US-S1Z-99-00001"</span>.into()))],
+<a href=#531 id=531 data-nosnippet>531</a>                ..Default::default()
+<a href=#532 id=532 data-nosnippet>532</a>            },
+<a href=#533 id=533 data-nosnippet>533</a>        )
+<a href=#534 id=534 data-nosnippet>534</a>        .unwrap();
+<a href=#535 id=535 data-nosnippet>535</a>
+<a href=#536 id=536 data-nosnippet>536</a>        <span class="kw">let </span>read = read_tags(<span class="kw-2">&amp;</span>path).unwrap();
+<a href=#537 id=537 data-nosnippet>537</a>        <span class="macro">assert_eq!</span>(
+<a href=#538 id=538 data-nosnippet>538</a>            read.extra
+<a href=#539 id=539 data-nosnippet>539</a>                .iter()
+<a href=#540 id=540 data-nosnippet>540</a>                .find(|(k, <span class="kw">_</span>)| <span class="kw-2">*</span>k == key)
+<a href=#541 id=541 data-nosnippet>541</a>                .map(|(<span class="kw">_</span>, v)| v.as_str()),
+<a href=#542 id=542 data-nosnippet>542</a>            <span class="prelude-val">Some</span>(<span class="string">"US-S1Z-99-00001"</span>)
+<a href=#543 id=543 data-nosnippet>543</a>        );
+<a href=#544 id=544 data-nosnippet>544</a>    }
 <a href=#545 id=545 data-nosnippet>545</a>
-<a href=#546 id=546 data-nosnippet>546</a>        write_tags(
-<a href=#547 id=547 data-nosnippet>547</a>            <span class="kw-2">&amp;</span>path,
-<a href=#548 id=548 data-nosnippet>548</a>            <span class="kw-2">&amp;</span>TagEdits {
-<a href=#549 id=549 data-nosnippet>549</a>                extra: <span class="macro">vec!</span>[(key.clone(), FieldEdit::Set(<span class="string">"US-S1Z-99-00001"</span>.into()))],
-<a href=#550 id=550 data-nosnippet>550</a>                ..Default::default()
-<a href=#551 id=551 data-nosnippet>551</a>            },
-<a href=#552 id=552 data-nosnippet>552</a>        )
-<a href=#553 id=553 data-nosnippet>553</a>        .unwrap();
-<a href=#554 id=554 data-nosnippet>554</a>        <span class="macro">assert!</span>(read_tags(<span class="kw-2">&amp;</span>path).unwrap().extra.iter().any(|(k, <span class="kw">_</span>)| <span class="kw-2">*</span>k == key));
-<a href=#555 id=555 data-nosnippet>555</a>
-<a href=#556 id=556 data-nosnippet>556</a>        write_tags(
-<a href=#557 id=557 data-nosnippet>557</a>            <span class="kw-2">&amp;</span>path,
-<a href=#558 id=558 data-nosnippet>558</a>            <span class="kw-2">&amp;</span>TagEdits {
-<a href=#559 id=559 data-nosnippet>559</a>                extra: <span class="macro">vec!</span>[(key.clone(), FieldEdit::Clear)],
-<a href=#560 id=560 data-nosnippet>560</a>                ..Default::default()
-<a href=#561 id=561 data-nosnippet>561</a>            },
-<a href=#562 id=562 data-nosnippet>562</a>        )
-<a href=#563 id=563 data-nosnippet>563</a>        .unwrap();
-<a href=#564 id=564 data-nosnippet>564</a>        <span class="macro">assert!</span>(!read_tags(<span class="kw-2">&amp;</span>path).unwrap().extra.iter().any(|(k, <span class="kw">_</span>)| <span class="kw-2">*</span>k == key));
-<a href=#565 id=565 data-nosnippet>565</a>    }
-<a href=#566 id=566 data-nosnippet>566</a>
-<a href=#567 id=567 data-nosnippet>567</a>    <span class="doccomment">/// A key this file's tag type has no `ItemKey` mapping for must not fail
-<a href=#568 id=568 data-nosnippet>568</a>    /// the whole write — the extended-tags panel can't know a mixed-format
-<a href=#569 id=569 data-nosnippet>569</a>    /// selection supports every key its "+" list offers (see `write_tags`'s
-<a href=#570 id=570 data-nosnippet>570</a>    /// doc comment on `Year`/`RecordingDate` for the same pattern with a
-<a href=#571 id=571 data-nosnippet>571</a>    /// named field), so it's silently skipped instead.
-<a href=#572 id=572 data-nosnippet>572</a>    </span><span class="attr">#[test]
-<a href=#573 id=573 data-nosnippet>573</a>    </span><span class="kw">fn </span>extra_tag_with_unmapped_key_is_silently_skipped() {
-<a href=#574 id=574 data-nosnippet>574</a>        <span class="kw">let </span>path = synth_wav();
-<a href=#575 id=575 data-nosnippet>575</a>        <span class="kw">let </span>result = write_tags(
-<a href=#576 id=576 data-nosnippet>576</a>            <span class="kw-2">&amp;</span>path,
-<a href=#577 id=577 data-nosnippet>577</a>            <span class="kw-2">&amp;</span>TagEdits {
-<a href=#578 id=578 data-nosnippet>578</a>                extra: <span class="macro">vec!</span>[(<span class="string">"NOT_A_REAL_TAG_KEY_XYZ"</span>.into(), FieldEdit::Set(<span class="string">"value"</span>.into()))],
-<a href=#579 id=579 data-nosnippet>579</a>                ..Default::default()
-<a href=#580 id=580 data-nosnippet>580</a>            },
-<a href=#581 id=581 data-nosnippet>581</a>        );
-<a href=#582 id=582 data-nosnippet>582</a>        <span class="macro">assert!</span>(result.is_ok());
-<a href=#583 id=583 data-nosnippet>583</a>    }
-<a href=#584 id=584 data-nosnippet>584</a>
-<a href=#585 id=585 data-nosnippet>585</a>    <span class="attr">#[test]
-<a href=#586 id=586 data-nosnippet>586</a>    </span><span class="kw">fn </span>unsupported_format_returns_a_named_error() {
-<a href=#587 id=587 data-nosnippet>587</a>        <span class="comment">// A tiny fake DSF: lofty doesn't have a DSD resolver, so this must
-<a href=#588 id=588 data-nosnippet>588</a>        // come back as a clean per-file error rather than a panic.
-<a href=#589 id=589 data-nosnippet>589</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>file = tempfile::Builder::new().suffix(<span class="string">".dsf"</span>).tempfile().unwrap();
-<a href=#590 id=590 data-nosnippet>590</a>        file.write_all(<span class="string">b"DSD not a real dsf file"</span>).unwrap();
-<a href=#591 id=591 data-nosnippet>591</a>        <span class="kw">let </span>path = file.into_temp_path();
-<a href=#592 id=592 data-nosnippet>592</a>        <span class="macro">assert!</span>(read_tags(<span class="kw-2">&amp;</span>path).is_err());
-<a href=#593 id=593 data-nosnippet>593</a>    }
-<a href=#594 id=594 data-nosnippet>594</a>}
+<a href=#546 id=546 data-nosnippet>546</a>    <span class="doccomment">/// The extended-tags pop-in's "−" button, staged as `Clear` — removes the
+<a href=#547 id=547 data-nosnippet>547</a>    /// key entirely rather than leaving it present with an empty value.
+<a href=#548 id=548 data-nosnippet>548</a>    </span><span class="attr">#[test]
+<a href=#549 id=549 data-nosnippet>549</a>    </span><span class="kw">fn </span>extra_tag_clear_removes_it() {
+<a href=#550 id=550 data-nosnippet>550</a>        <span class="kw">let </span>path = synth_wav();
+<a href=#551 id=551 data-nosnippet>551</a>        <span class="kw">let </span>tagged = read_from_path(<span class="kw-2">&amp;</span>path).unwrap();
+<a href=#552 id=552 data-nosnippet>552</a>        <span class="kw">let </span>tag_type = tagged.primary_tag_type();
+<a href=#553 id=553 data-nosnippet>553</a>        <span class="kw">let </span>key = ItemKey::Isrc
+<a href=#554 id=554 data-nosnippet>554</a>            .map_key(tag_type)
+<a href=#555 id=555 data-nosnippet>555</a>            .expect(<span class="string">"ISRC maps on this format"</span>)
+<a href=#556 id=556 data-nosnippet>556</a>            .to_string();
+<a href=#557 id=557 data-nosnippet>557</a>
+<a href=#558 id=558 data-nosnippet>558</a>        write_tags(
+<a href=#559 id=559 data-nosnippet>559</a>            <span class="kw-2">&amp;</span>path,
+<a href=#560 id=560 data-nosnippet>560</a>            <span class="kw-2">&amp;</span>TagEdits {
+<a href=#561 id=561 data-nosnippet>561</a>                extra: <span class="macro">vec!</span>[(key.clone(), FieldEdit::Set(<span class="string">"US-S1Z-99-00001"</span>.into()))],
+<a href=#562 id=562 data-nosnippet>562</a>                ..Default::default()
+<a href=#563 id=563 data-nosnippet>563</a>            },
+<a href=#564 id=564 data-nosnippet>564</a>        )
+<a href=#565 id=565 data-nosnippet>565</a>        .unwrap();
+<a href=#566 id=566 data-nosnippet>566</a>        <span class="macro">assert!</span>(read_tags(<span class="kw-2">&amp;</span>path).unwrap().extra.iter().any(|(k, <span class="kw">_</span>)| <span class="kw-2">*</span>k == key));
+<a href=#567 id=567 data-nosnippet>567</a>
+<a href=#568 id=568 data-nosnippet>568</a>        write_tags(
+<a href=#569 id=569 data-nosnippet>569</a>            <span class="kw-2">&amp;</span>path,
+<a href=#570 id=570 data-nosnippet>570</a>            <span class="kw-2">&amp;</span>TagEdits {
+<a href=#571 id=571 data-nosnippet>571</a>                extra: <span class="macro">vec!</span>[(key.clone(), FieldEdit::Clear)],
+<a href=#572 id=572 data-nosnippet>572</a>                ..Default::default()
+<a href=#573 id=573 data-nosnippet>573</a>            },
+<a href=#574 id=574 data-nosnippet>574</a>        )
+<a href=#575 id=575 data-nosnippet>575</a>        .unwrap();
+<a href=#576 id=576 data-nosnippet>576</a>        <span class="macro">assert!</span>(!read_tags(<span class="kw-2">&amp;</span>path).unwrap().extra.iter().any(|(k, <span class="kw">_</span>)| <span class="kw-2">*</span>k == key));
+<a href=#577 id=577 data-nosnippet>577</a>    }
+<a href=#578 id=578 data-nosnippet>578</a>
+<a href=#579 id=579 data-nosnippet>579</a>    <span class="doccomment">/// A key this file's tag type has no `ItemKey` mapping for must not fail
+<a href=#580 id=580 data-nosnippet>580</a>    /// the whole write — the extended-tags panel can't know a mixed-format
+<a href=#581 id=581 data-nosnippet>581</a>    /// selection supports every key its "+" list offers (see `write_tags`'s
+<a href=#582 id=582 data-nosnippet>582</a>    /// doc comment on `Year`/`RecordingDate` for the same pattern with a
+<a href=#583 id=583 data-nosnippet>583</a>    /// named field), so it's silently skipped instead.
+<a href=#584 id=584 data-nosnippet>584</a>    </span><span class="attr">#[test]
+<a href=#585 id=585 data-nosnippet>585</a>    </span><span class="kw">fn </span>extra_tag_with_unmapped_key_is_silently_skipped() {
+<a href=#586 id=586 data-nosnippet>586</a>        <span class="kw">let </span>path = synth_wav();
+<a href=#587 id=587 data-nosnippet>587</a>        <span class="kw">let </span>result = write_tags(
+<a href=#588 id=588 data-nosnippet>588</a>            <span class="kw-2">&amp;</span>path,
+<a href=#589 id=589 data-nosnippet>589</a>            <span class="kw-2">&amp;</span>TagEdits {
+<a href=#590 id=590 data-nosnippet>590</a>                extra: <span class="macro">vec!</span>[(<span class="string">"NOT_A_REAL_TAG_KEY_XYZ"</span>.into(), FieldEdit::Set(<span class="string">"value"</span>.into()))],
+<a href=#591 id=591 data-nosnippet>591</a>                ..Default::default()
+<a href=#592 id=592 data-nosnippet>592</a>            },
+<a href=#593 id=593 data-nosnippet>593</a>        );
+<a href=#594 id=594 data-nosnippet>594</a>        <span class="macro">assert!</span>(result.is_ok());
+<a href=#595 id=595 data-nosnippet>595</a>    }
+<a href=#596 id=596 data-nosnippet>596</a>
+<a href=#597 id=597 data-nosnippet>597</a>    <span class="attr">#[test]
+<a href=#598 id=598 data-nosnippet>598</a>    </span><span class="kw">fn </span>unsupported_format_returns_a_named_error() {
+<a href=#599 id=599 data-nosnippet>599</a>        <span class="comment">// A tiny fake DSF: lofty doesn't have a DSD resolver, so this must
+<a href=#600 id=600 data-nosnippet>600</a>        // come back as a clean per-file error rather than a panic.
+<a href=#601 id=601 data-nosnippet>601</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>file = tempfile::Builder::new().suffix(<span class="string">".dsf"</span>).tempfile().unwrap();
+<a href=#602 id=602 data-nosnippet>602</a>        file.write_all(<span class="string">b"DSD not a real dsf file"</span>).unwrap();
+<a href=#603 id=603 data-nosnippet>603</a>        <span class="kw">let </span>path = file.into_temp_path();
+<a href=#604 id=604 data-nosnippet>604</a>        <span class="macro">assert!</span>(read_tags(<span class="kw-2">&amp;</span>path).is_err());
+<a href=#605 id=605 data-nosnippet>605</a>    }
+<a href=#606 id=606 data-nosnippet>606</a>}
 </code></pre></div></section></main></body></html>

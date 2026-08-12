@@ -16,7 +16,7 @@
 <a href=#16 id=16 data-nosnippet>16</a><span class="kw">use </span>symphonia::core::meta::MetadataOptions;
 <a href=#17 id=17 data-nosnippet>17</a><span class="kw">use </span>symphonia::core::probe::Hint;
 <a href=#18 id=18 data-nosnippet>18</a>
-<a href=#19 id=19 data-nosnippet>19</a><span class="kw">use </span><span class="kw">super</span>::container::format_label;
+<a href=#19 id=19 data-nosnippet>19</a><span class="kw">use </span><span class="kw">super</span>::container::{codec_label, format_label};
 <a href=#20 id=20 data-nosnippet>20</a><span class="kw">use </span><span class="kw">crate</span>::AnalysisError;
 <a href=#21 id=21 data-nosnippet>21</a>
 <a href=#22 id=22 data-nosnippet>22</a><span class="doccomment">/// A probed file: its reader, positioned before the first packet, and the
@@ -135,14 +135,15 @@
 <a href=#135 id=135 data-nosnippet>135</a>/// decode). Used e.g. to caption spectrogram images.
 <a href=#136 id=136 data-nosnippet>136</a></span><span class="kw">pub fn </span>probe_info(path: <span class="kw-2">&amp;</span>Path) -&gt; <span class="prelude-ty">Result</span>&lt;BasicInfo, AnalysisError&gt; {
 <a href=#137 id=137 data-nosnippet>137</a>    <span class="kw">let </span>probed = probe(path, <span class="bool-val">false</span>)<span class="question-mark">?</span>;
-<a href=#138 id=138 data-nosnippet>138</a>    <span class="prelude-val">Ok</span>(BasicInfo {
-<a href=#139 id=139 data-nosnippet>139</a>        <span class="comment">// Unlike the decode paths, a missing rate or channel count is not
-<a href=#140 id=140 data-nosnippet>140</a>        // fatal here: this only captions an image, and "0" is a better answer
-<a href=#141 id=141 data-nosnippet>141</a>        // than refusing to render the spectrogram at all.
-<a href=#142 id=142 data-nosnippet>142</a>        </span>sample_rate: probed.params.sample_rate.unwrap_or(<span class="number">0</span>),
-<a href=#143 id=143 data-nosnippet>143</a>        channels: probed.params.channels.map(|c| c.count()).unwrap_or(<span class="number">0</span>),
-<a href=#144 id=144 data-nosnippet>144</a>        bits: probed.params.bits_per_sample,
-<a href=#145 id=145 data-nosnippet>145</a>        format: format_label(path),
-<a href=#146 id=146 data-nosnippet>146</a>    })
-<a href=#147 id=147 data-nosnippet>147</a>}
+<a href=#138 id=138 data-nosnippet>138</a>    <span class="kw">let </span>codec = codec_label(probed.params.codec);
+<a href=#139 id=139 data-nosnippet>139</a>    <span class="prelude-val">Ok</span>(BasicInfo {
+<a href=#140 id=140 data-nosnippet>140</a>        <span class="comment">// Unlike the decode paths, a missing rate or channel count is not
+<a href=#141 id=141 data-nosnippet>141</a>        // fatal here: this only captions an image, and "0" is a better answer
+<a href=#142 id=142 data-nosnippet>142</a>        // than refusing to render the spectrogram at all.
+<a href=#143 id=143 data-nosnippet>143</a>        </span>sample_rate: probed.params.sample_rate.unwrap_or(<span class="number">0</span>),
+<a href=#144 id=144 data-nosnippet>144</a>        channels: probed.params.channels.map(|c| c.count()).unwrap_or(<span class="number">0</span>),
+<a href=#145 id=145 data-nosnippet>145</a>        bits: probed.params.bits_per_sample,
+<a href=#146 id=146 data-nosnippet>146</a>        format: format_label(path, codec),
+<a href=#147 id=147 data-nosnippet>147</a>    })
+<a href=#148 id=148 data-nosnippet>148</a>}
 </code></pre></div></section></main></body></html>

@@ -92,11 +92,12 @@
 <a href=#92 id=92 data-nosnippet>92</a>
 <a href=#93 id=93 data-nosnippet>93</a>    <span class="prelude-val">Ok</span>(DecodeOutcome {
 <a href=#94 id=94 data-nosnippet>94</a>        format: <span class="string">"DSD"</span>.to_string(),
-<a href=#95 id=95 data-nosnippet>95</a>        sample_rate: decoded_rate,
-<a href=#96 id=96 data-nosnippet>96</a>        channels,
-<a href=#97 id=97 data-nosnippet>97</a>        declared_bits: <span class="prelude-val">None</span>, <span class="comment">// 1-bit stream; PCM bit depth does not apply
-<a href=#98 id=98 data-nosnippet>98</a>        </span>duration_secs: frame_count <span class="kw">as </span>f64 / decoded_rate.max(<span class="number">1</span>) <span class="kw">as </span>f64,
-<a href=#99 id=99 data-nosnippet>99</a>        analyzer,
-<a href=#100 id=100 data-nosnippet>100</a>    })
-<a href=#101 id=101 data-nosnippet>101</a>}
+<a href=#95 id=95 data-nosnippet>95</a>        codec: <span class="prelude-val">None</span>, <span class="comment">// container already says everything this field would
+<a href=#96 id=96 data-nosnippet>96</a>        </span>sample_rate: decoded_rate,
+<a href=#97 id=97 data-nosnippet>97</a>        channels,
+<a href=#98 id=98 data-nosnippet>98</a>        declared_bits: <span class="prelude-val">None</span>, <span class="comment">// 1-bit stream; PCM bit depth does not apply
+<a href=#99 id=99 data-nosnippet>99</a>        </span>duration_secs: frame_count <span class="kw">as </span>f64 / decoded_rate.max(<span class="number">1</span>) <span class="kw">as </span>f64,
+<a href=#100 id=100 data-nosnippet>100</a>        analyzer,
+<a href=#101 id=101 data-nosnippet>101</a>    })
+<a href=#102 id=102 data-nosnippet>102</a>}
 </code></pre></div></section></main></body></html>
