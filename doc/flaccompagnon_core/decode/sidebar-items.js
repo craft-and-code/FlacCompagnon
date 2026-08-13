@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["container","dsd","flac","playback","probe","stream"],"struct":["DecodeOutcome"]};
+window.SIDEBAR_ITEMS = {"mod":["container","dsd","flac","flac_md5","playback","probe","stream"],"struct":["DecodeOutcome"]};

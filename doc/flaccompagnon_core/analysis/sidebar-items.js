@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["analyzer","bitdepth","clipping","detections","mdct","requant","spectrum","stereo","truepeak"]};

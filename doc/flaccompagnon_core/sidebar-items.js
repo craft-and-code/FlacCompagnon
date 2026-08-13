@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["analyzer","bitdepth","clipping","convert","decode","detections","dsd","flac_md5","mdct","pipeline","playlist","report","requant","scan","spectrum","stereo","tags","truepeak","types"]};
+window.SIDEBAR_ITEMS = {"mod":["analysis","convert","decode","dsd","pipeline","playlist","report","scan","tags","types"]};

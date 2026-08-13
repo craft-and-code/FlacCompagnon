@@ -2,8 +2,8 @@
 <a href=#2 id=2 data-nosnippet>2</a>//! analyzer over it, and turn the raw measurements into a verdict.
 <a href=#3 id=3 data-nosnippet>3</a>//!
 <a href=#4 id=4 data-nosnippet>4</a>//! This is the orchestration layer. Every measurement it uses comes from
-<a href=#5 id=5 data-nosnippet>5</a>//! elsewhere ([`analyzer`](crate::analyzer) and the per-metric modules), and
-<a href=#6 id=6 data-nosnippet>6</a>//! the verdict logic lives in [`detections`](crate::detections) — what happens
+<a href=#5 id=5 data-nosnippet>5</a>//! elsewhere ([`analyzer`](crate::analysis::analyzer) and the per-metric modules), and
+<a href=#6 id=6 data-nosnippet>6</a>//! the verdict logic lives in [`detections`](crate::analysis::detections) — what happens
 <a href=#7 id=7 data-nosnippet>7</a>//! here is choosing *which* path a file takes and assembling the result.
 <a href=#8 id=8 data-nosnippet>8</a>//!
 <a href=#9 id=9 data-nosnippet>9</a>//! This file holds the PCM path (FLAC's fused pass, or the generic Symphonia
@@ -18,9 +18,9 @@
 <a href=#18 id=18 data-nosnippet>18</a><span class="kw">use </span>std::path::Path;
 <a href=#19 id=19 data-nosnippet>19</a>
 <a href=#20 id=20 data-nosnippet>20</a><span class="kw">use </span><span class="kw">crate</span>::decode;
-<a href=#21 id=21 data-nosnippet>21</a><span class="kw">use </span><span class="kw">crate</span>::detections::{<span class="self">self</span>, Detections, TranscodeState};
+<a href=#21 id=21 data-nosnippet>21</a><span class="kw">use </span><span class="kw">crate</span>::analysis::detections::{<span class="self">self</span>, Detections, TranscodeState};
 <a href=#22 id=22 data-nosnippet>22</a><span class="kw">use </span><span class="kw">crate</span>::dsd <span class="kw">as </span>dsd_format;
-<a href=#23 id=23 data-nosnippet>23</a><span class="kw">use </span><span class="kw">crate</span>::flac_md5::FlacMd5Status;
+<a href=#23 id=23 data-nosnippet>23</a><span class="kw">use </span><span class="kw">crate</span>::decode::FlacMd5Status;
 <a href=#24 id=24 data-nosnippet>24</a><span class="kw">use </span><span class="kw">crate</span>::types::{ClippingInfo, FileAnalysis, ScanOptions};
 <a href=#25 id=25 data-nosnippet>25</a>
 <a href=#26 id=26 data-nosnippet>26</a><span class="doccomment">/// Analyze a single audio file end-to-end.

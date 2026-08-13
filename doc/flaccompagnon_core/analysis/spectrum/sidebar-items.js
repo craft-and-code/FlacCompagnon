@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["CONTENT_FLOOR_DB"],"fn":["average_to_db","cutoff_context","detect_cutoff"]};

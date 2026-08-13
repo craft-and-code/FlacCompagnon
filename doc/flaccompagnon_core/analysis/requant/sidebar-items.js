@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["DETECT_RATE","L","N","SEGMENT_LEN","SWB_4448"],"fn":["analyze_segment","kbd_window","sine_window"],"struct":["Mdct","RequantResult"]};
