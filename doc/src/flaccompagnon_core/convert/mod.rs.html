@@ -17,9 +17,9 @@
 <a href=#17 id=17 data-nosnippet>17</a>//! ## Format choice
 <a href=#18 id=18 data-nosnippet>18</a>//!
 <a href=#19 id=19 data-nosnippet>19</a>//! All four targets are free to depend on: FLAC via a pure-Rust encoder
-<a href=#20 id=20 data-nosnippet>20</a>//! ([`flac`], crate `flacenc`, no C toolchain at all), WAV via plain PCM
-<a href=#21 id=21 data-nosnippet>21</a>//! muxing ([`wav`], crate `hound`), and Opus/MP3 ([`opus`], [`mp3`]) via
-<a href=#22 id=22 data-nosnippet>22</a>//! crates that vendor their respective C codec (`libopus`, LAME) from source
+<a href=#20 id=20 data-nosnippet>20</a>//! (`flac`, crate `flacenc`, no C toolchain at all), WAV via plain PCM muxing
+<a href=#21 id=21 data-nosnippet>21</a>//! (`wav`, crate `hound`), and Opus/MP3 (`opus`, `mp3`) via crates that
+<a href=#22 id=22 data-nosnippet>22</a>//! vendor their respective C codec (`libopus`, LAME) from source
 <a href=#23 id=23 data-nosnippet>23</a>//! rather than linking a system library — so a built binary has no runtime
 <a href=#24 id=24 data-nosnippet>24</a>//! dependency to install. *Building* is a different matter, and this comment
 <a href=#25 id=25 data-nosnippet>25</a>//! used to get it wrong: `audiopus_sys` 0.1.x (what `audiopus` 0.2 pins)
@@ -34,15 +34,15 @@
 <a href=#34 id=34 data-nosnippet>34</a>//!
 <a href=#35 id=35 data-nosnippet>35</a>//! ## Module layout
 <a href=#36 id=36 data-nosnippet>36</a>//!
-<a href=#37 id=37 data-nosnippet>37</a>//! One file per encoder ([`flac`], [`wav`], [`opus`], [`mp3`]), because each
-<a href=#38 id=38 data-nosnippet>38</a>//! wraps a different codec crate with essentially nothing in common. What's
+<a href=#37 id=37 data-nosnippet>37</a>//! One file per encoder (`flac`, `wav`, `opus`, `mp3`), because each wraps a
+<a href=#38 id=38 data-nosnippet>38</a>//! different codec crate with essentially nothing in common. What's
 <a href=#39 id=39 data-nosnippet>39</a>//! shared — deciding *where* converted files go, not *how* they're encoded —
 <a href=#40 id=40 data-nosnippet>40</a>//! lives here: [`convert_file`] dispatches to the right encoder for one file,
 <a href=#41 id=41 data-nosnippet>41</a>//! [`plan_batch`] works out every destination path up front (mirroring the
 <a href=#42 id=42 data-nosnippet>42</a>//! source folder structure under a new root), and [`passthrough_files`]
 <a href=#43 id=43 data-nosnippet>43</a>//! copies everything else in that source folder verbatim. Two neighbours sit
-<a href=#44 id=44 data-nosnippet>44</a>//! beside them for reasons of their own: [`pcm`] (sample reshaping shared by
-<a href=#45 id=45 data-nosnippet>45</a>//! the encoders) and [`cleanup`] (removing what a cancelled batch already
+<a href=#44 id=44 data-nosnippet>44</a>//! beside them for reasons of their own: `pcm` (sample reshaping shared by
+<a href=#45 id=45 data-nosnippet>45</a>//! the encoders) and `cleanup` (removing what a cancelled batch already
 <a href=#46 id=46 data-nosnippet>46</a>//! wrote).
 <a href=#47 id=47 data-nosnippet>47</a>
 <a href=#48 id=48 data-nosnippet>48</a></span><span class="kw">mod </span>cleanup;

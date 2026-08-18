@@ -3,42 +3,43 @@
 <a href=#3 id=3 data-nosnippet>3</a>//! Everything here is internal machinery — no module in this folder is
 <a href=#4 id=4 data-nosnippet>4</a>//! referenced from outside the crate, which is what made it possible to group
 <a href=#5 id=5 data-nosnippet>5</a>//! them without touching a single caller. What crosses the crate boundary is
-<a href=#6 id=6 data-nosnippet>6</a>//! the *result* ([`crate::types`], [`Detections`]), not the measuring.
-<a href=#7 id=7 data-nosnippet>7</a>//!
-<a href=#8 id=8 data-nosnippet>8</a>//! These nine modules were top-level files next to `report.rs`, `playlist.rs`
-<a href=#9 id=9 data-nosnippet>9</a>//! and `scan.rs`, which made the crate root read as a flat pile where the
-<a href=#10 id=10 data-nosnippet>10</a>//! export helpers and the DSP sat at the same level. They are one subsystem
-<a href=#11 id=11 data-nosnippet>11</a>//! and they change together — a new detection touches the analyzer, a metric
-<a href=#12 id=12 data-nosnippet>12</a>//! module and the verdict logic in one go — so they belong under one roof.
-<a href=#13 id=13 data-nosnippet>13</a>//!
-<a href=#14 id=14 data-nosnippet>14</a>//! ## Shape of the chain
-<a href=#15 id=15 data-nosnippet>15</a>//!
-<a href=#16 id=16 data-nosnippet>16</a>//! One pass over the samples, then one decision:
-<a href=#17 id=17 data-nosnippet>17</a>//!
-<a href=#18 id=18 data-nosnippet>18</a>//! * [`analyzer`] runs that single streaming pass and owns the state it needs
-<a href=#19 id=19 data-nosnippet>19</a>//!   across packets. It is the only module here the decode paths talk to.
-<a href=#20 id=20 data-nosnippet>20</a>//! * The per-metric modules do one measurement each and hold no session
-<a href=#21 id=21 data-nosnippet>21</a>//!   state: [`spectrum`] (FFT, cut-off), [`bitdepth`] (effective depth),
-<a href=#22 id=22 data-nosnippet>22</a>//!   [`stereo`] (dual-mono disguised as stereo), [`clipping`] (full-scale
-<a href=#23 id=23 data-nosnippet>23</a>//!   runs), [`truepeak`] (inter-sample peaks, dBTP).
-<a href=#24 id=24 data-nosnippet>24</a>//! * [`mdct`] and [`requant`] are the AAC-grid detection: the transform, then
-<a href=#25 id=25 data-nosnippet>25</a>//!   the search for coefficients that fall back onto the quantization lattice
-<a href=#26 id=26 data-nosnippet>26</a>//!   only an AAC encoder produces.
-<a href=#27 id=27 data-nosnippet>27</a>//! * [`detections`] takes the finished measurements and turns them into the
-<a href=#28 id=28 data-nosnippet>28</a>//!   verdict the UI shows. It is the only module here that decides anything;
-<a href=#29 id=29 data-nosnippet>29</a>//!   the rest only measure.
-<a href=#30 id=30 data-nosnippet>30</a>//!
-<a href=#31 id=31 data-nosnippet>31</a>//! Keeping the measuring and the deciding apart is deliberate: a threshold
-<a href=#32 id=32 data-nosnippet>32</a>//! that moves should move in [`detections`] alone, without touching the code
-<a href=#33 id=33 data-nosnippet>33</a>//! that produced the number it compares.
-<a href=#34 id=34 data-nosnippet>34</a>
-<a href=#35 id=35 data-nosnippet>35</a></span><span class="kw">pub mod </span>analyzer;
-<a href=#36 id=36 data-nosnippet>36</a><span class="kw">pub mod </span>bitdepth;
-<a href=#37 id=37 data-nosnippet>37</a><span class="kw">pub mod </span>clipping;
-<a href=#38 id=38 data-nosnippet>38</a><span class="kw">pub mod </span>detections;
-<a href=#39 id=39 data-nosnippet>39</a><span class="kw">pub mod </span>mdct;
-<a href=#40 id=40 data-nosnippet>40</a><span class="kw">pub mod </span>requant;
-<a href=#41 id=41 data-nosnippet>41</a><span class="kw">pub mod </span>spectrum;
-<a href=#42 id=42 data-nosnippet>42</a><span class="kw">pub mod </span>stereo;
-<a href=#43 id=43 data-nosnippet>43</a><span class="kw">pub mod </span>truepeak;
+<a href=#6 id=6 data-nosnippet>6</a>//! the *result* ([`crate::types`], [`detections::Detections`]), not the
+<a href=#7 id=7 data-nosnippet>7</a>//! measuring.
+<a href=#8 id=8 data-nosnippet>8</a>//!
+<a href=#9 id=9 data-nosnippet>9</a>//! These nine modules were top-level files next to `report.rs`, `playlist.rs`
+<a href=#10 id=10 data-nosnippet>10</a>//! and `scan.rs`, which made the crate root read as a flat pile where the
+<a href=#11 id=11 data-nosnippet>11</a>//! export helpers and the DSP sat at the same level. They are one subsystem
+<a href=#12 id=12 data-nosnippet>12</a>//! and they change together — a new detection touches the analyzer, a metric
+<a href=#13 id=13 data-nosnippet>13</a>//! module and the verdict logic in one go — so they belong under one roof.
+<a href=#14 id=14 data-nosnippet>14</a>//!
+<a href=#15 id=15 data-nosnippet>15</a>//! ## Shape of the chain
+<a href=#16 id=16 data-nosnippet>16</a>//!
+<a href=#17 id=17 data-nosnippet>17</a>//! One pass over the samples, then one decision:
+<a href=#18 id=18 data-nosnippet>18</a>//!
+<a href=#19 id=19 data-nosnippet>19</a>//! * [`analyzer`] runs that single streaming pass and owns the state it needs
+<a href=#20 id=20 data-nosnippet>20</a>//!   across packets. It is the only module here the decode paths talk to.
+<a href=#21 id=21 data-nosnippet>21</a>//! * The per-metric modules do one measurement each and hold no session
+<a href=#22 id=22 data-nosnippet>22</a>//!   state: [`spectrum`] (FFT, cut-off), [`bitdepth`] (effective depth),
+<a href=#23 id=23 data-nosnippet>23</a>//!   [`stereo`] (dual-mono disguised as stereo), [`clipping`] (full-scale
+<a href=#24 id=24 data-nosnippet>24</a>//!   runs), [`truepeak`] (inter-sample peaks, dBTP).
+<a href=#25 id=25 data-nosnippet>25</a>//! * [`mdct`] and [`requant`] are the AAC-grid detection: the transform, then
+<a href=#26 id=26 data-nosnippet>26</a>//!   the search for coefficients that fall back onto the quantization lattice
+<a href=#27 id=27 data-nosnippet>27</a>//!   only an AAC encoder produces.
+<a href=#28 id=28 data-nosnippet>28</a>//! * [`detections`] takes the finished measurements and turns them into the
+<a href=#29 id=29 data-nosnippet>29</a>//!   verdict the UI shows. It is the only module here that decides anything;
+<a href=#30 id=30 data-nosnippet>30</a>//!   the rest only measure.
+<a href=#31 id=31 data-nosnippet>31</a>//!
+<a href=#32 id=32 data-nosnippet>32</a>//! Keeping the measuring and the deciding apart is deliberate: a threshold
+<a href=#33 id=33 data-nosnippet>33</a>//! that moves should move in [`detections`] alone, without touching the code
+<a href=#34 id=34 data-nosnippet>34</a>//! that produced the number it compares.
+<a href=#35 id=35 data-nosnippet>35</a>
+<a href=#36 id=36 data-nosnippet>36</a></span><span class="kw">pub mod </span>analyzer;
+<a href=#37 id=37 data-nosnippet>37</a><span class="kw">pub mod </span>bitdepth;
+<a href=#38 id=38 data-nosnippet>38</a><span class="kw">pub mod </span>clipping;
+<a href=#39 id=39 data-nosnippet>39</a><span class="kw">pub mod </span>detections;
+<a href=#40 id=40 data-nosnippet>40</a><span class="kw">pub mod </span>mdct;
+<a href=#41 id=41 data-nosnippet>41</a><span class="kw">pub mod </span>requant;
+<a href=#42 id=42 data-nosnippet>42</a><span class="kw">pub mod </span>spectrum;
+<a href=#43 id=43 data-nosnippet>43</a><span class="kw">pub mod </span>stereo;
+<a href=#44 id=44 data-nosnippet>44</a><span class="kw">pub mod </span>truepeak;
 </code></pre></div></section></main></body></html>

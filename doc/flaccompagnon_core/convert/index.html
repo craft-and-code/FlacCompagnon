@@ -13,9 +13,9 @@ analysis path can), so a DSD source fails fast with
 panicking partway through.</p>
 <h3 id="format-choice"><a class="doc-anchor" href="#format-choice">§</a>Format choice</h3>
 <p>All four targets are free to depend on: FLAC via a pure-Rust encoder
-([<code>flac</code>], crate <code>flacenc</code>, no C toolchain at all), WAV via plain PCM
-muxing ([<code>wav</code>], crate <code>hound</code>), and Opus/MP3 ([<code>opus</code>], [<code>mp3</code>]) via
-crates that vendor their respective C codec (<code>libopus</code>, LAME) from source
+(<code>flac</code>, crate <code>flacenc</code>, no C toolchain at all), WAV via plain PCM muxing
+(<code>wav</code>, crate <code>hound</code>), and Opus/MP3 (<code>opus</code>, <code>mp3</code>) via crates that
+vendor their respective C codec (<code>libopus</code>, LAME) from source
 rather than linking a system library — so a built binary has no runtime
 dependency to install. <em>Building</em> is a different matter, and this comment
 used to get it wrong: <code>audiopus_sys</code> 0.1.x (what <code>audiopus</code> 0.2 pins)
@@ -28,15 +28,15 @@ Opus was designed royalty-free from the start, and MP3’s patents have all
 expired (the last, in the US, in 2017) — this app holds no codec license
 either way, so both are as free to ship as FLAC.</p>
 <h3 id="module-layout"><a class="doc-anchor" href="#module-layout">§</a>Module layout</h3>
-<p>One file per encoder ([<code>flac</code>], [<code>wav</code>], [<code>opus</code>], [<code>mp3</code>]), because each
-wraps a different codec crate with essentially nothing in common. What’s
+<p>One file per encoder (<code>flac</code>, <code>wav</code>, <code>opus</code>, <code>mp3</code>), because each wraps a
+different codec crate with essentially nothing in common. What’s
 shared — deciding <em>where</em> converted files go, not <em>how</em> they’re encoded —
 lives here: <a href="fn.convert_file.html" title="fn flaccompagnon_core::convert::convert_file"><code>convert_file</code></a> dispatches to the right encoder for one file,
 <a href="fn.plan_batch.html" title="fn flaccompagnon_core::convert::plan_batch"><code>plan_batch</code></a> works out every destination path up front (mirroring the
 source folder structure under a new root), and <a href="fn.passthrough_files.html" title="fn flaccompagnon_core::convert::passthrough_files"><code>passthrough_files</code></a>
 copies everything else in that source folder verbatim. Two neighbours sit
-beside them for reasons of their own: [<code>pcm</code>] (sample reshaping shared by
-the encoders) and [<code>cleanup</code>] (removing what a cancelled batch already
+beside them for reasons of their own: <code>pcm</code> (sample reshaping shared by
+the encoders) and <code>cleanup</code> (removing what a cancelled batch already
 wrote).</p>
 </div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.ConvertSettings.html" title="struct flaccompagnon_core::convert::ConvertSettings">Convert<wbr>Settings</a></dt><dd>What to convert to, and how. <code>bitrate_kbps</code> only matters for the two lossy
 formats; it is ignored for FLAC and WAV, which have no such setting.</dd></dl><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><dl class="item-table"><dt><a class="enum" href="enum.ConvertError.html" title="enum flaccompagnon_core::convert::ConvertError">Convert<wbr>Error</a></dt><dd>Errors that can occur while converting one file. Every variant carries the

@@ -7,7 +7,7 @@ read/write orchestration doesn’t need inline, and keeping it here is what
 lets that module stay under this codebase’s size cap (see CLAUDE.md).</p>
 </div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.AddableTag.html" title="struct flaccompagnon_core::tags::addable::AddableTag">Addable<wbr>Tag</a></dt><dd>One entry in the extended-tags pop-in’s “+” picker: the raw
 format-specific key to write (matches <code>TagSet::extra</code>’s keys) paired
-with a human label.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.addable_tags.html" title="fn flaccompagnon_core::tags::addable::addable_tags">addable_<wbr>tags</a></dt><dd>[<code>ADDABLE_KEYS</code>] resolved against <code>path</code>’s tag type and filtered to the
+with a human label.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.addable_tags.html" title="fn flaccompagnon_core::tags::addable::addable_tags">addable_<wbr>tags</a></dt><dd><code>ADDABLE_KEYS</code> resolved against <code>path</code>’s tag type and filtered to the
 ones that format actually supports (<code>ItemKey::map_key</code> returns <code>None</code>
 for a variant with no mapping in that scheme) — so the picker only ever
 offers a tag that can actually be written to the file(s) at hand. The

@@ -3,11 +3,11 @@
 <a href=#3 id=3 data-nosnippet>3</a>//!
 <a href=#4 id=4 data-nosnippet>4</a>//! This is the orchestration layer. Every measurement it uses comes from
 <a href=#5 id=5 data-nosnippet>5</a>//! elsewhere ([`analyzer`](crate::analysis::analyzer) and the per-metric modules), and
-<a href=#6 id=6 data-nosnippet>6</a>//! the verdict logic lives in [`detections`](crate::analysis::detections) — what happens
+<a href=#6 id=6 data-nosnippet>6</a>//! the verdict logic lives in [`detections`] — what happens
 <a href=#7 id=7 data-nosnippet>7</a>//! here is choosing *which* path a file takes and assembling the result.
 <a href=#8 id=8 data-nosnippet>8</a>//!
 <a href=#9 id=9 data-nosnippet>9</a>//! This file holds the PCM path (FLAC's fused pass, or the generic Symphonia
-<a href=#10 id=10 data-nosnippet>10</a>//! one); the DSD path is [`dsd`], which shares almost nothing with it.
+<a href=#10 id=10 data-nosnippet>10</a>//! one); the DSD path is `dsd`, which shares almost nothing with it.
 <a href=#11 id=11 data-nosnippet>11</a>//!
 <a href=#12 id=12 data-nosnippet>12</a>//! [`analyze_file`] never returns an `Err`: a file that cannot be decoded comes
 <a href=#13 id=13 data-nosnippet>13</a>//! back with [`FileAnalysis::error`] set and best-effort defaults elsewhere, so

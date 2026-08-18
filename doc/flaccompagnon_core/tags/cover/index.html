@@ -4,7 +4,7 @@ picture on a lofty [<code>Tag</code>]. Split out of <code>tags</code> proper so 
 stay focused on the text-field read/write path — this one owns
 everything about the image itself (mapping a role name to lofty’s
 [<code>PictureType</code>], extracting the picture on read, replacing it on write).</p>
-<p>[<code>extract</code>] and [<code>apply_edit</code>] are the two entry points the parent module
+<p><code>extract</code> and <code>apply_edit</code> are the two entry points the parent module
 calls from <a href="../fn.read_tags.html" title="fn flaccompagnon_core::tags::read_tags"><code>super::read_tags</code></a>/<a href="../fn.write_tags.html" title="fn flaccompagnon_core::tags::write_tags"><code>super::write_tags</code></a>; everything else
 here is either a public type shared with the frontend or a private
 implementation detail.</p>
@@ -13,8 +13,8 @@ the raw image bytes, base64-encoded — prefix with <code>data:{mime};base64,</c
 use directly as an <code>&lt;img src&gt;</code>).</dd></dl><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><dl class="item-table"><dt><a class="enum" href="enum.CoverEdit.html" title="enum flaccompagnon_core::tags::cover::CoverEdit">Cover<wbr>Edit</a></dt><dd>Cover art edit instruction — same three-way shape as <a href="../enum.FieldEdit.html" title="enum flaccompagnon_core::tags::FieldEdit"><code>super::FieldEdit</code></a>,
 plus the image payload for <code>Set</code>. <code>picture_type</code> is the role to write it
 under (<code>"CoverFront"</code>, <code>"CoverBack"</code>, …, matching the strings
-[<code>extract</code>] surfaces via <a href="struct.CoverArt.html#structfield.picture_type" title="field flaccompagnon_core::tags::cover::CoverArt::picture_type"><code>CoverArt::picture_type</code></a>) — see
-[<code>parse_picture_type</code>] for how an unrecognized string is handled.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.cover_from_bytes.html" title="fn flaccompagnon_core::tags::cover::cover_from_bytes">cover_<wbr>from_<wbr>bytes</a></dt><dd>Build a <a href="struct.CoverArt.html" title="struct flaccompagnon_core::tags::cover::CoverArt"><code>CoverArt</code></a> from raw image bytes, from wherever they came from —
+<code>extract</code> surfaces via <a href="struct.CoverArt.html#structfield.picture_type" title="field flaccompagnon_core::tags::cover::CoverArt::picture_type"><code>CoverArt::picture_type</code></a>) — see
+<code>parse_picture_type</code> for how an unrecognized string is handled.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.cover_from_bytes.html" title="fn flaccompagnon_core::tags::cover::cover_from_bytes">cover_<wbr>from_<wbr>bytes</a></dt><dd>Build a <a href="struct.CoverArt.html" title="struct flaccompagnon_core::tags::cover::CoverArt"><code>CoverArt</code></a> from raw image bytes, from wherever they came from —
 shared by <a href="fn.read_cover_file.html" title="fn flaccompagnon_core::tags::cover::read_cover_file"><code>read_cover_file</code></a> (a dropped image) and the online lookup’s
 downloaded artwork (<code>src-tauri/src/lookup.rs</code>). <code>label</code> is only used to
 identify the source in an error message (a file path, or a URL).</dd><dt><a class="fn" href="fn.read_cover_file.html" title="fn flaccompagnon_core::tags::cover::read_cover_file">read_<wbr>cover_<wbr>file</a></dt><dd>Read a plain image file (dropped onto the cover box, not an audio file)

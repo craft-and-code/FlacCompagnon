@@ -5,7 +5,7 @@ elsewhere (<a href="../analysis/analyzer/index.html" title="mod flaccompagnon_co
 the verdict logic lives in <a href="../analysis/detections/index.html" title="mod flaccompagnon_core::analysis::detections"><code>detections</code></a> — what happens
 here is choosing <em>which</em> path a file takes and assembling the result.</p>
 <p>This file holds the PCM path (FLAC’s fused pass, or the generic Symphonia
-one); the DSD path is [<code>dsd</code>], which shares almost nothing with it.</p>
+one); the DSD path is <code>dsd</code>, which shares almost nothing with it.</p>
 <p><a href="fn.analyze_file.html" title="fn flaccompagnon_core::pipeline::analyze_file"><code>analyze_file</code></a> never returns an <code>Err</code>: a file that cannot be decoded comes
 back with <a href="../types/struct.FileAnalysis.html#structfield.error" title="field flaccompagnon_core::types::FileAnalysis::error"><code>FileAnalysis::error</code></a> set and best-effort defaults elsewhere, so
 one bad file never aborts a batch.</p>

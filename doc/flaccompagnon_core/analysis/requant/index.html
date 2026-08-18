@@ -16,7 +16,7 @@ representations (L, R, M, S — the encoder may have used MS stereo), and
 128-coefficient sub-blocks of an EIGHT_SHORT_SEQUENCE frame (encoders
 switch to short blocks on transients; those frames are invisible to a
 long-window analysis);</li>
-<li>sweeps, per band, [<code>NSF</code>] candidate scalefactors across the plausible
+<li>sweeps, per band, <code>NSF</code> candidate scalefactors across the plausible
 range <code>δ ∈ [0.3, 0.7]</code> of the dead-zone bound <code>φdz = 16/3 + 4·log2(max|X|)</code>
 (eq. 2; 90% of real encoder scalefactors land in that window), computes
 the rounding-error energy <code>E(s) = Σ ε²</code> and flags the band when
