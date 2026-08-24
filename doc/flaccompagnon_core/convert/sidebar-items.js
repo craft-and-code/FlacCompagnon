@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["DEFAULT_MP3_KBPS","DEFAULT_OPUS_KBPS"],"enum":["ConvertError","ConvertFormat"],"fn":["convert_file","passthrough_files","plan_batch","undo_batch"],"struct":["ConvertSettings"]};
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_MP3_KBPS","DEFAULT_OPUS_KBPS"],"enum":["ConvertError","ConvertFormat","FlacEffort"],"fn":["convert_file","passthrough_files","plan_batch","undo_batch"],"struct":["ConvertOutcome","ConvertSettings","ConvertSource"]};
