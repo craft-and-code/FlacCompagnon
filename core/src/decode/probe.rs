@@ -16,7 +16,7 @@ use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 
-use super::container::{codec_label, format_label};
+use super::container::{codec_label, format_label, missing_decoder_reason};
 use crate::AnalysisError;
 
 /// A probed file: its reader, positioned before the first packet, and the
@@ -86,7 +86,16 @@ impl ProbedTrack {
     pub(super) fn make_decoder(&self) -> Result<Box<dyn Decoder>, AnalysisError> {
         symphonia::default::get_codecs()
             .make(&self.params, &DecoderOptions::default())
-            .map_err(|e| AnalysisError::Decode(format!("no decoder: {e}")))
+            .map_err(|e| {
+                // A codec Symphonia can name but not decode gets said plainly
+                // — see `missing_decoder_reason`. Everything else keeps
+                // Symphonia's own wording, which is the honest answer when we
+                // don't know better.
+                AnalysisError::Decode(match missing_decoder_reason(self.params.codec) {
+                    Some(reason) => reason.to_string(),
+                    None => format!("no decoder: {e}"),
+                })
+            })
     }
 }
 

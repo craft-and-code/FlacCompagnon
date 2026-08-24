@@ -98,18 +98,40 @@ fn sweep_roots(sources: &[ConvertSource]) -> HashSet<(PathBuf, PathBuf)> {
 /// "Tout ou rien": there is no per-file choice, by design. The audio files in
 /// `sources` are the exclusion list, so a caller cannot get it out of step
 /// with what was actually converted.
+///
+/// ## Overlapping drops
+///
+/// Dropping a folder *and* something inside it means one neighbouring file is
+/// reachable from two sweeps, under two different bases — and those bases give
+/// it two *different* destinations (`out/Band/Album/cover.jpg` from `/music`,
+/// `out/Album/cover.jpg` from `/music/Band`). So the thing that has to be
+/// unique is the **source**, not the destination: deduplicating on the
+/// destination lets the same file through twice, which is exactly what it did.
+///
+/// Which of the two destinations wins then has to be decided rather than left
+/// to chance. The sweeps run outermost base first, so the deepest surviving
+/// structure wins — consistent with the rest of this module: the user dropped
+/// `Band`, so `Band/` is what they expect to find. Sorting also makes the
+/// returned list stable, which a `HashSet` iteration order alone was not.
 pub fn passthrough_files(
     sources: &[ConvertSource],
     output_root: &Path,
 ) -> std::io::Result<Vec<PathBuf>> {
     let audio: HashSet<&Path> = sources.iter().map(|s| s.path.as_path()).collect();
     let mut written = Vec::new();
-    // Overlapping drops (a folder *and* something inside it) would otherwise
-    // copy the same file twice; the destination is what has to be unique.
-    let mut done: HashSet<PathBuf> = HashSet::new();
+    let mut copied: HashSet<PathBuf> = HashSet::new();
 
-    for (root, base) in sweep_roots(sources) {
-        for entry in walkdir::WalkDir::new(&root).into_iter().filter_map(Result::ok) {
+    // A path sorts after every prefix of itself, so ordering by base puts the
+    // outermost (shortest) one first; the root breaks ties between two sweeps
+    // sharing a base.
+    let mut roots: Vec<(PathBuf, PathBuf)> = sweep_roots(sources).into_iter().collect();
+    roots.sort_by(|(a_root, a_base), (b_root, b_base)| {
+        a_base.cmp(b_base).then_with(|| a_root.cmp(b_root))
+    });
+
+    for (root, base) in roots {
+        let walk = walkdir::WalkDir::new(&root).sort_by_file_name();
+        for entry in walk.into_iter().filter_map(Result::ok) {
             let path = entry.into_path();
             if !path.is_file() || audio.contains(path.as_path()) {
                 continue;
@@ -117,10 +139,12 @@ pub fn passthrough_files(
             let Ok(rel) = path.strip_prefix(&base) else {
                 continue;
             };
-            let dest = output_root.join(rel);
-            if !done.insert(dest.clone()) {
+            // Only after `strip_prefix` succeeded: a file this sweep can't
+            // place must stay eligible for a later one that can.
+            if !copied.insert(path.clone()) {
                 continue;
             }
+            let dest = output_root.join(rel);
             if let Some(parent) = dest.parent() {
                 std::fs::create_dir_all(parent)?;
             }
@@ -265,6 +289,14 @@ mod tests {
 
     /// A folder dropped alongside something inside it must not copy the same
     /// neighbour twice.
+    ///
+    /// The symptom that caught the first attempt: deduplicating on the
+    /// *destination* let the cover through twice, because the two bases give
+    /// it two different destinations (`out/Band/Album/cover.jpg` and
+    /// `out/Album/cover.jpg`) — so the set never saw a collision. Hence the
+    /// assertion on where the single copy lands, not just on how many there
+    /// are: a count alone would also pass if the arbitrary winner changed
+    /// between runs.
     #[test]
     fn overlapping_drops_copy_each_file_once() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -286,10 +318,13 @@ mod tests {
             },
         ];
         let written = passthrough_files(&sources, &out).expect("copy");
-        let covers = written
+        let covers: Vec<_> = written
             .iter()
             .filter(|p| p.file_name().is_some_and(|n| n == "cover.jpg"))
-            .count();
-        assert_eq!(covers, 1, "{written:?}");
+            .collect();
+        assert_eq!(covers.len(), 1, "{written:?}");
+        // The outermost base wins, so the dropped `Band` folder survives.
+        assert_eq!(covers[0], &out.join("Band/Album/cover.jpg"));
+        assert!(!out.join("Album/cover.jpg").exists());
     }
 }

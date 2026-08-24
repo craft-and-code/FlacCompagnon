@@ -13,7 +13,7 @@ import type { CoverArt, Detections, FileAnalysis, FlacMd5Status } from "./types"
 /// copy only exists so a drop can be refused without a round trip.
 const AUDIO_EXTS = [
   "flac", "wav", "wave", "aif", "aiff", "aifc", "alac", "m4a", "mp4", "caf",
-  "ogg", "oga", "mp3", "aac", "dsf", "dff",
+  "ogg", "oga", "opus", "mp3", "aac", "dsf", "dff",
 ];
 
 /// Image extensions a dropped cover may have — see [`isImagePath`].

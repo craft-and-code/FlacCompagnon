@@ -78,7 +78,13 @@ pub fn ext_canonical(path: &Path) -> Option<&'static str> {
         Some("aif" | "aiff" | "aifc") => Some("AIFF"),
         Some("m4a" | "mp4" | "alac") => Some("MP4"),
         Some("caf") => Some("CAF"),
-        Some("ogg" | "oga") => Some("OGG"),
+        // `.opus` is an Ogg container like the other two — the extension only
+        // narrows the codec, not the wrapper. It has to be listed here even
+        // though `format_label` shows it as "Opus": an extension this function
+        // doesn't know returns `None`, and `flag_container_mismatch` treats
+        // that as "unrecognized" and overwrites the label with the bare
+        // detected container, which would throw the codec name away again.
+        Some("ogg" | "oga" | "opus") => Some("OGG"),
         Some("mp3") => Some("MP3"),
         Some("aac") => Some("AAC"),
         Some("dsf") => Some("DSF"),
@@ -115,6 +121,10 @@ pub(super) fn format_label(path: &Path, codec: Option<&str>) -> String {
         },
         Some("caf") => "CAF".to_string(),
         Some("ogg" | "oga") => "OGG".to_string(),
+        // An `.opus` file is an Ogg stream too, but unlike a generic `.ogg` it
+        // can only carry Opus — so the label says the codec outright, where
+        // "OGG" would leave the one useful fact to the codec column.
+        Some("opus") => "Opus".to_string(),
         Some("mp3") => "MP3".to_string(),
         Some("aac") => "AAC".to_string(),
         Some(other) => other.to_uppercase(),
@@ -151,6 +161,32 @@ pub(super) fn codec_label(codec: CodecType) -> Option<&'static str> {
         | CODEC_TYPE_PCM_F32BE
         | CODEC_TYPE_PCM_F64LE
         | CODEC_TYPE_PCM_F64BE => "PCM",
+        _ => return None,
+    })
+}
+
+/// Why no decoder exists for `codec`, when the reason is a known gap in
+/// Symphonia rather than an unrecognized stream.
+///
+/// Symphonia probes far more codecs than it can decode: it will happily
+/// identify an Opus track in an Ogg stream and then have nothing to hand it
+/// to, because `symphonia-codec-opus` is a placeholder that isn't even pulled
+/// in by the `all` feature. The raw failure that comes back from
+/// `get_codecs().make()` is a bare "unsupported codec", which reads like a
+/// corrupt file rather than a missing feature. This turns the handful of cases
+/// we know about into something a user can act on.
+///
+/// Returns `None` for anything else, so a genuinely unreadable stream still
+/// reports Symphonia's own error rather than a guess.
+pub(super) fn missing_decoder_reason(codec: CodecType) -> Option<&'static str> {
+    Some(match codec {
+        // Encoding *to* Opus works (that path uses libopus directly), which is
+        // why this one is worth naming: the app can write a format it cannot
+        // read back, and that asymmetry is otherwise baffling.
+        CODEC_TYPE_OPUS => {
+            "Opus decoding is not supported yet — Symphonia has no Opus decoder \
+             (conversion to Opus does work, it uses libopus directly)"
+        }
         _ => return None,
     })
 }
@@ -224,6 +260,10 @@ mod tests {
             ("a.wav", "WAV"),
             ("a.aiff", "AIFF"),
             ("a.ogg", "OGG"),
+            // Same container as `.ogg`, so it must map to the same canonical
+            // name — mapping it to nothing made `flag_container_mismatch`
+            // treat every `.opus` as an unrecognized extension.
+            ("a.opus", "OGG"),
             ("a.mp3", "MP3"),
             ("a.aac", "AAC"),
             ("a.dsf", "DSF"),
@@ -236,6 +276,30 @@ mod tests {
         // Case-insensitive, as file systems are in practice.
         assert_eq!(ext_canonical(Path::new("A.FLAC")), Some("FLAC"));
         assert_eq!(ext_canonical(Path::new("noext")), None);
+    }
+
+    /// `.opus` says the codec, not the container: an Ogg stream under that
+    /// name can hold nothing else, so "OGG" would waste the label on the one
+    /// thing it doesn't need to say.
+    #[test]
+    fn opus_extension_is_labelled_by_its_codec() {
+        assert_eq!(format_label(Path::new("a.opus"), None), "Opus");
+        assert_eq!(format_label(Path::new("a.opus"), Some("Opus")), "Opus");
+        // A generic Ogg keeps the container name — it could be either codec.
+        assert_eq!(format_label(Path::new("a.ogg"), Some("Vorbis")), "OGG");
+    }
+
+    /// Symphonia identifies far more codecs than it decodes. The bare
+    /// "unsupported codec" it returns for Opus reads like a corrupt file, so
+    /// the one gap we know about is named explicitly — and anything else must
+    /// keep falling through to Symphonia's own wording rather than being
+    /// guessed at.
+    #[test]
+    fn known_missing_decoders_explain_themselves() {
+        let opus = missing_decoder_reason(CODEC_TYPE_OPUS).expect("Opus is a known gap");
+        assert!(opus.contains("Opus"), "{opus}");
+        assert!(missing_decoder_reason(CODEC_TYPE_FLAC).is_none());
+        assert!(missing_decoder_reason(CODEC_TYPE_VORBIS).is_none());
     }
 
     #[test]

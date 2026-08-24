@@ -141,6 +141,18 @@ Converting never touches your original files — it only ever writes new ones un
 
 FLAC, WAV, AIFF, ALAC/MP4 (`.m4a`), CAF, OGG/Vorbis, MP3, AAC, and **DSD** (`.dsf` / `.dff`). MP3/AAC are decoded so you can compare them, though they are lossy by definition. DSD container headers are verified natively; DSD _content_ analysis requires ffmpeg (DST-compressed DFF is header-only).
 
+### Opus and APE: waiting on Symphonia
+
+Two formats people reasonably expect are **not analyzable**, and in both cases the blocker is the same one — [Symphonia](https://github.com/pdeljanov/Symphonia), the decoding library this app is built on, cannot decode them. Neither is something FlacCompagnon can fix on its own.
+
+- **Opus** — Symphonia lists the codec at status `-` ("in work or not started yet"), and `symphonia-codec-opus` is a placeholder crate that the `all` feature doesn't even pull in. Symphonia _identifies_ Opus streams happily, so a `.opus` file (or an Opus stream inside a `.ogg`) is accepted, probed, and then fails with an explicit "Opus decoding is not supported yet" rather than a bare "unsupported codec". Note the asymmetry this creates: **conversion _to_ Opus works**, because the encoder path uses libopus directly and never goes through Symphonia. The app can write a format it can't read back.
+- **APE (Monkey's Audio)** — Symphonia has no APE demuxer or decoder at all ([issue #469](https://github.com/pdeljanov/Symphonia/issues/469)). Beware a confusing coincidence of naming: Symphonia _does_ read **APEv1/APEv2 tags**, which is a metadata format that happens to share the name and has nothing to do with the codec. APE is also absent from the conversion targets, and that part is unlikely to change: the only reference encoder is the original C++ SDK, there is no Rust one, and FLAC already does the same lossless job with far better support.
+
+If either becomes worth doing before Symphonia ships its own:
+
+- Opus could go through [`symphonia-adapter-libopus`](https://crates.io/crates/symphonia-adapter-libopus) — version **0.2.7** is the last one built against `symphonia-core` 0.5, which is what this project uses (0.3.0 requires 0.6). Untested caveat: it depends on `opusic-sys` while the encoder already links libopus through `audiopus_sys`, and two `-sys` crates claiming the same native library can refuse to link.
+- APE input could go through [`ape-decoder`](https://crates.io/crates/ape-decoder), pure Rust, no `unsafe`, all compression levels — it would need registering as a third-party decoder rather than dropping into `symphonia::default`.
+
 ---
 
 ## How it works

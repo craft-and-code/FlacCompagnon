@@ -5,10 +5,19 @@ use std::path::{Path, PathBuf};
 use crate::pipeline::analyze_file;
 use crate::types::{AnalysisError, FileAnalysis, FolderReport, ScanOptions};
 
-/// Audio file extensions FlacCompagnon will attempt to analyze.
+/// Audio file extensions FlacCompagnon will attempt to *analyze* — which is
+/// not the same as the ones it can currently decode.
+///
+/// `.opus` is listed even though there is no Opus decoder yet (see
+/// [`crate::decode`]). Leaving it out was worse, not safer: `.ogg` and `.oga`
+/// are here, an Ogg stream can just as well carry Opus, so the same audio was
+/// accepted under one name and silently refused at the drop under another. A
+/// listed file that fails with "Opus decoding is not supported yet" tells the
+/// user what is going on; a file that vanishes on drop tells them the app is
+/// broken. The day a decoder is wired in, this entry needs no change.
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "flac", "wav", "wave", "aif", "aiff", "aifc", "alac", "m4a", "mp4", "caf", "ogg", "oga",
-    "mp3", "aac", "dsf", "dff",
+    "opus", "mp3", "aac", "dsf", "dff",
 ];
 
 /// Folder name used for generated spectrograms. Files inside one are skipped
@@ -98,6 +107,17 @@ mod tests {
         assert!(!is_supported_audio(Path::new("README")));
         // An extension that merely *contains* a supported one is not one.
         assert!(!is_supported_audio(Path::new("track.flacx")));
+    }
+
+    /// The symptom: a `.opus` file dropped on the app vanished without a
+    /// word, while the *same* Opus audio named `.ogg` was accepted (and then
+    /// failed at decode with a real message). Whether a file is worth trying
+    /// must not depend on which of two names its container was given.
+    #[test]
+    fn opus_is_accepted_under_both_its_container_names() {
+        for name in ["track.opus", "track.ogg", "track.oga", "TRACK.OPUS"] {
+            assert!(is_supported_audio(Path::new(name)), "{name}");
+        }
     }
 
     /// Generated spectrograms live next to the audio; a rescan must not pick
