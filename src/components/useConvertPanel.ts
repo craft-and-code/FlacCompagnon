@@ -11,7 +11,7 @@
 import { useCallback, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 
-import type { ConvertFormat, ConvertSettings, Progress } from "../types";
+import type { ConvertFormat, ConvertSettings, ConvertSource, Progress } from "../types";
 import * as api from "../api";
 
 export interface UseConvertPanelArgs {
@@ -23,7 +23,10 @@ export interface UseConvertPanelArgs {
 
 export function useConvertPanel({ onToast, onBeforeStart }: UseConvertPanelArgs) {
   const [panelOpen, setPanelOpen] = useState(false);
-  const [targets, setTargets] = useState<string[]>([]);
+  // Each entry carries the folder its output layout is measured against, set
+  // when it was imported. Selection and the rendered list stay keyed by
+  // `path`, so only `convert()` ever looks at `base`.
+  const [targets, setTargets] = useState<ConvertSource[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [format, setFormat] = useState<ConvertFormat>("flac");
   const [bitrateKbps, setBitrateKbps] = useState<number | null>(null);
@@ -51,7 +54,7 @@ export function useConvertPanel({ onToast, onBeforeStart }: UseConvertPanelArgs)
       // returns nothing on screen has changed — which reads as a drop the app
       // missed. `importing` gives the drop zone something to say meanwhile.
       setImporting(true);
-      let files: string[];
+      let files: ConvertSource[];
       try {
         files = await api.listConvertSources(paths);
       } catch (e) {
@@ -66,7 +69,16 @@ export function useConvertPanel({ onToast, onBeforeStart }: UseConvertPanelArgs)
       }
       setTargets((prev) => {
         const next = [...prev];
-        for (const p of files) if (!next.includes(p)) next.push(p);
+        const known = new Set(prev.map((t) => t.path));
+        // Re-importing the same file keeps the base it first arrived with,
+        // rather than letting a later, differently-rooted drop silently move
+        // where its output lands.
+        for (const f of files) {
+          if (!known.has(f.path)) {
+            known.add(f.path);
+            next.push(f);
+          }
+        }
         return next;
       });
     },
@@ -74,7 +86,7 @@ export function useConvertPanel({ onToast, onBeforeStart }: UseConvertPanelArgs)
   );
 
   const removeTarget = useCallback((path: string) => {
-    setTargets((prev) => prev.filter((p) => p !== path));
+    setTargets((prev) => prev.filter((t) => t.path !== path));
     setSelected((prev) => {
       if (!prev.has(path)) return prev;
       const next = new Set(prev);
@@ -120,7 +132,8 @@ export function useConvertPanel({ onToast, onBeforeStart }: UseConvertPanelArgs)
   /// per the panel's own "one click converts every title" design.
   const convert = useCallback(async () => {
     if (busy || targets.length === 0) return;
-    const effectiveTargets = selected.size > 0 ? [...selected] : targets;
+    const effectiveTargets =
+      selected.size > 0 ? targets.filter((t) => selected.has(t.path)) : targets;
 
     const dir = await open({ directory: true, multiple: false });
     if (typeof dir !== "string") return;
@@ -133,10 +146,17 @@ export function useConvertPanel({ onToast, onBeforeStart }: UseConvertPanelArgs)
     try {
       const settings: ConvertSettings = { format, bitrate_kbps: bitrateKbps };
       const summary = await api.convertFiles(effectiveTargets, dir, settings, copyOthers);
+      // Tag warnings are reported, but never as an error and never folded
+      // into the failed count: those files converted. Worth saying out loud
+      // all the same — a track that arrives without its title or cover looks
+      // like the conversion misbehaved, and silence here would leave the user
+      // to discover it in their player.
+      const tagged = summary.tag_warnings.length;
       onToast(
         `Converted ${summary.converted}/${summary.total}` +
           (summary.copied > 0 ? `, ${summary.copied} file(s) copied` : "") +
           (summary.failed > 0 ? ` — ${summary.failed} failed` : "") +
+          (tagged > 0 ? ` — ${tagged} without tags` : "") +
           ` → ${summary.output_root}`,
         summary.failed > 0 ? "error" : "info",
       );

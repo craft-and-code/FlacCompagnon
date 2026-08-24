@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   AddableTag,
   ConvertSettings,
+  ConvertSource,
   ConvertSummary,
   CoverArt,
   FolderReport,
@@ -148,11 +149,13 @@ export const savePlaylist = (dest: string, entries: PlaylistEntry[], format: Pla
 // Expands dropped folders into the tracks they hold, so the conversion panel
 // lists (and counts) real files rather than whatever was dropped. Same walk
 // and same filtering `convert_files` performs, so the two cannot disagree.
+// Each file comes back with the folder its output layout is measured
+// against, recorded from what was dropped — see `ConvertSource`.
 export const listConvertSources = (targets: string[]) =>
-  invoke<string[]>("list_convert_sources", { targets });
+  invoke<ConvertSource[]>("list_convert_sources", { targets });
 
 export const convertFiles = (
-  targets: string[],
+  targets: ConvertSource[],
   outputRoot: string,
   settings: ConvertSettings,
   copyOthers: boolean,

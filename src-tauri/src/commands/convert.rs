@@ -13,10 +13,10 @@
 //! conversion itself.
 
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use flaccompagnon_core::convert::{self, ConvertSettings};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 
 use super::batch::{cancelled, gather_targets, parallel_map_ordered, reset_cancel, Progress};
@@ -37,6 +37,11 @@ pub struct ConvertSummary {
     /// One message per failed file, `"name: reason"` — the batch keeps going
     /// past a single bad file rather than aborting the rest.
     errors: Vec<String>,
+    /// Files that converted correctly but whose tags could not be carried
+    /// over. Kept apart from `errors` on purpose: these files exist and play,
+    /// so counting them as failures would send the user hunting for output
+    /// that is sitting right there.
+    tag_warnings: Vec<String>,
 }
 
 /// Expand what the conversion panel was handed — any mix of audio files and
@@ -53,16 +58,47 @@ pub struct ConvertSummary {
 /// Recursive, and it applies the same filtering [`convert_files`] would
 /// (extension-based, generated `spectres/` folders skipped), so what the panel
 /// lists and what the batch writes cannot disagree.
+///
+/// Each file is returned with the `base` its output layout will be measured
+/// against — the *parent* of the dropped target, so a dropped folder is
+/// itself recreated at the destination. Recording it here is the whole point:
+/// once the folders are expanded, nothing downstream can tell what was
+/// dropped, and deriving a root from the files instead flattens the very case
+/// this exists for (see `core::convert::layout`).
 #[tauri::command]
-pub async fn list_convert_sources(targets: Vec<String>) -> Result<Vec<String>, String> {
+pub async fn list_convert_sources(targets: Vec<String>) -> Result<Vec<SourceEntry>, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        gather_targets(&targets, true)
-            .iter()
-            .map(|p| p.to_string_lossy().to_string())
-            .collect()
+        let mut out = Vec::new();
+        for target in &targets {
+            let target_path = PathBuf::from(target);
+            // A dropped file mirrors nothing, so its base is its own parent
+            // and it lands directly in the output folder. A dropped folder is
+            // reproduced, so the base is one level up.
+            let base = target_path
+                .parent()
+                .map(Path::to_path_buf)
+                .unwrap_or_else(|| target_path.clone());
+            for path in gather_targets(std::slice::from_ref(target), true) {
+                out.push(SourceEntry {
+                    path: path.to_string_lossy().to_string(),
+                    base: base.to_string_lossy().to_string(),
+                });
+            }
+        }
+        out
     })
     .await
     .map_err(|e| e.to_string())
+}
+
+/// One importable audio file and the folder its output layout is measured
+/// against. Mirrors `ConvertSource` in `src/types.ts`.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct SourceEntry {
+    /// Absolute path of the audio file.
+    pub path: String,
+    /// Folder `path`'s position is expressed relative to.
+    pub base: String,
 }
 
 /// Convert every audio file implied by `targets` (the panel's own imported
@@ -74,7 +110,7 @@ pub async fn list_convert_sources(targets: Vec<String>) -> Result<Vec<String>, S
 #[tauri::command]
 pub async fn convert_files(
     app: AppHandle,
-    targets: Vec<String>,
+    targets: Vec<SourceEntry>,
     output_root: String,
     settings: ConvertSettings,
     copy_others: bool,
@@ -82,14 +118,18 @@ pub async fn convert_files(
     if targets.is_empty() {
         return Err("Nothing to convert.".to_string());
     }
-    let sources = gather_targets(&targets, true);
-    if sources.is_empty() {
-        return Err("No supported audio files found.".to_string());
-    }
+    // Already expanded and filtered by `list_convert_sources`; re-walking here
+    // would also throw away the `base` each file was imported with.
+    let sources: Vec<convert::ConvertSource> = targets
+        .into_iter()
+        .map(|t| convert::ConvertSource {
+            path: PathBuf::from(t.path),
+            base: PathBuf::from(t.base),
+        })
+        .collect();
     let total = sources.len();
-    let input_root = common_root(&sources);
     let output_root_path = PathBuf::from(&output_root);
-    let destinations = convert::plan_batch(&sources, &input_root, &output_root_path, settings.format);
+    let destinations = convert::plan_batch(&sources, &output_root_path, settings.format);
     // Taken before a single file is written, so a cancellation can tell the
     // outputs *this* batch created from ones that were already sitting in the
     // chosen folder (an earlier run, most likely) and must survive it — see
@@ -99,8 +139,11 @@ pub async fn convert_files(
         .filter(|dest| dest.exists())
         .cloned()
         .collect();
-    let pairs: Vec<(PathBuf, PathBuf)> =
-        sources.iter().cloned().zip(destinations.iter().cloned()).collect();
+    let pairs: Vec<(PathBuf, PathBuf)> = sources
+        .iter()
+        .map(|s| s.path.clone())
+        .zip(destinations.iter().cloned())
+        .collect();
 
     reset_cancel();
     let app_bg = app.clone();
@@ -142,13 +185,21 @@ pub async fn convert_files(
         .iter()
         .filter_map(|r| r.as_ref().err().map(ToString::to_string))
         .collect();
+    // A tag warning belongs to a file that *did* convert, so it is collected
+    // from the `Ok` side and never counted in `failed`.
+    let tag_warnings: Vec<String> = outcomes
+        .iter()
+        .filter_map(|r| r.as_ref().ok().and_then(|o| o.tag_warning.clone()))
+        .collect();
     let failed = errors.len();
     let converted = outcomes.len() - failed;
 
     let mut copied = 0usize;
     if copy_others {
-        let exclude: HashSet<PathBuf> = sources.into_iter().collect();
-        match convert::passthrough_files(&input_root, &output_root_path, &exclude) {
+        // No exclusion list to assemble here anymore: `passthrough_files`
+        // takes the sources themselves and derives both what to sweep and
+        // what to skip, so the two cannot drift apart.
+        match convert::passthrough_files(&sources, &output_root_path) {
             Ok(written) => copied = written.len(),
             Err(e) => errors.push(format!("copy: {e}")),
         }
@@ -170,62 +221,6 @@ pub async fn convert_files(
         copied,
         output_root,
         errors,
+        tag_warnings,
     })
-}
-
-/// The common ancestor folder of every source's own parent folder — what
-/// [`convert::plan_batch`] mirrors the sources' relative layout against. Not
-/// [`super::batch::display_root`]: that one only ever looks at the *first*
-/// target, which is enough for a label but not for a folder structure that
-/// has to hold every source at once.
-fn common_root(paths: &[PathBuf]) -> PathBuf {
-    let mut iter = paths.iter();
-    let Some(first) = iter.next() else {
-        return PathBuf::new();
-    };
-    let mut root: Vec<_> = first
-        .parent()
-        .map(|p| p.components().collect())
-        .unwrap_or_default();
-    for p in iter {
-        let comps: Vec<_> = p.parent().map(|p| p.components().collect()).unwrap_or_default();
-        let common_len = root.iter().zip(comps.iter()).take_while(|(a, b)| a == b).count();
-        root.truncate(common_len);
-    }
-    root.into_iter().collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn common_root_is_the_shared_ancestor_of_every_source() {
-        let paths = vec![
-            PathBuf::from("/music/Album/01 track.flac"),
-            PathBuf::from("/music/Album/Disc 2/02 track.flac"),
-        ];
-        assert_eq!(common_root(&paths), PathBuf::from("/music/Album"));
-    }
-
-    #[test]
-    fn common_root_of_a_single_file_is_its_own_folder() {
-        let paths = vec![PathBuf::from("/music/Album/track.flac")];
-        assert_eq!(common_root(&paths), PathBuf::from("/music/Album"));
-    }
-
-    #[test]
-    fn common_root_of_unrelated_folders_is_their_shared_prefix() {
-        let paths = vec![
-            PathBuf::from("/music/Album A/track.flac"),
-            PathBuf::from("/music/Album B/track.flac"),
-        ];
-        assert_eq!(common_root(&paths), PathBuf::from("/music"));
-    }
-
-    #[test]
-    fn common_root_of_nothing_is_empty() {
-        let paths: Vec<PathBuf> = Vec::new();
-        assert_eq!(common_root(&paths), PathBuf::new());
-    }
 }

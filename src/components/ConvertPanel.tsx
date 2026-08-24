@@ -6,7 +6,7 @@
 
 import { X } from "lucide-react";
 
-import type { ConvertFormat } from "../types";
+import type { ConvertFormat, ConvertSource } from "../types";
 import { baseName } from "../format";
 import "./ConvertPanel.css";
 import { ConvertDropzone } from "./ConvertDropzone";
@@ -43,7 +43,9 @@ const FORMAT_NOTES: Record<ConvertFormat, string> = {
 };
 
 export interface ConvertPanelProps {
-  targets: string[];
+  /// Imported files. Only `path` is used here — `base` exists so the batch
+  /// can reproduce each file's folder at the destination (see types.ts).
+  targets: ConvertSource[];
   selected: Set<string>;
   format: ConvertFormat;
   bitrateKbps: number | null;
@@ -198,13 +200,15 @@ export function ConvertPanel({
 
         {targets.length > 0 && (
           <ul className="convert-item-list">
-            {targets.map((path) => (
+            {targets.map(({ path }) => (
               <li
                 key={path}
                 className={selected.has(path) ? "convert-item selected" : "convert-item"}
                 onClick={() => onToggleSelected(path)}
               >
-                <span className="convert-item-name">{baseName(path)}</span>
+                <span className="convert-item-name" title={path}>
+                  {baseName(path)}
+                </span>
                 <IconButton
                   icon={<X size={12} strokeWidth={2} />}
                   title="Remove from the list"

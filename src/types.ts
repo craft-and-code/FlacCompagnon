@@ -254,6 +254,16 @@ export interface ConvertSettings {
   bitrate_kbps: number | null;
 }
 
+// One audio file queued for conversion, and the folder its output layout is
+// measured against — the parent of whatever the user dropped, so a dropped
+// folder is itself recreated at the destination. Carried per file rather than
+// recomputed later: once folders are expanded into files, nothing downstream
+// can tell what was dropped. Mirrors `SourceEntry` in commands/convert.rs.
+export interface ConvertSource {
+  path: string;
+  base: string;
+}
+
 export interface ConvertSummary {
   total: number;
   converted: number;
@@ -265,4 +275,8 @@ export interface ConvertSummary {
   // One "name: reason" message per failed file — a batch keeps going past a
   // single bad file rather than aborting the rest.
   errors: string[];
+  // Files that converted but whose tags could not be carried over. Separate
+  // from `errors` because these files exist and play: reporting them as
+  // failures would send the user looking for output that is already there.
+  tag_warnings: string[];
 }

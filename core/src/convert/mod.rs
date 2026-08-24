@@ -32,34 +32,43 @@
 //! expired (the last, in the US, in 2017) — this app holds no codec license
 //! either way, so both are as free to ship as FLAC.
 //!
+//! ## Metadata
+//!
+//! Every conversion also carries the source's tags onto the result, via
+//! [`crate::tags::copy_tags`] — not as an option, because a copy of the music
+//! with no title and no cover is barely a copy at all. It runs after the
+//! encoder, and its failure is a warning rather than an error: see
+//! [`ConvertOutcome`].
+//!
 //! ## Module layout
 //!
 //! One file per encoder (`flac`, `wav`, `opus`, `mp3`), because each wraps a
-//! different codec crate with essentially nothing in common. What's
-//! shared — deciding *where* converted files go, not *how* they're encoded —
-//! lives here: [`convert_file`] dispatches to the right encoder for one file,
-//! [`plan_batch`] works out every destination path up front (mirroring the
-//! source folder structure under a new root), and [`passthrough_files`]
-//! copies everything else in that source folder verbatim. Two neighbours sit
-//! beside them for reasons of their own: `pcm` (sample reshaping shared by
-//! the encoders) and `cleanup` (removing what a cancelled batch already
-//! wrote).
+//! different codec crate with essentially nothing in common. What's left here
+//! is the dispatch: [`convert_file`] picks the encoder for one file, decodes
+//! it once, and copies its tags across.
+//!
+//! Three neighbours sit beside them, each for a reason of its own:
+//! `layout` (where output files land — [`plan_batch`], [`passthrough_files`]
+//! and [`ConvertSource`] are re-exported from it), `pcm` (sample reshaping
+//! shared by the encoders) and `cleanup` (removing what a cancelled batch
+//! already wrote).
 
 mod cleanup;
 mod flac;
+mod layout;
 mod mp3;
 mod opus;
 mod pcm;
 mod wav;
 
-use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 use crate::decode;
 
 pub use cleanup::undo_batch;
+pub use layout::{passthrough_files, plan_batch, ConvertSource};
 pub(crate) use pcm::{f32_to_ints, resample_linear};
 
 /// A conversion target format.
@@ -136,6 +145,19 @@ pub enum ConvertError {
     Cancelled(String),
 }
 
+/// What a successful [`convert_file`] produced.
+///
+/// Exists for one reason: "the audio converted, its tags did not" is a real
+/// third outcome, and neither `Ok(())` nor `Err` can say it. Folding it into
+/// the error would mark a perfectly good file as failed; dropping it would
+/// let a file lose its title and cover in silence.
+#[derive(Debug, Clone, Default)]
+pub struct ConvertOutcome {
+    /// `Some` when the file was written but its tags could not be copied
+    /// across, carrying the reason. Not an error: the audio is intact.
+    pub tag_warning: Option<String>,
+}
+
 /// Convert `src` to `dest` per `settings`. `dest`'s parent folder is created
 /// if it doesn't exist yet (see [`plan_batch`], which is what typically
 /// produces `dest` in the first place).
@@ -148,12 +170,16 @@ pub enum ConvertError {
 /// several seconds of a UI that looks hung; the encode itself is one opaque
 /// call into a codec crate and stays uninterruptible, so the decode half is
 /// what there is to give back.
+///
+/// Returns a [`ConvertOutcome`] rather than `()` because copying the source's
+/// tags onto the result can fail on its own, without the conversion having
+/// failed — see that type.
 pub fn convert_file(
     src: &Path,
     dest: &Path,
     settings: &ConvertSettings,
     is_cancelled: &dyn Fn() -> bool,
-) -> Result<(), ConvertError> {
+) -> Result<ConvertOutcome, ConvertError> {
     let name = || src.display().to_string();
 
     if matches!(lower_ext(src).as_deref(), Some("dsf" | "dff")) {
@@ -184,7 +210,16 @@ pub fn convert_file(
         ConvertFormat::Mp3 => {
             mp3::encode(&pcm, dest, settings.bitrate_kbps.unwrap_or(DEFAULT_MP3_KBPS))
         }
-    }
+    }?;
+
+    // Deliberately not `?`. By this point the audio is written and correct;
+    // failing the whole file over its metadata would throw away a good
+    // conversion and, worse, make the batch report it as failed — sending the
+    // user looking for a file that is actually sitting there, complete. The
+    // problem is still surfaced, just as what it is: a warning about one
+    // file's tags, not a failed conversion.
+    let tag_warning = crate::tags::copy_tags(src, dest).err().map(|e| e.to_string());
+    Ok(ConvertOutcome { tag_warning })
 }
 
 /// The bit depth to encode FLAC output at: the source's own declared depth
@@ -214,119 +249,12 @@ fn ensure_parent_dir(dest: &Path) -> Result<(), ConvertError> {
     Ok(())
 }
 
-/// Work out one destination path per source in `sources`, mirroring each
-/// one's position relative to `input_root` under `output_root` instead —
-/// same folder, same subfolders, only the root and the extension change.
-///
-/// A source that (unexpectedly) doesn't live under `input_root` falls back
-/// to just its own file name directly under `output_root`, rather than
-/// failing the whole batch over one path oddity — the common root is
-/// computed from the same file list on the frontend (`commonDir`), so this
-/// should not normally happen, but a destination that's merely flatter than
-/// intended is a far smaller problem than a batch that refuses to run.
-pub fn plan_batch(
-    sources: &[PathBuf],
-    input_root: &Path,
-    output_root: &Path,
-    format: ConvertFormat,
-) -> Vec<PathBuf> {
-    sources
-        .iter()
-        .map(|src| {
-            let rel: &Path = src.strip_prefix(input_root).unwrap_or_else(|_| {
-                src.file_name().map(Path::new).unwrap_or(src.as_path())
-            });
-            output_root.join(rel).with_extension(format.extension())
-        })
-        .collect()
-}
 
-/// Copy every file under `input_root` that isn't in `exclude` (the tracks
-/// just converted) to the same relative position under `output_root` —
-/// covers, `.m3u` playlists, generated spectrograms, anything else that
-/// shares the folder, verbatim. "Tout ou rien": there is no per-file choice,
-/// by design (see the module's callers) — a file the caller wants left out
-/// belongs in `exclude`, not a filter this function grows.
-pub fn passthrough_files(
-    input_root: &Path,
-    output_root: &Path,
-    exclude: &HashSet<PathBuf>,
-) -> std::io::Result<Vec<PathBuf>> {
-    let mut written = Vec::new();
-    for entry in walkdir::WalkDir::new(input_root)
-        .into_iter()
-        .filter_map(Result::ok)
-    {
-        let path = entry.into_path();
-        if !path.is_file() || exclude.contains(&path) {
-            continue;
-        }
-        let Ok(rel) = path.strip_prefix(input_root) else {
-            continue;
-        };
-        let dest = output_root.join(rel);
-        if let Some(parent) = dest.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        std::fs::copy(&path, &dest)?;
-        written.push(dest);
-    }
-    Ok(written)
-}
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn plan_batch_mirrors_the_source_structure_under_the_new_root() {
-        let input_root = Path::new("/music/Album");
-        let output_root = Path::new("/export/Album (FLAC)");
-        let sources = vec![
-            PathBuf::from("/music/Album/01 track.mp3"),
-            PathBuf::from("/music/Album/Disc 2/02 track.mp3"),
-        ];
-        let got = plan_batch(&sources, input_root, output_root, ConvertFormat::Flac);
-        assert_eq!(
-            got,
-            vec![
-                PathBuf::from("/export/Album (FLAC)/01 track.flac"),
-                PathBuf::from("/export/Album (FLAC)/Disc 2/02 track.flac"),
-            ]
-        );
-    }
-
-    /// A source outside `input_root` (shouldn't normally happen — see the
-    /// doc comment) still gets a destination, just a flatter one, rather
-    /// than panicking or silently dropping the file from the batch.
-    #[test]
-    fn plan_batch_falls_back_to_the_file_name_for_a_path_outside_the_root() {
-        let input_root = Path::new("/music/Album");
-        let output_root = Path::new("/export");
-        let sources = vec![PathBuf::from("/elsewhere/loose.wav")];
-        let got = plan_batch(&sources, input_root, output_root, ConvertFormat::Wav);
-        assert_eq!(got, vec![PathBuf::from("/export/loose.wav")]);
-    }
-
-    #[test]
-    fn passthrough_copies_everything_except_the_excluded_paths() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let input_root = dir.path().join("in");
-        let output_root = dir.path().join("out");
-        std::fs::create_dir_all(input_root.join("Disc 1")).expect("mkdir");
-        std::fs::write(input_root.join("track.mp3"), b"audio").expect("write");
-        std::fs::write(input_root.join("cover.jpg"), b"jpeg").expect("write");
-        std::fs::write(input_root.join("Disc 1/playlist.m3u"), b"m3u").expect("write");
-
-        let mut exclude = HashSet::new();
-        exclude.insert(input_root.join("track.mp3"));
-
-        let written = passthrough_files(&input_root, &output_root, &exclude).expect("copy");
-        assert_eq!(written.len(), 2, "{written:?}");
-        assert!(output_root.join("cover.jpg").exists());
-        assert!(output_root.join("Disc 1/playlist.m3u").exists());
-        assert!(!output_root.join("track.mp3").exists());
-    }
 
     /// Cancellation is checked before the first packet is decoded, so an
     /// already-cancelled batch never reads or writes anything at all — and

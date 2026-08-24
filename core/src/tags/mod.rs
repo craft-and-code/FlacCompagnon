@@ -339,6 +339,71 @@ pub fn write_tags(path: &Path, edits: &TagEdits) -> Result<(), TagError> {
         .map_err(|e| TagError::Write(path.display().to_string(), e.to_string()))
 }
 
+/// Copy every tag `src` carries onto `dest`, for [`crate::convert`].
+///
+/// A converted file is a copy of the music, and a copy with no title or cover
+/// is barely usable — so this runs for all four output formats, not as an
+/// option. It is a *copy*, not a merge: `dest` is freshly written by an
+/// encoder and has no tags of its own worth preserving.
+///
+/// ## What survives, and what cannot
+///
+/// The named fields and the cover art round-trip on every format lofty
+/// supports (Vorbis comments for FLAC and Opus, ID3v2 for MP3 and WAV), so
+/// they always make it across. [`TagSet::extra`] is best-effort by nature:
+/// those keys are *format-specific* names, and one container's key often has
+/// no equivalent in another — a Vorbis-only comment has nowhere to go in an
+/// MP3's ID3v2 frames. [`write_tags`] already drops such a key silently
+/// rather than failing, which is the behaviour wanted here too: losing an
+/// obscure tag is not a reason to refuse a conversion the user asked for.
+///
+/// [`TagSet::encoder`] is deliberately *not* copied. It records which tool
+/// produced the file, and the converted file was produced by this one —
+/// carrying the source's value over would make the copy claim a history that
+/// isn't its own, and this app's own analysis reads that field to reason
+/// about a file's provenance.
+pub fn copy_tags(src: &Path, dest: &Path) -> Result<(), TagError> {
+    let tags = read_tags(src)?;
+
+    // `Set` for a value that is there, `Unset` for one that is not: `Clear`
+    // would be wrong even though `dest` starts bare, since it would mean
+    // "remove", and there is nothing to remove.
+    let set = |v: Option<String>| v.map(FieldEdit::Set).unwrap_or_default();
+
+    let edits = TagEdits {
+        title: set(tags.title),
+        artist: set(tags.artist),
+        album: set(tags.album),
+        album_artist: set(tags.album_artist),
+        composer: set(tags.composer),
+        year: set(tags.year),
+        track: set(tags.track),
+        track_total: set(tags.track_total),
+        disc: set(tags.disc),
+        disc_total: set(tags.disc_total),
+        genre: set(tags.genre),
+        comment: set(tags.comment),
+        // Only carried when true: writing `0` onto every non-compilation file
+        // would add a tag the source never had.
+        compilation: tags.compilation.then_some(true),
+        cover: match tags.cover {
+            Some(c) => CoverEdit::Set {
+                mime: c.mime,
+                data_base64: c.data_base64,
+                picture_type: c.picture_type,
+            },
+            None => CoverEdit::Unset,
+        },
+        extra: tags
+            .extra
+            .into_iter()
+            .map(|(k, v)| (k, FieldEdit::Set(v)))
+            .collect(),
+    };
+
+    write_tags(dest, &edits)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
