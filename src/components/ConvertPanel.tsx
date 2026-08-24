@@ -22,16 +22,24 @@ const FORMAT_LABELS: Record<ConvertFormat, string> = {
   wav: "WAV (16-bit PCM)",
 };
 
-/// Shown in place of the bitrate select for the two formats that don't have
-/// one — otherwise the settings block just goes quiet on FLAC/WAV with no
-/// indication that's expected rather than a missing control. WAV's note
-/// spells out the fixed 16-bit depth specifically (not just "uncompressed")
-/// since that's the one that actually explains its file size relative to a
-/// FLAC of the same source — see convert::wav's own doc comment for why it's
-/// fixed rather than following the source's bit depth the way FLAC does.
-const FORMAT_NOTES: Partial<Record<ConvertFormat, string>> = {
-  flac: "Lossless — no bitrate to choose.",
-  wav: "Fixed at 16-bit PCM, regardless of the source's own bit depth — no bitrate to choose.",
+/// One note per format, shown under the picker — always, not on hover.
+///
+/// Choosing the format is the only decision in this panel with lasting
+/// consequences: it decides whether the copy can ever be turned back into the
+/// original. That is exactly the sort of thing a tooltip hides from anyone who
+/// doesn't already know to look for it, so it stays on screen.
+///
+/// Each note answers the same two questions in the same order — *what does
+/// this cost me* and *when would I pick it* — so the four can be compared by
+/// reading the same position in each, rather than four differently-shaped
+/// paragraphs. The FLAC and WAV ones also carry what used to be their only
+/// note ("no bitrate to choose"), since the bitrate select disappears for
+/// them and its absence otherwise looks like a missing control.
+const FORMAT_NOTES: Record<ConvertFormat, string> = {
+  flac: "Keeps every bit of the original, at approximately half its size. No bitrate to choose — the size follows the music. Pick it to archive, or whenever the copy may itself become a source.",
+  opus: "Discards what you are unlikely to hear, for roughly a fifth of the size. The best quality per megabyte of the four, but younger, so some older players and car stereos don't read it. Pick it for a phone or a music player that supports it.",
+  mp3: "Also discards detail, and less efficiently than Opus at the same bitrate — its advantage is that everything made in the last twenty-five years can play it. Pick it when compatibility matters more than size.",
+  wav: "No compression at all: the largest files of the four, fixed at 16-bit whatever the source's own depth. Pick it only for a tool that refuses everything else — for keeping the audio intact, FLAC does the same job far smaller.",
 };
 
 export interface ConvertPanelProps {
@@ -173,7 +181,9 @@ export function ConvertPanel({
             </label>
           )}
 
-          {FORMAT_NOTES[format] && <p className="convert-field-note">{FORMAT_NOTES[format]}</p>}
+          {/* Unconditional: every format has a note now, so the guard that
+              used to be here would always pass and only suggest otherwise. */}
+          <p className="convert-field-note">{FORMAT_NOTES[format]}</p>
 
           <label className="convert-checkbox" title="Covers, playlists, spectrograms, and any other non-audio file">
             <input
