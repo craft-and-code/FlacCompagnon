@@ -107,8 +107,38 @@ pub const DEFAULT_OPUS_KBPS: u32 = 160;
 /// Default MP3 bitrate — LAME's own commonly-recommended "high quality" rate.
 pub const DEFAULT_MP3_KBPS: u32 = 256;
 
-/// What to convert to, and how. `bitrate_kbps` only matters for the two lossy
-/// formats; it is ignored for FLAC and WAV, which have no such setting.
+/// How hard the FLAC encoder should work.
+///
+/// Deliberately *not* libFLAC's `-0`..`-8`. Those are presets defined over
+/// libFLAC's own implementation, and this app encodes with `flacenc`, whose
+/// knobs are its own — labelling a setting "-5" would claim a byte-for-byte
+/// equivalence the output does not have. What the user actually chooses is
+/// the trade they care about, so that is what the scale says.
+///
+/// Every level is lossless. The only thing that varies is how long the
+/// encoder spends looking for a smaller representation of the same audio.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FlacEffort {
+    /// Shortest predictor search, no mid-side stereo. Noticeably quicker on a
+    /// large batch, files a few percent larger.
+    Fast,
+    /// `flacenc`'s own defaults — the sensible middle, and the default here.
+    #[default]
+    Balanced,
+    /// Longer predictor search and mid-side stereo. Slower, smallest files;
+    /// the returns are small enough that this is worth it for archiving
+    /// rather than for a batch you are waiting on.
+    Maximum,
+}
+
+/// What to convert to, and how.
+///
+/// Some fields only apply to some formats — `bitrate_kbps` to the two lossy
+/// ones, `flac_effort` to FLAC — and are simply ignored elsewhere rather than
+/// modelled per format: one flat struct crosses the Tauri boundary as one
+/// JSON object, and the panel already only shows each control where it means
+/// something.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConvertSettings {
     /// The output format.
@@ -116,6 +146,20 @@ pub struct ConvertSettings {
     /// Target bitrate in kbps, for [`ConvertFormat::Opus`]/[`ConvertFormat::Mp3`].
     /// `None` falls back to [`DEFAULT_OPUS_KBPS`]/[`DEFAULT_MP3_KBPS`].
     pub bitrate_kbps: Option<u32>,
+    /// How hard to work when the target is FLAC. Ignored for other formats.
+    #[serde(default)]
+    pub flac_effort: FlacEffort,
+    /// Give the converted file the source's last-modified date instead of
+    /// "now".
+    ///
+    /// Applies to *every* format, which is why it lives here rather than
+    /// among the FLAC settings where it was first asked for: it is a property
+    /// of the file that gets written, not of the codec that wrote it. Worth
+    /// having because a converted library otherwise arrives with every track
+    /// stamped the same second, destroying any "sort by date added" ordering
+    /// the original had.
+    #[serde(default)]
+    pub preserve_modtime: bool,
 }
 
 /// Errors that can occur while converting one file. Every variant carries the
@@ -202,7 +246,7 @@ pub fn convert_file(
     ensure_parent_dir(dest)?;
 
     match settings.format {
-        ConvertFormat::Flac => flac::encode(&pcm, dest, source_bit_depth(src)),
+        ConvertFormat::Flac => flac::encode(&pcm, dest, source_bit_depth(src), settings.flac_effort),
         ConvertFormat::Wav => wav::encode(&pcm, dest),
         ConvertFormat::Opus => {
             opus::encode(&pcm, dest, settings.bitrate_kbps.unwrap_or(DEFAULT_OPUS_KBPS))
@@ -219,6 +263,12 @@ pub fn convert_file(
     // problem is still surfaced, just as what it is: a warning about one
     // file's tags, not a failed conversion.
     let tag_warning = crate::tags::copy_tags(src, dest).err().map(|e| e.to_string());
+
+    // After the tags, never before: writing them rewrites the file and would
+    // stamp it "now" again, silently undoing this.
+    if settings.preserve_modtime {
+        copy_modtime(src, dest)?;
+    }
     Ok(ConvertOutcome { tag_warning })
 }
 
@@ -239,6 +289,20 @@ fn lower_ext(path: &Path) -> Option<String> {
     path.extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_ascii_lowercase())
+}
+
+/// Give `dest` the same last-modified time as `src`.
+///
+/// Only the modification time, not the creation time: the converted file was
+/// genuinely created now, and claiming otherwise would be a lie a backup tool
+/// might act on. What the user wants preserved is the ordering — when the
+/// music was added — and that is what mtime carries.
+fn copy_modtime(src: &Path, dest: &Path) -> Result<(), ConvertError> {
+    let io_err = |e: std::io::Error| ConvertError::Io(dest.display().to_string(), e.to_string());
+    let modified = std::fs::metadata(src).and_then(|m| m.modified()).map_err(io_err)?;
+    std::fs::File::open(dest)
+        .and_then(|f| f.set_modified(modified))
+        .map_err(io_err)
 }
 
 fn ensure_parent_dir(dest: &Path) -> Result<(), ConvertError> {
@@ -271,6 +335,8 @@ mod tests {
         let settings = ConvertSettings {
             format: ConvertFormat::Flac,
             bitrate_kbps: None,
+            flac_effort: FlacEffort::default(),
+            preserve_modtime: false,
         };
         let err = convert_file(&src, &dest, &settings, &|| true).expect_err("cancelled");
         assert!(matches!(err, ConvertError::Cancelled(_)), "{err:?}");
@@ -290,6 +356,8 @@ mod tests {
         let settings = ConvertSettings {
             format: ConvertFormat::Flac,
             bitrate_kbps: None,
+            flac_effort: FlacEffort::default(),
+            preserve_modtime: false,
         };
         let err = convert_file(&src, &dest, &settings, &|| false).expect_err("unsupported");
         assert!(matches!(err, ConvertError::Unsupported(_, _)), "{err:?}");

@@ -7,14 +7,19 @@ use std::path::Path;
 use flacenc::component::BitRepr;
 use flacenc::error::Verify;
 
-use super::{f32_to_ints, ConvertError};
+use super::{f32_to_ints, ConvertError, FlacEffort};
 use crate::decode::PcmAudio;
 
 /// Encode `pcm` as FLAC to `dest`, at `bit_depth` bits per sample (16 or 24
 /// in practice — see [`super::source_bit_depth`]). `dest`'s parent folder is
 /// assumed to already exist ([`super::convert_file`] creates it once for
 /// whichever encoder ends up handling the file).
-pub(super) fn encode(pcm: &PcmAudio, dest: &Path, bit_depth: u32) -> Result<(), ConvertError> {
+pub(super) fn encode(
+    pcm: &PcmAudio,
+    dest: &Path,
+    bit_depth: u32,
+    effort: FlacEffort,
+) -> Result<(), ConvertError> {
     let name = || dest.display().to_string();
     let samples = f32_to_ints(&pcm.samples, bit_depth);
 
@@ -32,6 +37,31 @@ pub(super) fn encode(pcm: &PcmAudio, dest: &Path, bit_depth: u32) -> Result<(), 
     // — the field is set on an already-constructed instance instead.
     let mut config = flacenc::config::Encoder::default();
     config.multithread = false;
+
+    // `FlacEffort` in this app's own terms, translated into the two knobs
+    // that actually move the needle in `flacenc`: how far the linear
+    // predictor search goes, and whether mid-side stereo is tried. Both are
+    // pure search effort — every level produces a bit-identical decode, only
+    // the time spent and the resulting size differ.
+    //
+    // The default is left untouched for `Balanced` on purpose: `flacenc`'s
+    // own defaults are the reference point, and re-stating them here would
+    // silently freeze today's values if upstream ever tunes them.
+    match effort {
+        FlacEffort::Fast => {
+            config.subframe_coding.qlpc.lpc_order = 4;
+            config.stereo_coding.use_midside = false;
+        }
+        FlacEffort::Balanced => {}
+        FlacEffort::Maximum => {
+            // 24 rather than FLAC's maximum of 32: past roughly this point
+            // the extra orders buy fractions of a percent for a search cost
+            // that keeps climbing.
+            config.subframe_coding.qlpc.lpc_order = 24;
+            config.stereo_coding.use_midside = true;
+        }
+    }
+
     let config = config
         .into_verified()
         .map_err(|e| ConvertError::Encode(name(), format!("invalid encoder config: {e:?}")))?;
@@ -86,7 +116,7 @@ mod tests {
         };
         let dir = tempfile::tempdir().expect("tempdir");
         let dest = dir.path().join("tone.flac");
-        encode(&pcm, &dest, bits).expect("encode");
+        encode(&pcm, &dest, bits, FlacEffort::Balanced).expect("encode");
 
         let mut reader = claxon::FlacReader::open(&dest).expect("reopen");
         let decoded: Vec<i32> = reader

@@ -246,12 +246,25 @@ export type PlaylistFormat = "Simple" | "Extended";
 // "lowercase")]` on a unit-only enum serializes as a plain string).
 export type ConvertFormat = "flac" | "opus" | "mp3" | "wav";
 
+// How hard the FLAC encoder should search for a smaller representation.
+// Deliberately not libFLAC's -0..-8: this app encodes with `flacenc`, whose
+// knobs are its own, so those labels would promise an equivalence the output
+// does not have. Every level is lossless — only the time spent and the
+// resulting size change. Mirrors Rust's `core::convert::FlacEffort`.
+export type FlacEffort = "fast" | "balanced" | "maximum";
+
 export interface ConvertSettings {
   format: ConvertFormat;
   // kbps, only meaningful for "opus"/"mp3" — ignored (and may be omitted) for
   // "flac"/"wav". `null`/omitted falls back to the backend's own default for
   // whichever lossy format is picked.
   bitrate_kbps: number | null;
+  // How hard to search when the target is FLAC. Ignored for other formats.
+  flac_effort: FlacEffort;
+  // Stamp the converted file with the source's last-modified date. Applies to
+  // every format — it describes the file written, not the codec that wrote
+  // it — which is why it sits beside "copy other files" and not under FLAC.
+  preserve_modtime: boolean;
 }
 
 // One audio file queued for conversion, and the folder its output layout is

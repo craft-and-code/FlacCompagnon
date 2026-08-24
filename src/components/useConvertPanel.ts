@@ -11,7 +11,13 @@
 import { useCallback, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 
-import type { ConvertFormat, ConvertSettings, ConvertSource, Progress } from "../types";
+import type {
+  ConvertFormat,
+  ConvertSettings,
+  ConvertSource,
+  FlacEffort,
+  Progress,
+} from "../types";
 import * as api from "../api";
 
 export interface UseConvertPanelArgs {
@@ -30,6 +36,11 @@ export function useConvertPanel({ onToast, onBeforeStart }: UseConvertPanelArgs)
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [format, setFormat] = useState<ConvertFormat>("flac");
   const [bitrateKbps, setBitrateKbps] = useState<number | null>(null);
+  // Kept even while another format is picked, so switching away from FLAC and
+  // back doesn't silently reset a choice the user made on purpose — same
+  // reason `bitrateKbps` survives a switch to a lossless format.
+  const [flacEffort, setFlacEffort] = useState<FlacEffort>("balanced");
+  const [preserveModtime, setPreserveModtime] = useState(false);
   const [copyOthers, setCopyOthers] = useState(false);
   const [importing, setImporting] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -144,7 +155,12 @@ export function useConvertPanel({ onToast, onBeforeStart }: UseConvertPanelArgs)
     setProgressLabel("Converting…");
     setProgressPercent(0);
     try {
-      const settings: ConvertSettings = { format, bitrate_kbps: bitrateKbps };
+      const settings: ConvertSettings = {
+        format,
+        bitrate_kbps: bitrateKbps,
+        flac_effort: flacEffort,
+        preserve_modtime: preserveModtime,
+      };
       const summary = await api.convertFiles(effectiveTargets, dir, settings, copyOthers);
       // Tag warnings are reported, but never as an error and never folded
       // into the failed count: those files converted. Worth saying out loud
@@ -170,7 +186,18 @@ export function useConvertPanel({ onToast, onBeforeStart }: UseConvertPanelArgs)
       setBusy(false);
       setCancelling(false);
     }
-  }, [busy, targets, selected, format, bitrateKbps, copyOthers, onBeforeStart, onToast]);
+  }, [
+    busy,
+    targets,
+    selected,
+    format,
+    bitrateKbps,
+    flacEffort,
+    preserveModtime,
+    copyOthers,
+    onBeforeStart,
+    onToast,
+  ]);
 
   return {
     open: panelOpen,
@@ -180,6 +207,8 @@ export function useConvertPanel({ onToast, onBeforeStart }: UseConvertPanelArgs)
     selected,
     format,
     bitrateKbps,
+    flacEffort,
+    preserveModtime,
     copyOthers,
     importing,
     busy,
@@ -188,6 +217,8 @@ export function useConvertPanel({ onToast, onBeforeStart }: UseConvertPanelArgs)
     progressPercent,
     setFormat,
     setBitrateKbps,
+    setFlacEffort,
+    setPreserveModtime,
     setCopyOthers,
     addTargets,
     removeTarget,

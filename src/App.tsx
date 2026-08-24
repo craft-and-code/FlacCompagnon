@@ -605,6 +605,8 @@ export function App() {
             selected={convert.selected}
             format={convert.format}
             bitrateKbps={convert.bitrateKbps}
+            flacEffort={convert.flacEffort}
+            preserveModtime={convert.preserveModtime}
             copyOthers={convert.copyOthers}
             importing={convert.importing}
             busy={convert.busy}
@@ -615,6 +617,8 @@ export function App() {
             onClose={convert.closePanel}
             onSetFormat={convert.setFormat}
             onSetBitrateKbps={convert.setBitrateKbps}
+            onSetFlacEffort={convert.setFlacEffort}
+            onSetPreserveModtime={convert.setPreserveModtime}
             onSetCopyOthers={convert.setCopyOthers}
             onRemoveTarget={convert.removeTarget}
             onClearTargets={convert.clearTargets}

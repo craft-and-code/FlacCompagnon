@@ -1,0 +1,70 @@
+/* The settings form under the drop zone. Classes stay named `convert-*`
+   rather than `convert-settings-*`: they were already in the markup before
+   this component existed, they are only ever matched by it, and renaming them
+   would churn every rule for no gain. */
+
+.convert-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.convert-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+/* Box model copied field-for-field from `.tag-field input[type="text"]`
+   (TagField.css) — same font size, padding, border and radius — so a select
+   here and a text input in the tag panel come out the same height. They sit
+   in mirrored panels either side of the results table, where a couple of
+   pixels of difference reads as one of them being misaligned. A native
+   select adds its own chevron inside that box, which is why the right
+   padding is larger than the left. */
+.convert-field select {
+  width: 100%;
+  font-size: 12.5px;
+  font-family: inherit;
+  color: var(--text);
+  padding: 6px 24px 6px 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-elev2);
+}
+.convert-field select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.convert-field select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+/* What the selected format costs, and when to pick it — see FORMAT_NOTES in
+   ConvertPanel.tsx for why this is on screen rather than in a tooltip.
+   Three or four lines of prose in a 272px panel, so unlike the one-liner it
+   replaced it needs real line spacing to stay readable at this size, and a
+   rule down the left to bind it visually to the picker above rather than
+   float as a loose paragraph between two controls. */
+.convert-field-note {
+  margin: 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--border);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+  /* Long words (format names, "twenty-five") must not push the panel wider:
+     it is a fixed 272px and the results table is what would give up the room. */
+  overflow-wrap: break-word;
+}
+.convert-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.convert-checkbox input {
+  margin-top: 2px;
+}
