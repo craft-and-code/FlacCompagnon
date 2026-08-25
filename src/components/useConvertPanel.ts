@@ -48,8 +48,15 @@ export function useConvertPanel({ onToast, onBeforeStart }: UseConvertPanelArgs)
   const [progressPercent, setProgressPercent] = useState(0);
   const [cancelling, setCancelling] = useState(false);
 
-  const openPanel = useCallback(() => setPanelOpen(true), []);
+  /// The panel's own × — always "close", never "toggle". Kept separate from
+  /// `togglePanel` on purpose: a close button that reopens what it just shut
+  /// would be absurd, however tempting the code reuse.
   const closePanel = useCallback(() => setPanelOpen(false), []);
+  /// The toolbar button opens *and* closes. A control that only ever opens
+  /// leaves the user hunting for the × to undo a click they may have made by
+  /// accident — and the button stays lit while the panel is up, which reads
+  /// as something that should turn it back off.
+  const togglePanel = useCallback(() => setPanelOpen((v) => !v), []);
 
   /// Imports `paths` — audio files, folders, or a mix — into the panel's list.
   ///
@@ -201,8 +208,8 @@ export function useConvertPanel({ onToast, onBeforeStart }: UseConvertPanelArgs)
 
   return {
     open: panelOpen,
-    openPanel,
     closePanel,
+    togglePanel,
     targets,
     selected,
     format,

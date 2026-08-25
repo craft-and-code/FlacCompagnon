@@ -512,7 +512,7 @@ export function App() {
         onExportPlaylist={() => setPlaylistModalOpen(true)}
         onGenerateSpectrograms={() => void analysis.generateSpectrograms()}
         onReset={menuActions.reset}
-        onOpenConvert={convert.openPanel}
+        onOpenConvert={convert.togglePanel}
       />
 
       <div className="main-row">
