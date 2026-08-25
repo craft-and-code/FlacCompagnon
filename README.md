@@ -11,6 +11,11 @@
 
 **A cross-platform desktop tool that checks whether your "lossless" audio is actually lossless.**
 
+> **Note about the Detection column**:
+> For the time being, please do not rely on the values shown in the **Detection** column. These results are not yet considered reliable. The rest of the analysis has been verified and can be trusted, but the detection logic still requires further work.
+> I am currently in discussion with a member of the **Lossless Audio Checker** team regarding access to part of the original algorithm, which may eventually be released as open source. My goal is to reproduce the original detection logic as faithfully as possible in Rust.
+> Until significant progress has been made on this part of the project, you may want to hide the **Detection** column.
+
 > **About this project.** FlacCompagnon was built with an AI assistant, as an experiment: how far can AI-assisted development go on a real, non-trivial piece of software — signal processing, a native desktop app, tests, CI, documentation? It also serves as a working case study on how to use AI effectively: every detection algorithm was validated against independently computed ground truth (reference encoders, real files, bit-exact replicas) before being trusted, and the limitations that remain are documented rather than hidden. The AAC transcoding detection notably implements the re-quantization method described in the peer-reviewed study _"Lossless Audio Checker: A Software for the Detection of Upscaling, Upsampling, and Transcoding in Lossless Musical Tracks"_ by Julien Lacroix, Yann Prime, Alexandre Remy and Olivier Derrien (AES 139th Convention, Paper 9416, 2015).
 
 FlacCompagnon is a from-scratch, open-source successor to the discontinued _Lossless Audio Checker_. Drop a folder **or a single audio file** onto the window and it runs the same three independent detections as the original — **Upscaling**, **Upsampling**, and **Transcoding** (including the **AAC re-quantization** test, which catches AAC sources at every bitrate) — verifies **FLAC MD5** signatures, flags **fake stereo** files, detects **clipping**, and can render a **spectrogram** for each track.
