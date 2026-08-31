@@ -55,10 +55,9 @@
   color: #fff;
   pointer-events: none;
 }
-.tag-cover-overlay svg {
-  width: 32px;
-  height: 32px;
-}
+/* No icon sizing here any more: what the overlay shows is a `DropHint`,
+   which sizes its own icon so the two drop targets cannot disagree about it.
+   A rule here would silently win over that and reintroduce the mismatch. */
 .tag-cover-nav {
   position: absolute;
   top: 50%;

@@ -9,10 +9,9 @@
 // side by side.
 import { ArrowDownToLine, FileAudio } from "lucide-react";
 
+import { DropHint } from "./DropHint";
 import { dropZone } from "./dropZones";
 import "./ConvertDropzone.css";
-
-const PLACEHOLDER_ICON_SIZE = 32;
 
 export interface ConvertDropzoneProps {
   /// A file is being dragged over this box specifically (not just the
@@ -54,22 +53,21 @@ export function ConvertDropzone({
           <p className="convert-drop-text">{progressLabel}</p>
         </>
       ) : (
-        <>
-          {/* Same icon swap as the main dropzone: at rest it names what the
-              box takes, under a drag it says "release here". */}
-          {dragOver ? (
-            <ArrowDownToLine size={PLACEHOLDER_ICON_SIZE} strokeWidth={1.4} />
-          ) : (
-            <FileAudio size={PLACEHOLDER_ICON_SIZE} strokeWidth={1.4} />
-          )}
-          <p className="convert-drop-text">
-            {dragOver
+        /* Same icon swap as the main dropzone: at rest it names what the box
+           takes, under a drag it says "release here". Rendered through the
+           shared `DropHint` so the cover box on the other side of the table
+           stays identical in size, colour and spacing. */
+        <DropHint
+          icon={dragOver ? ArrowDownToLine : FileAudio}
+          tone={dragOver ? "over" : "rest"}
+          label={
+            dragOver
               ? "Release to import"
               : itemCount === 0
                 ? "Drop audio files or folders to convert"
-                : `${itemCount} track${itemCount === 1 ? "" : "s"} imported — drop more anytime`}
-          </p>
-        </>
+                : `${itemCount} track${itemCount === 1 ? "" : "s"} imported — drop more anytime`
+          }
+        />
       )}
     </div>
   );

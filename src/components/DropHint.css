@@ -1,0 +1,33 @@
+/* The icon-over-prompt block shared by the cover box and the conversion drop
+   zone. It carries its own vertical rhythm rather than leaning on the
+   surrounding frame's `gap`, so it looks the same whichever box it lands in —
+   the two frames are not identical (one also hosts artwork and a spinner). */
+.drop-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  text-align: center;
+}
+.drop-hint-label {
+  font-size: 11.5px;
+  line-height: 1.4;
+  max-width: 220px;
+}
+
+/* Two tones rather than inherited colour: the drag state is a white-on-veil
+   treatment both boxes already use, and leaving it to a descendant selector
+   in each caller's own stylesheet is how the two ended up looking different
+   in the first place. */
+.drop-hint-rest svg {
+  color: var(--accent);
+}
+.drop-hint-rest .drop-hint-label {
+  color: var(--muted);
+}
+.drop-hint-over,
+.drop-hint-over svg {
+  color: #fff;
+}

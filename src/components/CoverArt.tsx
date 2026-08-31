@@ -13,6 +13,8 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, ImageDown, Music, Trash2, Upload } from "lucide-react";
 
+import { DropHint } from "./DropHint";
+
 import type { CoverArt as CoverArtData } from "../types";
 import { PICTURE_TYPE_LABELS, coverDataUrl, pictureTypeLabel } from "../format";
 import { dropZone } from "./dropZones";
@@ -21,9 +23,13 @@ import { IconButton } from "./IconButton";
 import { MarqueeText } from "./MarqueeText";
 
 const CAROUSEL_MS = 3000;
-// Larger than the results table's 14px thumbnail icon — this box has actual
-// room, and a 14px glyph would look lost centered in it.
-const PLACEHOLDER_ICON_SIZE = 44;
+
+/// What the empty box and the drag overlay say. Kept next to each other
+/// because they are two halves of one instruction — the first names what the
+/// box takes and what dropping it does, the second confirms the release —
+/// and the conversion panel's drop zone words its own pair the same way.
+const IDLE_PROMPT = "Drop an image to set the cover on the selected tracks";
+const RELEASE_PROMPT = "Release to import";
 
 export interface CoverArtProps {
   covers: CoverArtData[];
@@ -121,6 +127,14 @@ export function CoverArt({
   // obscure-but-real role into an actual front-cover overwrite.
   const knownRole = cover ? cover.picture_type in PICTURE_TYPE_LABELS : false;
 
+  // The overlay covers the frame edge to edge, but its veil is translucent —
+  // artwork is meant to stay visible underneath, which is the point. The empty
+  // box's own prompt is not: it would show through the release prompt, two
+  // lines of text on top of each other. So the placeholder steps aside while
+  // the overlay is up, giving the same one-prompt-at-a-time reading as the
+  // conversion panel, which swaps its single hint rather than stacking two.
+  const overlay = dragOver || loading;
+
   // One shared frame markup for both the "has a cover" and "no cover yet"
   // cases — the drag/loading overlay and the drop-target styling apply to
   // the box itself, not to whatever happens to be inside it.
@@ -137,14 +151,20 @@ export function CoverArt({
             onClick={() => onOpenLightbox(covers, index)}
           />
         ) : (
-          <span className="tag-cover-placeholder">
-            <Music size={PLACEHOLDER_ICON_SIZE} strokeWidth={1.4} />
-          </span>
+          !overlay && (
+            <span className="tag-cover-placeholder">
+              <DropHint icon={Music} label={IDLE_PROMPT} />
+            </span>
+          )
         )}
         {nav}
-        {(dragOver || loading) && (
+        {overlay && (
           <div className="tag-cover-overlay">
-            {loading ? <span className="spinner" /> : <ImageDown />}
+            {loading ? (
+              <span className="spinner" />
+            ) : (
+              <DropHint icon={ImageDown} label={RELEASE_PROMPT} tone="over" />
+            )}
           </div>
         )}
       </div>

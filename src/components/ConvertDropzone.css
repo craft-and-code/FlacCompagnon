@@ -14,8 +14,12 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  /* `gap` and `text-align` are for the spinner states, which are two plain
+     children of this frame. The idle and drag prompts are a single `DropHint`
+     that brings its own padding — declaring padding here too would stack on
+     top of it and inset the right-hand prompt further than the cover box's,
+     which is the mismatch this whole component exists to remove. */
   gap: 10px;
-  padding: 12px;
   text-align: center;
   color: var(--muted);
   background: var(--bg-elev2);
@@ -23,9 +27,6 @@
   transition:
     background 0.15s,
     box-shadow 0.15s;
-}
-.convert-drop-frame svg {
-  color: var(--accent);
 }
 /* Exactly the cover box's drag feedback (`.tag-cover-overlay`, CoverArt.css):
    the same `--drop-veil` wash and white content, no ring and no border shift.
@@ -37,9 +38,9 @@
   background-image: linear-gradient(var(--drop-veil), var(--drop-veil));
   color: #fff;
 }
-.convert-drop-frame.drag-over svg {
-  color: #fff;
-}
+/* Only the spinner states still use this: the idle and drag prompts moved to
+   the shared `DropHint`, which owns their type scale so the cover box on the
+   other side of the table matches it. */
 .convert-drop-text {
   margin: 0;
   font-size: 11.5px;
