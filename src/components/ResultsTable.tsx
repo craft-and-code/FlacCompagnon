@@ -66,6 +66,8 @@ export interface ResultsTableProps {
   /// The one row currently showing an editable name field, or `null`.
   editingPath: string | null;
   renameBusy: boolean;
+  /// Paths that no longer resolve on disk — see useMissingFiles.ts.
+  missing: Set<string>;
   onSelectRow: (path: string, ev: SelectionModifiers) => void;
   /// Opens the rename field for `path` — only ever called for the sole
   /// selected row, well after the click that selected it (see
@@ -90,6 +92,7 @@ export function ResultsTable({
   onSortChange,
   editingPath,
   renameBusy,
+  missing,
   onSelectRow,
   onStartRename,
   onCancelRename,
@@ -250,6 +253,7 @@ export function ResultsTable({
                 }
                 editing={editingPath === f.path}
                 renameBusy={renameBusy}
+                missing={missing.has(f.path)}
                 onReveal={() => onReveal(f.path)}
                 onTogglePlay={() => onTogglePlay(f.path)}
                 onDelete={() => onDelete(f.path, selected.has(f.path))}

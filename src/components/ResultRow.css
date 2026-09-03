@@ -65,3 +65,23 @@
 .play-btn.playing:hover .play-overlay-hover {
   display: flex;
 }
+
+/* A file that is no longer at the path the table recorded. Struck through and
+   muted rather than coloured: the row's own colour vocabulary is already spoken
+   for by the detections (Transcoded, Upsampled, clipping), and adding a fourth
+   meaning to red would blunt the three that matter. Strike-through carries
+   "this is gone" on its own, and the summary strip's "N missing" chip supplies
+   the word for it. */
+.fname-missing {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+/* Not struck through with the name: a crossed-out icon is illegible at 12px. */
+.fname-missing-icon {
+  display: inline-block;
+  vertical-align: -1px;
+  margin-right: 5px;
+  color: var(--bad);
+  text-decoration: none;
+}

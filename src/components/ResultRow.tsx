@@ -5,7 +5,7 @@
 // immediately and fills in later without needing a distinct loading state.
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import { GripVertical, Music, Play, Search, Square, Trash2 } from "lucide-react";
+import { GripVertical, Music, Play, Search, Square, Trash2, Unlink } from "lucide-react";
 
 import type { CoverArt, FileAnalysis, TagSet } from "../types";
 import { coverDataUrl, splitStem } from "../format";
@@ -43,6 +43,9 @@ export interface ResultRowProps {
   /// read-only (not `disabled`: a disabled input forces a blur in most
   /// browsers, which would fire `onCancelRename` mid-request).
   renameBusy: boolean;
+  /// The file is no longer at `file.path`. Frontend-only, never part of the
+  /// analysis or of any export — see useMissingFiles.ts.
+  missing: boolean;
   onReveal: () => void;
   onTogglePlay: () => void;
   onDelete: () => void;
@@ -89,6 +92,7 @@ export function ResultRow({
   dropEdge,
   editing,
   renameBusy,
+  missing,
   onReveal,
   onTogglePlay,
   onDelete,
@@ -216,7 +220,16 @@ export function ResultRow({
       {ext && <span className="fname-ext">{ext}</span>}
     </td>
   ) : (
-    <td className="fname has-tip" title={f.path}>
+    // A missing file gets a broken-link glyph and a struck-through name — the
+    // one visual idiom that already means "this is gone" without a legend.
+    // The legend exists anyway, once, in the summary strip above the table
+    // ("N missing"), because a struck-through row on its own still leaves
+    // *why* to guesswork.
+    <td
+      className={missing ? "fname fname-missing has-tip" : "fname has-tip"}
+      title={missing ? `Not found: ${f.path}` : f.path}
+    >
+      {missing && <Unlink className="fname-missing-icon" size={12} strokeWidth={1.8} />}
       {f.file_name}
     </td>
   );

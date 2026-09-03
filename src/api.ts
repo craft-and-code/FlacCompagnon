@@ -52,6 +52,14 @@ export const revealInFolder = (path: string) =>
 // results header's folder icon next to the analyzed root path.
 export const openFolder = (path: string) => invoke("open_folder", { path });
 
+// Which of `paths` are no longer files on disk. Returns only the missing
+// ones, so an empty array means everything is where the table says it is.
+// Backs the results table's refresh button and the automatic check after a
+// saved report is reloaded — see useMissingFiles.ts for why the answer is
+// never stored in `FileAnalysis`.
+export const missingPaths = (paths: string[]) =>
+  invoke<string[]>("missing_paths", { paths });
+
 // Renames a file on disk to `newStem` plus its existing extension — the
 // backend re-appends the extension itself rather than trusting a full name
 // from the frontend, so the results table's inline rename can never smuggle

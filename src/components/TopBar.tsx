@@ -7,6 +7,7 @@ import {
   CheckSquare,
   ListMusic,
   ListOrdered,
+  RefreshCw,
   Repeat,
   Search,
   Square,
@@ -53,6 +54,13 @@ export interface TopBarProps {
   onReset: () => void;
   /// Opens the conversion panel (right-hand side, mirroring the tag panel).
   onOpenConvert: () => void;
+  /// Re-checks that every listed file is still on disk. Separated from the
+  /// buttons around it by a gap: it acts on the *listing* rather than on the
+  /// audio, which is a different kind of action and shouldn't read as one
+  /// more export.
+  onRefreshPresence: () => void;
+  /// True while that check is running.
+  checkingPresence: boolean;
 }
 
 export function TopBar({
@@ -74,6 +82,8 @@ export function TopBar({
   onGenerateSpectrograms,
   onReset,
   onOpenConvert,
+  onRefreshPresence,
+  checkingPresence,
 }: TopBarProps) {
   const theme = useTheme();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -162,6 +172,20 @@ export function TopBar({
         className="topbar-toolbtn"
         disabled={busy}
         onClick={onOpenConvert}
+      />
+      <span className="topbar-gap" />
+      <IconButton
+        icon={
+          <RefreshCw
+            size={16}
+            strokeWidth={1.7}
+            className={checkingPresence ? "topbar-spinning" : undefined}
+          />
+        }
+        title="Check that every listed file is still on disk"
+        className="topbar-toolbtn"
+        disabled={busy || !hasReport || checkingPresence}
+        onClick={onRefreshPresence}
       />
       <div className="actions">
         <button className="btn" disabled={busy} onClick={onPick}>

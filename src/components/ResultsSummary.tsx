@@ -20,6 +20,9 @@ export interface ResultsSummaryProps {
   /// filter is active, in which case the count line only shows the total —
   /// exactly as before the filter existed.
   visibleCount: number | null;
+  /// Paths that no longer resolve on disk. Frontend-only state — never in the
+  /// report, never exported (see useMissingFiles.ts).
+  missing: Set<string>;
   onToast: (msg: string, kind?: "info" | "error") => void;
 }
 
@@ -28,23 +31,22 @@ export function ResultsSummary({
   rootPath,
   selectedCount,
   visibleCount,
+  missing,
   onToast,
 }: ResultsSummaryProps) {
   let clean = 0;
   let upscaled = 0;
   let upsampled = 0;
   let transcoded = 0;
-  let suspicious = 0;
   let md5Bad = 0;
   let md5Missing = 0;
 
   for (const f of report.files) {
     const d = f.detections;
     if (d.summary === "Clean") clean++;
-    if (d.summary === "Suspicious") suspicious++;
     if (d.upscaling) upscaled++;
     if (d.upsampling) upsampled++;
-    if (d.transcoding === "detected") transcoded++;
+    if (d.transcoding) transcoded++;
     if (f.flac_md5?.state === "Mismatch") md5Bad++;
     if (f.flac_md5?.state === "NoSignature") md5Missing++;
   }
@@ -54,8 +56,12 @@ export function ResultsSummary({
     { cls: "v-upscaled", label: "upscaled", n: upscaled },
     { cls: "v-upsampled", label: "upsampled", n: upsampled },
     { cls: "v-transcoded", label: "transcoded", n: transcoded },
-    { cls: "v-suspected", label: "suspicious", n: suspicious },
   ];
+  // Last chip, and the only one about the files rather than the audio: it is
+  // what gives the struck-through rows below their meaning. Without a word for
+  // it somewhere on screen, a struck-through name is just a style nobody can
+  // interpret.
+  chips.push({ cls: "v-bad", label: "missing", n: missing.size });
   if (report.has_flac) {
     chips.push({ cls: "v-bad", label: "MD5 mismatch", n: md5Bad });
     // A missing signature is not an error, just missing information.

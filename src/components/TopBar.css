@@ -141,3 +141,25 @@
   height: 32px;
   border-radius: var(--radius-md);
 }
+
+/* Sets the presence-check button apart from the export/convert buttons on its
+   left. Those act on the audio; this one only re-reads the listing, and
+   without a gap it reads as one more export. */
+.topbar-gap {
+  width: 10px;
+  flex: none;
+}
+@keyframes topbar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.topbar-spinning {
+  animation: topbar-spin 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .topbar-spinning {
+    animation: none;
+    opacity: 0.5;
+  }
+}

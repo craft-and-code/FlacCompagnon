@@ -26,6 +26,10 @@ export function useAnalysis({ onToast, onFilesChanged }: UseAnalysisArgs) {
   const [progressLabel, setProgressLabel] = useState("Working…");
   const [progressPercent, setProgressPercent] = useState(0);
   const [cancelling, setCancelling] = useState(false);
+  // True when the current listing came from a reloaded `.json` report rather
+  // than from analyzing files. Only that case can hold paths whose files have
+  // moved since — a fresh analysis just opened every one of them.
+  const [loadedFromReport, setLoadedFromReport] = useState(false);
   // Spectrogram rendering works on files already listed, so the table stays up
   // while it runs; an analysis replaces the list, so it doesn't.
   const [keepResultsWhileBusy, setKeepResultsWhileBusy] = useState(false);
@@ -99,6 +103,7 @@ export function useAnalysis({ onToast, onFilesChanged }: UseAnalysisArgs) {
     setReport(null);
     setTargets([]);
     setDisplayOrder([]);
+    setLoadedFromReport(false);
     onFilesChanged(new Set());
   }, [onFilesChanged]);
 
@@ -121,6 +126,7 @@ export function useAnalysis({ onToast, onFilesChanged }: UseAnalysisArgs) {
         const nextTargets = [...targets];
         for (const t of paths) if (!nextTargets.includes(t)) nextTargets.push(t);
         applyReport(merged, nextTargets);
+        setLoadedFromReport(false);
         onToast(
           `Added ${added.length} ${added.length === 1 ? "file" : "files"} — ${merged.files.length} in the list.`,
         );
@@ -145,6 +151,11 @@ export function useAnalysis({ onToast, onFilesChanged }: UseAnalysisArgs) {
   );
 
   /// Re-import a previously-saved JSON report without re-analyzing any audio.
+  ///
+  /// Flagged as such (`loadedFromReport`) because it is the one path where the
+  /// listing's file paths were not just read from disk: they were recorded
+  /// whenever the report was saved, and the files may have moved since. That
+  /// is what `useMissingFiles` keys its automatic check on.
   const loadReport = useCallback(
     async (path: string) => {
       if (busy) return;
@@ -156,6 +167,7 @@ export function useAnalysis({ onToast, onFilesChanged }: UseAnalysisArgs) {
         // and further drops keep working, same as after a normal folder drop.
         // The same list doubles as the display order — see `applyReport`.
         applyReport(loaded, order, order);
+        setLoadedFromReport(true);
         onToast(
           `Loaded ${loaded.files.length} ${loaded.files.length === 1 ? "file" : "files"} from report.`,
         );
@@ -249,6 +261,7 @@ export function useAnalysis({ onToast, onFilesChanged }: UseAnalysisArgs) {
     updateProgress,
     analyze,
     loadReport,
+    loadedFromReport,
     generateSpectrograms,
     cancelTask,
     removeFile,

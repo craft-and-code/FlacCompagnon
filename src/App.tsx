@@ -21,6 +21,7 @@ import { TagPanel, type TagPanelHandle } from "./components/TagPanel";
 import { nextSort, sortFiles, type SortColumn, type SortState } from "./components/tableSort";
 import { TopBar } from "./components/TopBar";
 import { useAnalysis } from "./components/useAnalysis";
+import { useMissingFiles } from "./components/useMissingFiles";
 import {
   useConvertProgress,
   useMenuActions,
@@ -74,6 +75,13 @@ export function App() {
     () => analysis.orderedFiles.map((f) => f.path),
     [analysis.orderedFiles],
   );
+  // Whether the listed files are still on disk. Frontend-only and never
+  // exported — see useMissingFiles.ts for why it stays out of `FileAnalysis`.
+  const presence = useMissingFiles({
+    paths: orderedPaths,
+    fromReport: analysis.loadedFromReport,
+    onToast: showToast,
+  });
 
   // Search box in the top bar: a pure display filter over the table. The
   // selection, drag-reorder and every export read from
@@ -513,6 +521,8 @@ export function App() {
         onGenerateSpectrograms={() => void analysis.generateSpectrograms()}
         onReset={menuActions.reset}
         onOpenConvert={convert.togglePanel}
+        onRefreshPresence={() => void presence.refresh()}
+        checkingPresence={presence.checking}
       />
 
       <div className="main-row">
@@ -543,6 +553,7 @@ export function App() {
                   rootPath={commonDir(analysis.report.files.map((f) => f.path))}
                   selectedCount={selection.selectedPaths.length}
                   visibleCount={visiblePaths == null ? null : visiblePaths.size}
+                  missing={presence.missing}
                   onToast={showToast}
                 />
                 <ResultsTable
@@ -556,6 +567,7 @@ export function App() {
                   onSortChange={onSortChange}
                   editingPath={editingPath}
                   renameBusy={renameBusy}
+                  missing={presence.missing}
                   onSelectRow={guardedSelectRow}
                   onStartRename={guardedStartRename}
                   onCancelRename={cancelRename}
