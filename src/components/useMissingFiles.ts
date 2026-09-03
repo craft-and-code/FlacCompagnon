@@ -19,6 +19,12 @@ import * as api from "../api";
 export interface UseMissingFilesArgs {
   /// Every path currently in the table.
   paths: string[];
+  /// Called with the paths that were missing and are now back. Their tags and
+  /// cover art were read (and failed) while they were gone, and the cache
+  /// remembers a failed read as "nothing there" — so without this, a file
+  /// that reappears comes back nameless and coverless until the whole listing
+  /// is rebuilt.
+  onReappeared: (paths: string[]) => void;
   /// True when the current listing came from a reloaded `.json` report rather
   /// than from a fresh analysis. A fresh analysis just read every one of
   /// these files, so they exist by construction and there is nothing to
@@ -27,7 +33,12 @@ export interface UseMissingFilesArgs {
   onToast: (msg: string, kind?: "info" | "error") => void;
 }
 
-export function useMissingFiles({ paths, fromReport, onToast }: UseMissingFilesArgs) {
+export function useMissingFiles({
+  paths,
+  fromReport,
+  onReappeared,
+  onToast,
+}: UseMissingFilesArgs) {
   const [missing, setMissing] = useState<Set<string>>(() => new Set());
   const [checking, setChecking] = useState(false);
 
@@ -37,6 +48,18 @@ export function useMissingFiles({ paths, fromReport, onToast }: UseMissingFilesA
   const pathsRef = useRef(paths);
   pathsRef.current = paths;
 
+  // The callbacks go through refs for the same reason, and it is not
+  // defensive: `check` listed them as dependencies, so an inline arrow from
+  // the caller made `check` a new function every render, which retriggered
+  // the effect below, which called `setChecking` — a render loop that showed
+  // up as a refresh button spinning forever and permanently disabled. Reading
+  // them here means a caller cannot cause that by writing perfectly ordinary
+  // JSX.
+  const onReappearedRef = useRef(onReappeared);
+  onReappearedRef.current = onReappeared;
+  const onToastRef = useRef(onToast);
+  onToastRef.current = onToast;
+
   const check = useCallback(async () => {
     const current = pathsRef.current;
     if (current.length === 0) {
@@ -45,13 +68,23 @@ export function useMissingFiles({ paths, fromReport, onToast }: UseMissingFilesA
     }
     setChecking(true);
     try {
-      setMissing(new Set(await api.missingPaths(current)));
+      const now = new Set(await api.missingPaths(current));
+      setMissing((before) => {
+        // Everything that *was* missing and no longer is. These need their
+        // metadata re-read, not just their strike-through removed.
+        const back = [...before].filter((p) => !now.has(p));
+        if (back.length > 0) onReappearedRef.current(back);
+        return now;
+      });
     } catch (e) {
-      onToast(String(e), "error");
+      onToastRef.current(String(e), "error");
     } finally {
       setChecking(false);
     }
-  }, [onToast]);
+    // No dependencies: everything this reads is a ref, so `check` is stable
+    // for the life of the hook and the effect below fires only when the
+    // listing actually changes.
+  }, []);
 
   /// The refresh button: same check, plus a spoken result. Silence would be
   /// indistinguishable from a button that does nothing, which is exactly the
@@ -63,7 +96,7 @@ export function useMissingFiles({ paths, fromReport, onToast }: UseMissingFilesA
     // Read back through the state setter rather than `missing`, which is the
     // value captured when this callback was created, not the one just set.
     setMissing((now) => {
-      onToast(
+      onToastRef.current(
         now.size === 0
           ? `All ${before} file${before === 1 ? "" : "s"} are where they should be.`
           : `${now.size} of ${before} file${before === 1 ? "" : "s"} could not be found.`,
@@ -71,7 +104,7 @@ export function useMissingFiles({ paths, fromReport, onToast }: UseMissingFilesA
       );
       return now;
     });
-  }, [check, onToast]);
+  }, [check]);
 
   // A reloaded report is the case that motivates all of this: its paths were
   // written at some point in the past and nothing guarantees they still

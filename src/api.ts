@@ -12,6 +12,7 @@ import type {
   LookupRelease,
   PlaylistEntry,
   PlaylistFormat,
+  Relocation,
   RenameResult,
   SpectroSummary,
   TagEdits,
@@ -59,6 +60,12 @@ export const openFolder = (path: string) => invoke("open_folder", { path });
 // never stored in `FileAnalysis`.
 export const missingPaths = (paths: string[]) =>
   invoke<string[]>("missing_paths", { paths });
+
+// Looks for each missing file by name under `root`, returning the moves it
+// found. Nothing is written — the caller repoints the listing, and the user
+// still has to save the report for the new paths to survive the session.
+export const relocatePaths = (missing: string[], root: string) =>
+  invoke<Relocation[]>("relocate_paths", { missing, root });
 
 // Renames a file on disk to `newStem` plus its existing extension — the
 // backend re-appends the extension itself rather than trusting a full name

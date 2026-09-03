@@ -11,6 +11,8 @@
 use std::path::Path;
 use std::process::Command;
 
+use flaccompagnon_core as core;
+
 /// Reveal a file in the OS file browser (Finder / Explorer / default manager),
 /// selecting it when the platform supports it.
 #[tauri::command]
@@ -111,4 +113,17 @@ mod tests {
     fn an_empty_request_is_an_empty_answer() {
         assert!(missing_paths(Vec::new()).is_empty());
     }
+}
+
+/// Find where the missing files went, under the folder the user picked.
+///
+/// Thin, as commands should be: walk `root` for supported audio, hand the
+/// candidates to [`core::match_moved_files`] — which holds the matching rules
+/// and their tests — and pass the answer back. Nothing is written; the caller
+/// decides what to do with the pairs, and the user still has to save the
+/// report for the new paths to outlive the session.
+#[tauri::command]
+pub fn relocate_paths(missing: Vec<String>, root: String) -> Vec<core::Relocation> {
+    let candidates = core::list_audio_files(Path::new(&root), true);
+    core::match_moved_files(&missing, &candidates)
 }

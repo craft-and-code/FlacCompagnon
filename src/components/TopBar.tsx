@@ -6,9 +6,11 @@ import {
   ArrowLeftRight,
   CheckSquare,
   ListMusic,
+  FolderSearch,
   ListOrdered,
   RefreshCw,
   Repeat,
+  Save,
   Search,
   Square,
   X,
@@ -61,6 +63,15 @@ export interface TopBarProps {
   onRefreshPresence: () => void;
   /// True while that check is running.
   checkingPresence: boolean;
+  /// How many listed files were not found. Drives whether the relocate button
+  /// is offered at all — with nothing missing it has nothing to do.
+  missingCount: number;
+  /// Asks for a folder and repoints the missing rows at the files found there.
+  onRelocateMissing: () => void;
+  /// True when the listing came from a `.json` report, which is the only case
+  /// where there is a file to write back over.
+  canUpdateReport: boolean;
+  onUpdateReport: () => void;
 }
 
 export function TopBar({
@@ -84,6 +95,10 @@ export function TopBar({
   onOpenConvert,
   onRefreshPresence,
   checkingPresence,
+  missingCount,
+  onRelocateMissing,
+  canUpdateReport,
+  onUpdateReport,
 }: TopBarProps) {
   const theme = useTheme();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -187,6 +202,27 @@ export function TopBar({
         disabled={busy || !hasReport || checkingPresence}
         onClick={onRefreshPresence}
       />
+      {/* Both only make sense once something is actually wrong or reloadable,
+          so they stay out of the way otherwise rather than sitting greyed out
+          — the bar is already dense. */}
+      {missingCount > 0 && (
+        <IconButton
+          icon={<FolderSearch size={16} strokeWidth={1.7} />}
+          title={`Locate the ${missingCount} missing file${missingCount === 1 ? "" : "s"} in another folder`}
+          className="topbar-toolbtn"
+          disabled={busy}
+          onClick={onRelocateMissing}
+        />
+      )}
+      {canUpdateReport && (
+        <IconButton
+          icon={<Save size={16} strokeWidth={1.7} />}
+          title="Write the current listing back over the report it was loaded from"
+          className="topbar-toolbtn"
+          disabled={busy}
+          onClick={onUpdateReport}
+        />
+      )}
       <div className="actions">
         <button className="btn" disabled={busy} onClick={onPick}>
           Add titles…

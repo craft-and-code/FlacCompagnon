@@ -66,6 +66,7 @@ pub fn run() {
             commands::report::save_playlist,
             commands::report::load_report,
             commands::files::missing_paths,
+            commands::files::relocate_paths,
             commands::files::reveal_in_folder,
             commands::files::open_folder,
             commands::rename::rename_file,
