@@ -12,6 +12,9 @@
 // opens the resulting row in edit mode for the value, exactly like a
 // freshly-started rename.
 
+import { X } from "lucide-react";
+
+import { IconButton } from "./IconButton";
 import type { AddableTag } from "../types";
 import "./AddTagPicker.css";
 
@@ -23,13 +26,32 @@ export interface AddTagPickerProps {
   /// place instead.
   existingKeys: Set<string>;
   onPick: (key: string, label: string) => void;
+  /// Dismisses the list without adding anything. The pop-in also closes it
+  /// from the "+" button and from Escape, but neither is discoverable from
+  /// inside the list itself — and a list with no visible way out reads as a
+  /// step you are committed to.
+  onClose: () => void;
 }
 
-export function AddTagPicker({ addable, loading, existingKeys, onPick }: AddTagPickerProps) {
+export function AddTagPicker({
+  addable,
+  loading,
+  existingKeys,
+  onPick,
+  onClose,
+}: AddTagPickerProps) {
   const options = addable.filter((t) => !existingKeys.has(t.key));
 
   return (
     <div className="add-tag-picker">
+      <div className="add-tag-head">
+        <span className="add-tag-title">Add a tag</span>
+        <IconButton
+          icon={<X size={13} strokeWidth={1.8} />}
+          title="Close without adding"
+          onClick={onClose}
+        />
+      </div>
       {loading ? (
         <p className="add-tag-status">Loading…</p>
       ) : options.length === 0 ? (

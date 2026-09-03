@@ -53,8 +53,19 @@
 }
 
 /* --- Toast --- */
+/* Above everything, and that is the whole rule: a toast is the app's only way
+   to answer "did that work?", so it has to be readable whatever is open when
+   it fires. It had no `z-index` at all, which put it behind every positioned
+   layer in the app — including a modal's backdrop, where "Copied ACOUSTID_ID."
+   appeared as an unreadable blur underneath the pop-in that had just asked
+   for it.
+   The stack it sits on top of: .app-freeze-overlay 40, .convert-panel 45,
+   DropGuard 50, ColumnMenu 55, Modal 60, .row-drag-ghost 1000. Nothing new
+   should be given a value above this one — if something must cover a toast,
+   it is a modal, and a modal has a backdrop rather than a z-index race. */
 .toast {
   position: fixed;
+  z-index: 1100;
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);

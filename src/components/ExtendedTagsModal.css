@@ -15,8 +15,22 @@
      footer's left/right-pinned groups collapse toward the middle. */
   align-items: stretch;
 }
+/* Each row bleeds 8px past this box on both sides (`.ext-row`'s negative
+   margin) so a selected row's tint reaches the card's edges instead of
+   stopping short of them. That bleed is wider than this box's content, and
+   `overflow-y: auto` silently turns `overflow-x` into `auto` too — which is
+   where the second, horizontal scrollbar came from, scrolling 16px of
+   decoration nobody wanted to reach.
+
+   Fixed by widening the scroll container by exactly that bleed and clipping
+   what is left: `overflow: hidden` cuts at the padding box, which now lands
+   precisely on the rows' outer edge, so nothing is trimmed and there is
+   nothing left to scroll sideways. */
 .extended-tags-body {
   overflow-y: auto;
+  overflow-x: hidden;
+  margin: 0 -8px;
+  padding: 0 8px;
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -112,4 +126,21 @@
 .ext-plusminus .icon-btn:last-child {
   border-top-right-radius: var(--radius-md);
   border-bottom-right-radius: var(--radius-md);
+}
+
+/* Holds the per-row copy button. It keeps its slot at all times rather than
+   appearing on hover: the rows are dense, and a control that shifts the value
+   text sideways as the pointer crosses the list is harder to aim at than one
+   that is simply always there. Muted until the row is hovered or selected, so
+   a long list doesn't read as a column of buttons. */
+.ext-copy {
+  flex: none;
+  display: flex;
+  align-items: center;
+  opacity: 0.35;
+  transition: opacity 0.12s;
+}
+.ext-row:hover .ext-copy,
+.ext-row.selected .ext-copy {
+  opacity: 1;
 }

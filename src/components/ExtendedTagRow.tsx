@@ -1,19 +1,24 @@
-// One row of the extended-tags pop-in: the tag's raw key and its value —
-// plain text, or (after two well-spaced clicks on the value, same
-// Mp3tag/Finder pattern as the inline file-rename field; see ResultsTable's
-// RENAME_CLICK_GAP_MS) an editable field. Clicking anywhere on the row
-// selects it — selection is what the pop-in's grouped +/− buttons act on
-// (see ExtendedTagsModal), mirroring Mp3tag's own extended-tags list rather
-// than a per-row remove button.
+// One row of the extended-tags pop-in: the tag's raw key, its value, and a
+// copy button. Clicking anywhere on the row selects it — selection is what
+// the pop-in's grouped +/− buttons act on (see ExtendedTagsModal), mirroring
+// Mp3tag's own extended-tags list rather than a per-row remove button.
+//
+// Clicking the *value* opens it for editing straight away. It used to take
+// two well-spaced clicks, borrowed from the inline file-rename field, but the
+// two situations are not alike: renaming happens in a table where a click is
+// mostly for selecting and an accidental rename is disruptive, whereas this
+// pop-in exists to edit and its whole session is discarded by Cancel.
+//
+// The value is not selectable text (deliberately — the row is a click
+// target), so the copy button is the only way to get a value out. That makes
+// it part of the row's job rather than a convenience: without it, something
+// like an AcoustID fingerprint can be read on screen and nowhere else.
 
 import { useEffect, useRef, useState } from "react";
+import { Copy } from "lucide-react";
 
+import { IconButton } from "./IconButton";
 import type { ExtendedRow } from "./tagSelection";
-
-// Same reasoning as RENAME_CLICK_GAP_MS: comfortably above any OS's own
-// double-click speed, so a real double click still just selects the row
-// instead of being mistaken for two deliberate, separately-spaced clicks.
-const EDIT_CLICK_GAP_MS = 500;
 
 export interface ExtendedTagRowProps {
   row: ExtendedRow;
@@ -23,6 +28,10 @@ export interface ExtendedTagRowProps {
   onStartEdit: () => void;
   onSubmit: (value: string) => void;
   onCancelEdit: () => void;
+  /// Copies this row's value. The row reports the intent; the pop-in owns the
+  /// clipboard call and the toast, so the feedback matches every other
+  /// confirmation in the app.
+  onCopy: () => void;
 }
 
 export function ExtendedTagRow({
@@ -33,13 +42,10 @@ export function ExtendedTagRow({
   onStartEdit,
   onSubmit,
   onCancelEdit,
+  onCopy,
 }: ExtendedTagRowProps) {
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  // Only tracks clicks on *this* row's value — unlike the table's rename
-  // gap-check, each row is its own component instance, so there's no need to
-  // also compare against which row was clicked last.
-  const lastClickTime = useRef<number | null>(null);
 
   useEffect(() => {
     if (!editing) return;
@@ -73,16 +79,24 @@ export function ExtendedTagRow({
       ) : (
         <div
           className={row.mixed ? "ext-value ext-mixed" : "ext-value"}
-          onClick={(ev) => {
-            const now = ev.timeStamp;
-            const prev = lastClickTime.current;
-            const secondClick = prev != null && now - prev > EDIT_CLICK_GAP_MS;
-            lastClickTime.current = now;
-            if (secondClick) onStartEdit();
-          }}
+          onClick={onStartEdit}
         >
           {row.mixed ? "Multiple values" : row.value}
         </div>
+      )}
+      {/* Outside the editing branch on purpose: while a row is being edited
+          the text is selectable in the input, so the button has nothing left
+          to offer and would only compete with Enter/Escape. `stopPropagation`
+          keeps the click from also selecting the row underneath. */}
+      {!editing && (
+        <span className="ext-copy" onClick={(ev) => ev.stopPropagation()}>
+          <IconButton
+            icon={<Copy size={13} strokeWidth={1.7} />}
+            title={row.mixed ? "The selected files disagree — nothing to copy" : `Copy ${row.key}`}
+            disabled={row.mixed}
+            onClick={onCopy}
+          />
+        </span>
       )}
     </div>
   );

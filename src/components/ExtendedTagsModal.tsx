@@ -18,6 +18,7 @@ import { Minus, Plus } from "lucide-react";
 
 import type { AddableTag, FieldEdit } from "../types";
 import * as api from "../api";
+import { copyText } from "../clipboard";
 import { AddTagPicker } from "./AddTagPicker";
 import { ExtendedTagRow } from "./ExtendedTagRow";
 import { IconButton } from "./IconButton";
@@ -82,6 +83,30 @@ export function ExtendedTagsModal({
     // effect — `pendingEdits` is read once at open time, so staging more
     // edits in the panel behind an open pop-in can't retrigger a reseed.
   }, [open]);
+
+  // Escape closes the "+" list before it closes the pop-in. Bound in the
+  // capture phase so it runs before Modal's own document-level listener, and
+  // `stopPropagation` there keeps the event from ever reaching it — otherwise
+  // one Escape would dismiss both, throwing away the whole session because
+  // the user wanted to back out of a list.
+  useEffect(() => {
+    if (!open || !pickerOpen) return;
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key !== "Escape") return;
+      ev.stopPropagation();
+      setPickerOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [open, pickerOpen]);
+
+  const copyValue = useCallback(
+    async (key: string, value: string) => {
+      const ok = await copyText(value);
+      onToast(ok ? `Copied ${key}.` : "Could not reach the clipboard.", ok ? "info" : "error");
+    },
+    [onToast],
+  );
 
   const representativePath = selectedPaths[0] ?? null;
   useEffect(() => {
@@ -164,6 +189,7 @@ export function ExtendedTagsModal({
               onStartEdit={() => setEditingKey(r.key)}
               onSubmit={(value) => submitEdit(r.key, value)}
               onCancelEdit={() => cancelEdit(r.key)}
+              onCopy={() => void copyValue(r.key, r.value)}
             />
           ))
         )}
@@ -172,13 +198,16 @@ export function ExtendedTagsModal({
       {/* Inline, not a floating/anchored popover: no "click outside to
           close" listener to race against the click that opened it (that
           race is what made the list flash and disappear), and nothing that
-          can end up visually clipped by an ancestor's own layout. It only
-          closes via the + button itself or picking an item. */}
+          can end up visually clipped by an ancestor's own layout.
+          Backing out therefore has to be explicit, and all three ways are
+          offered — the list's own ✕, the + button again, or Escape — because
+          the one that seems obvious depends entirely on who is looking. */}
       {pickerOpen && (
         <AddTagPicker
           addable={addable}
           loading={addableLoading}
           existingKeys={new Set(effectiveRows.map((r) => r.key))}
+          onClose={() => setPickerOpen(false)}
           onPick={(key) => {
             setPickerOpen(false);
             setNewRow({ key });
@@ -191,7 +220,7 @@ export function ExtendedTagsModal({
         <div className="ext-plusminus">
           <IconButton
             icon={<Plus size={13} strokeWidth={1.8} />}
-            title="Add a tag"
+            title={pickerOpen ? "Close the tag list" : "Add a tag"}
             onClick={() => setPickerOpen((v) => !v)}
           />
           <IconButton

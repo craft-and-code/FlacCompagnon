@@ -40,3 +40,20 @@
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   color: var(--accent);
 }
+
+/* A titled header with its own dismiss button. The list is rendered inline
+   between the rows and the footer, so nothing about its position says "this
+   is temporary" — the header is what makes it read as something you can back
+   out of rather than a step you are committed to. */
+.add-tag-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.add-tag-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
