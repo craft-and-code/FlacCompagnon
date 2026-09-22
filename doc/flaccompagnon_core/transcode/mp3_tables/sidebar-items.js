@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["GRANULE_LEN","GRANULE_SIZE","N_LONG","N_SHORT","PQMF_BANDS","PQMF_WINDOW","PQMF_WINDOW_LEN","SF_BIAS","SHORT_COUNT","SHORT_OFFSET"],"fn":["butterfly_coefficients","long_bands","short_bands"],"struct":["Windows"]};

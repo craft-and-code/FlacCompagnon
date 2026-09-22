@@ -1,0 +1,382 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `core/src/transcode/mp3_tables.rs`."><title>mp3_tables.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-1ed95124.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="flaccompagnon_core" data-themes="" data-resource-suffix="" data-rustdoc-version="1.98.1 (48a229cea 2026-09-01)" data-channel="1.98.1" data-search-js="search-9944d736.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-417ebf0a.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">flaccompagnon_core/transcode/</div>mp3_tables.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! MPEG-1 Layer III constants: the polyphase analysis window, the scalefactor
+<a href=#2 id=2 data-nosnippet>2</a>//! band layouts, and the aliasing-reduction coefficients.
+<a href=#3 id=3 data-nosnippet>3</a>//!
+<a href=#4 id=4 data-nosnippet>4</a>//! All three are **from the standard**, ISO/IEC 11172-3. The analysis window
+<a href=#5 id=5 data-nosnippet>5</a>//! is Table C.1 (the 512 coefficients `Ci` of the polyphase filterbank); the
+<a href=#6 id=6 data-nosnippet>6</a>//! band layouts are the Layer III scalefactor band tables; the butterfly
+<a href=#7 id=7 data-nosnippet>7</a>//! coefficients are the eight `ci` of the alias-reduction stage. They are
+<a href=#8 id=8 data-nosnippet>8</a>//! reproduced as published — nobody's invention, and no authorship attaches
+<a href=#9 id=9 data-nosnippet>9</a>//! to them.
+<a href=#10 id=10 data-nosnippet>10</a>//!
+<a href=#11 id=11 data-nosnippet>11</a>//! # Why MP3 needs all this and AAC needed almost none of it
+<a href=#12 id=12 data-nosnippet>12</a>//!
+<a href=#13 id=13 data-nosnippet>13</a>//! AAC transforms the signal once. MP3 transforms it three times over: a
+<a href=#14 id=14 data-nosnippet>14</a>//! 32-band polyphase filter, an 18-point MDCT inside each of those bands, then
+<a href=#15 id=15 data-nosnippet>15</a>//! a butterfly stage that partially undoes the aliasing the first two
+<a href=#16 id=16 data-nosnippet>16</a>//! introduced. The quantization lattice this detector looks for only exists at
+<a href=#17 id=17 data-nosnippet>17</a>//! the *end* of that chain, so every stage has to be reproduced exactly —
+<a href=#18 id=18 data-nosnippet>18</a>//! including the alias reduction, which is not optional cosmetics but part of
+<a href=#19 id=19 data-nosnippet>19</a>//! what defines where the coefficients land.
+<a href=#20 id=20 data-nosnippet>20</a>//!
+<a href=#21 id=21 data-nosnippet>21</a>//! This file is one long table by design; see the module ceiling exemption in
+<a href=#22 id=22 data-nosnippet>22</a>//! CLAUDE.md.
+<a href=#23 id=23 data-nosnippet>23</a>
+<a href=#24 id=24 data-nosnippet>24</a></span><span class="kw">use </span><span class="kw">super</span>::Band;
+<a href=#25 id=25 data-nosnippet>25</a>
+<a href=#26 id=26 data-nosnippet>26</a><span class="doccomment">/// Subbands the polyphase filterbank splits the signal into.
+<a href=#27 id=27 data-nosnippet>27</a></span><span class="kw">pub const </span>PQMF_BANDS: usize = <span class="number">32</span>;
+<a href=#28 id=28 data-nosnippet>28</a><span class="doccomment">/// Samples the analysis window spans.
+<a href=#29 id=29 data-nosnippet>29</a></span><span class="kw">pub const </span>PQMF_WINDOW_LEN: usize = <span class="number">512</span>;
+<a href=#30 id=30 data-nosnippet>30</a><span class="doccomment">/// MDCT coefficients per subband, per granule.
+<a href=#31 id=31 data-nosnippet>31</a></span><span class="kw">pub const </span>GRANULE_SIZE: usize = <span class="number">18</span>;
+<a href=#32 id=32 data-nosnippet>32</a><span class="doccomment">/// Samples in one granule: 32 subbands x 18 = 576.
+<a href=#33 id=33 data-nosnippet>33</a></span><span class="kw">pub const </span>GRANULE_LEN: usize = PQMF_BANDS * GRANULE_SIZE;
+<a href=#34 id=34 data-nosnippet>34</a><span class="doccomment">/// Short transforms packed into one granule's span.
+<a href=#35 id=35 data-nosnippet>35</a></span><span class="kw">pub const </span>SHORT_COUNT: usize = <span class="number">3</span>;
+<a href=#36 id=36 data-nosnippet>36</a><span class="doccomment">/// Long MDCT length, in subband samples.
+<a href=#37 id=37 data-nosnippet>37</a></span><span class="kw">pub const </span>N_LONG: usize = <span class="number">36</span>;
+<a href=#38 id=38 data-nosnippet>38</a><span class="doccomment">/// Short MDCT length, in subband samples.
+<a href=#39 id=39 data-nosnippet>39</a></span><span class="kw">pub const </span>N_SHORT: usize = <span class="number">12</span>;
+<a href=#40 id=40 data-nosnippet>40</a><span class="doccomment">/// Where the first short transform starts inside a granule.
+<a href=#41 id=41 data-nosnippet>41</a></span><span class="kw">pub const </span>SHORT_OFFSET: usize = <span class="number">12</span>;
+<a href=#42 id=42 data-nosnippet>42</a>
+<a href=#43 id=43 data-nosnippet>43</a><span class="doccomment">/// Scalefactor coding bias for MP3.
+<a href=#44 id=44 data-nosnippet>44</a>///
+<a href=#45 id=45 data-nosnippet>45</a>/// 80, where AAC uses 60 — the two standards bias their transmitted
+<a href=#46 id=46 data-nosnippet>46</a>/// scalefactors differently, and the search runs in biased units. See
+<a href=#47 id=47 data-nosnippet>47</a>/// [`crate::transcode::criterion::PreparedSubband::prepare`].
+<a href=#48 id=48 data-nosnippet>48</a></span><span class="kw">pub const </span>SF_BIAS: f64 = <span class="number">80.0</span>;
+<a href=#49 id=49 data-nosnippet>49</a>
+<a href=#50 id=50 data-nosnippet>50</a><span class="doccomment">/// Alias-reduction butterfly coefficients `ci`, ISO/IEC 11172-3.
+<a href=#51 id=51 data-nosnippet>51</a></span><span class="kw">const </span>CI: [f64; <span class="number">8</span>] = [-<span class="number">0.6</span>, -<span class="number">0.535</span>, -<span class="number">0.33</span>, -<span class="number">0.185</span>, -<span class="number">0.095</span>, -<span class="number">0.041</span>, -<span class="number">0.0142</span>, -<span class="number">0.0037</span>];
+<a href=#52 id=52 data-nosnippet>52</a>
+<a href=#53 id=53 data-nosnippet>53</a><span class="doccomment">/// The polyphase analysis window, ISO/IEC 11172-3 Table C.1.
+<a href=#54 id=54 data-nosnippet>54</a>///
+<a href=#55 id=55 data-nosnippet>55</a>/// Verified symmetric in magnitude about its centre (`|C[i]| == |C[512-i]|`
+<a href=#56 id=56 data-nosnippet>56</a>/// exactly, for i in 1..256) — the property the standard's table has and a
+<a href=#57 id=57 data-nosnippet>57</a>/// mistyped one would not.
+<a href=#58 id=58 data-nosnippet>58</a></span><span class="kw">pub const </span>PQMF_WINDOW: [f64; PQMF_WINDOW_LEN] = [
+<a href=#59 id=59 data-nosnippet>59</a>    <span class="number">0.0</span>, -<span class="number">0.000000477</span>, -<span class="number">0.000000477</span>, -<span class="number">0.000000477</span>,
+<a href=#60 id=60 data-nosnippet>60</a>    -<span class="number">0.000000477</span>, -<span class="number">0.000000477</span>, -<span class="number">0.000000477</span>, -<span class="number">0.000000954</span>,
+<a href=#61 id=61 data-nosnippet>61</a>    -<span class="number">0.000000954</span>, -<span class="number">0.000000954</span>, -<span class="number">0.000000954</span>, -<span class="number">0.000001431</span>,
+<a href=#62 id=62 data-nosnippet>62</a>    -<span class="number">0.000001431</span>, -<span class="number">0.000001907</span>, -<span class="number">0.000001907</span>, -<span class="number">0.000002384</span>,
+<a href=#63 id=63 data-nosnippet>63</a>    -<span class="number">0.000002384</span>, -<span class="number">0.000002861</span>, -<span class="number">0.000003338</span>, -<span class="number">0.000003338</span>,
+<a href=#64 id=64 data-nosnippet>64</a>    -<span class="number">0.000003815</span>, -<span class="number">0.000004292</span>, -<span class="number">0.000004768</span>, -<span class="number">0.000005245</span>,
+<a href=#65 id=65 data-nosnippet>65</a>    -<span class="number">0.000006199</span>, -<span class="number">0.000006676</span>, -<span class="number">0.000007629</span>, -<span class="number">0.000008106</span>,
+<a href=#66 id=66 data-nosnippet>66</a>    -<span class="number">0.00000906</span>, -<span class="number">0.000010014</span>, -<span class="number">0.000011444</span>, -<span class="number">0.000012398</span>,
+<a href=#67 id=67 data-nosnippet>67</a>    -<span class="number">0.000013828</span>, -<span class="number">0.000014782</span>, -<span class="number">0.000016689</span>, -<span class="number">0.00001812</span>,
+<a href=#68 id=68 data-nosnippet>68</a>    -<span class="number">0.00001955</span>, -<span class="number">0.000021458</span>, -<span class="number">0.000023365</span>, -<span class="number">0.000025272</span>,
+<a href=#69 id=69 data-nosnippet>69</a>    -<span class="number">0.000027657</span>, -<span class="number">0.000030041</span>, -<span class="number">0.000032425</span>, -<span class="number">0.000034809</span>,
+<a href=#70 id=70 data-nosnippet>70</a>    -<span class="number">0.00003767</span>, -<span class="number">0.000040531</span>, -<span class="number">0.000043392</span>, -<span class="number">0.000046253</span>,
+<a href=#71 id=71 data-nosnippet>71</a>    -<span class="number">0.000049591</span>, -<span class="number">0.000052929</span>, -<span class="number">0.00005579</span>, -<span class="number">0.000059605</span>,
+<a href=#72 id=72 data-nosnippet>72</a>    -<span class="number">0.000062943</span>, -<span class="number">0.00006628</span>, -<span class="number">0.000070095</span>, -<span class="number">0.000073433</span>,
+<a href=#73 id=73 data-nosnippet>73</a>    -<span class="number">0.000076771</span>, -<span class="number">0.000080585</span>, -<span class="number">0.000083923</span>, -<span class="number">0.000087261</span>,
+<a href=#74 id=74 data-nosnippet>74</a>    -<span class="number">0.000090599</span>, -<span class="number">0.00009346</span>, -<span class="number">0.000096321</span>, -<span class="number">0.000099182</span>,
+<a href=#75 id=75 data-nosnippet>75</a>    <span class="number">0.000101566</span>, <span class="number">0.000103951</span>, <span class="number">0.000105858</span>, <span class="number">0.000107288</span>,
+<a href=#76 id=76 data-nosnippet>76</a>    <span class="number">0.000108242</span>, <span class="number">0.000108719</span>, <span class="number">0.000108719</span>, <span class="number">0.000108242</span>,
+<a href=#77 id=77 data-nosnippet>77</a>    <span class="number">0.000106812</span>, <span class="number">0.000105381</span>, <span class="number">0.00010252</span>, <span class="number">0.000099182</span>,
+<a href=#78 id=78 data-nosnippet>78</a>    <span class="number">0.000095367</span>, <span class="number">0.000090122</span>, <span class="number">0.0000844</span>, <span class="number">0.000077724</span>,
+<a href=#79 id=79 data-nosnippet>79</a>    <span class="number">0.000069618</span>, <span class="number">0.000060558</span>, <span class="number">0.000050545</span>, <span class="number">0.000039577</span>,
+<a href=#80 id=80 data-nosnippet>80</a>    <span class="number">0.00002718</span>, <span class="number">0.000013828</span>, -<span class="number">0.000000954</span>, -<span class="number">0.000017166</span>,
+<a href=#81 id=81 data-nosnippet>81</a>    -<span class="number">0.000034332</span>, -<span class="number">0.000052929</span>, -<span class="number">0.000072956</span>, -<span class="number">0.000093937</span>,
+<a href=#82 id=82 data-nosnippet>82</a>    -<span class="number">0.000116348</span>, -<span class="number">0.00014019</span>, -<span class="number">0.000165462</span>, -<span class="number">0.000191212</span>,
+<a href=#83 id=83 data-nosnippet>83</a>    -<span class="number">0.000218868</span>, -<span class="number">0.000247478</span>, -<span class="number">0.000277042</span>, -<span class="number">0.00030756</span>,
+<a href=#84 id=84 data-nosnippet>84</a>    -<span class="number">0.000339031</span>, -<span class="number">0.000371456</span>, -<span class="number">0.000404358</span>, -<span class="number">0.000438213</span>,
+<a href=#85 id=85 data-nosnippet>85</a>    -<span class="number">0.000472546</span>, -<span class="number">0.000507355</span>, -<span class="number">0.000542164</span>, -<span class="number">0.000576973</span>,
+<a href=#86 id=86 data-nosnippet>86</a>    -<span class="number">0.000611782</span>, -<span class="number">0.000646591</span>, -<span class="number">0.000680923</span>, -<span class="number">0.000714302</span>,
+<a href=#87 id=87 data-nosnippet>87</a>    -<span class="number">0.000747204</span>, -<span class="number">0.000779152</span>, -<span class="number">0.000809669</span>, -<span class="number">0.000838757</span>,
+<a href=#88 id=88 data-nosnippet>88</a>    -<span class="number">0.000866413</span>, -<span class="number">0.000891685</span>, -<span class="number">0.000915051</span>, -<span class="number">0.000935555</span>,
+<a href=#89 id=89 data-nosnippet>89</a>    -<span class="number">0.000954151</span>, -<span class="number">0.000968933</span>, -<span class="number">0.000980854</span>, -<span class="number">0.000989437</span>,
+<a href=#90 id=90 data-nosnippet>90</a>    -<span class="number">0.000994205</span>, -<span class="number">0.000995159</span>, -<span class="number">0.000991821</span>, -<span class="number">0.000983715</span>,
+<a href=#91 id=91 data-nosnippet>91</a>    <span class="number">0.000971317</span>, <span class="number">0.000953674</span>, <span class="number">0.000930786</span>, <span class="number">0.000902653</span>,
+<a href=#92 id=92 data-nosnippet>92</a>    <span class="number">0.000868797</span>, <span class="number">0.00082922</span>, <span class="number">0.00078392</span>, <span class="number">0.000731945</span>,
+<a href=#93 id=93 data-nosnippet>93</a>    <span class="number">0.000674248</span>, <span class="number">0.000610352</span>, <span class="number">0.000539303</span>, <span class="number">0.000462532</span>,
+<a href=#94 id=94 data-nosnippet>94</a>    <span class="number">0.000378609</span>, <span class="number">0.000288486</span>, <span class="number">0.000191689</span>, <span class="number">0.000088215</span>,
+<a href=#95 id=95 data-nosnippet>95</a>    -<span class="number">0.000021458</span>, -<span class="number">0.000137329</span>, -<span class="number">0.000259876</span>, -<span class="number">0.000388145</span>,
+<a href=#96 id=96 data-nosnippet>96</a>    -<span class="number">0.000522137</span>, -<span class="number">0.00066185</span>, -<span class="number">0.000806808</span>, -<span class="number">0.000956535</span>,
+<a href=#97 id=97 data-nosnippet>97</a>    -<span class="number">0.001111031</span>, -<span class="number">0.001269817</span>, -<span class="number">0.001432419</span>, -<span class="number">0.001597881</span>,
+<a href=#98 id=98 data-nosnippet>98</a>    -<span class="number">0.001766682</span>, -<span class="number">0.001937389</span>, -<span class="number">0.002110004</span>, -<span class="number">0.002283096</span>,
+<a href=#99 id=99 data-nosnippet>99</a>    -<span class="number">0.002457142</span>, -<span class="number">0.002630711</span>, -<span class="number">0.002803326</span>, -<span class="number">0.002974033</span>,
+<a href=#100 id=100 data-nosnippet>100</a>    -<span class="number">0.00314188</span>, -<span class="number">0.003306866</span>, -<span class="number">0.003467083</span>, -<span class="number">0.003622532</span>,
+<a href=#101 id=101 data-nosnippet>101</a>    -<span class="number">0.003771782</span>, -<span class="number">0.003914356</span>, -<span class="number">0.004048824</span>, -<span class="number">0.004174709</span>,
+<a href=#102 id=102 data-nosnippet>102</a>    -<span class="number">0.004290581</span>, -<span class="number">0.004395962</span>, -<span class="number">0.004489899</span>, -<span class="number">0.004570484</span>,
+<a href=#103 id=103 data-nosnippet>103</a>    -<span class="number">0.004638195</span>, -<span class="number">0.004691124</span>, -<span class="number">0.004728317</span>, -<span class="number">0.004748821</span>,
+<a href=#104 id=104 data-nosnippet>104</a>    -<span class="number">0.004752159</span>, -<span class="number">0.004737377</span>, -<span class="number">0.004703045</span>, -<span class="number">0.004649162</span>,
+<a href=#105 id=105 data-nosnippet>105</a>    -<span class="number">0.004573822</span>, -<span class="number">0.004477024</span>, -<span class="number">0.004357815</span>, -<span class="number">0.00421524</span>,
+<a href=#106 id=106 data-nosnippet>106</a>    -<span class="number">0.004049301</span>, -<span class="number">0.003858566</span>, -<span class="number">0.003643036</span>, -<span class="number">0.003401756</span>,
+<a href=#107 id=107 data-nosnippet>107</a>    <span class="number">0.003134727</span>, <span class="number">0.002841473</span>, <span class="number">0.002521515</span>, <span class="number">0.002174854</span>,
+<a href=#108 id=108 data-nosnippet>108</a>    <span class="number">0.001800537</span>, <span class="number">0.001399517</span>, <span class="number">0.000971317</span>, <span class="number">0.000515938</span>,
+<a href=#109 id=109 data-nosnippet>109</a>    <span class="number">0.000033379</span>, -<span class="number">0.000475883</span>, -<span class="number">0.001011848</span>, -<span class="number">0.001573563</span>,
+<a href=#110 id=110 data-nosnippet>110</a>    -<span class="number">0.002161503</span>, -<span class="number">0.002774239</span>, -<span class="number">0.003411293</span>, -<span class="number">0.004072189</span>,
+<a href=#111 id=111 data-nosnippet>111</a>    -<span class="number">0.004756451</span>, -<span class="number">0.00546217</span>, -<span class="number">0.006189346</span>, -<span class="number">0.006937027</span>,
+<a href=#112 id=112 data-nosnippet>112</a>    -<span class="number">0.007703304</span>, -<span class="number">0.008487225</span>, -<span class="number">0.009287834</span>, -<span class="number">0.010103703</span>,
+<a href=#113 id=113 data-nosnippet>113</a>    -<span class="number">0.010933399</span>, -<span class="number">0.011775017</span>, -<span class="number">0.012627602</span>, -<span class="number">0.013489246</span>,
+<a href=#114 id=114 data-nosnippet>114</a>    -<span class="number">0.014358521</span>, -<span class="number">0.015233517</span>, -<span class="number">0.016112804</span>, -<span class="number">0.016994476</span>,
+<a href=#115 id=115 data-nosnippet>115</a>    -<span class="number">0.017876148</span>, -<span class="number">0.018756866</span>, -<span class="number">0.019634247</span>, -<span class="number">0.020506859</span>,
+<a href=#116 id=116 data-nosnippet>116</a>    -<span class="number">0.021372318</span>, -<span class="number">0.022228718</span>, -<span class="number">0.02307415</span>, -<span class="number">0.023907185</span>,
+<a href=#117 id=117 data-nosnippet>117</a>    -<span class="number">0.024725437</span>, -<span class="number">0.025527</span>, -<span class="number">0.026310921</span>, -<span class="number">0.02707386</span>,
+<a href=#118 id=118 data-nosnippet>118</a>    -<span class="number">0.027815342</span>, -<span class="number">0.028532982</span>, -<span class="number">0.029224873</span>, -<span class="number">0.02989006</span>,
+<a href=#119 id=119 data-nosnippet>119</a>    -<span class="number">0.030526638</span>, -<span class="number">0.031132698</span>, -<span class="number">0.03170681</span>, -<span class="number">0.03224802</span>,
+<a href=#120 id=120 data-nosnippet>120</a>    -<span class="number">0.032754898</span>, -<span class="number">0.033225536</span>, -<span class="number">0.033659935</span>, -<span class="number">0.03405571</span>,
+<a href=#121 id=121 data-nosnippet>121</a>    -<span class="number">0.034412861</span>, -<span class="number">0.034730434</span>, -<span class="number">0.035007</span>, -<span class="number">0.035242081</span>,
+<a href=#122 id=122 data-nosnippet>122</a>    -<span class="number">0.0354352</span>, -<span class="number">0.035586357</span>, -<span class="number">0.035694122</span>, -<span class="number">0.035758972</span>,
+<a href=#123 id=123 data-nosnippet>123</a>    <span class="number">0.035780907</span>, <span class="number">0.035758972</span>, <span class="number">0.035694122</span>, <span class="number">0.035586357</span>,
+<a href=#124 id=124 data-nosnippet>124</a>    <span class="number">0.0354352</span>, <span class="number">0.035242081</span>, <span class="number">0.035007</span>, <span class="number">0.034730434</span>,
+<a href=#125 id=125 data-nosnippet>125</a>    <span class="number">0.034412861</span>, <span class="number">0.03405571</span>, <span class="number">0.033659935</span>, <span class="number">0.033225536</span>,
+<a href=#126 id=126 data-nosnippet>126</a>    <span class="number">0.032754898</span>, <span class="number">0.03224802</span>, <span class="number">0.03170681</span>, <span class="number">0.031132698</span>,
+<a href=#127 id=127 data-nosnippet>127</a>    <span class="number">0.030526638</span>, <span class="number">0.02989006</span>, <span class="number">0.029224873</span>, <span class="number">0.028532982</span>,
+<a href=#128 id=128 data-nosnippet>128</a>    <span class="number">0.027815342</span>, <span class="number">0.02707386</span>, <span class="number">0.026310921</span>, <span class="number">0.025527</span>,
+<a href=#129 id=129 data-nosnippet>129</a>    <span class="number">0.024725437</span>, <span class="number">0.023907185</span>, <span class="number">0.02307415</span>, <span class="number">0.022228718</span>,
+<a href=#130 id=130 data-nosnippet>130</a>    <span class="number">0.021372318</span>, <span class="number">0.020506859</span>, <span class="number">0.019634247</span>, <span class="number">0.018756866</span>,
+<a href=#131 id=131 data-nosnippet>131</a>    <span class="number">0.017876148</span>, <span class="number">0.016994476</span>, <span class="number">0.016112804</span>, <span class="number">0.015233517</span>,
+<a href=#132 id=132 data-nosnippet>132</a>    <span class="number">0.014358521</span>, <span class="number">0.013489246</span>, <span class="number">0.012627602</span>, <span class="number">0.011775017</span>,
+<a href=#133 id=133 data-nosnippet>133</a>    <span class="number">0.010933399</span>, <span class="number">0.010103703</span>, <span class="number">0.009287834</span>, <span class="number">0.008487225</span>,
+<a href=#134 id=134 data-nosnippet>134</a>    <span class="number">0.007703304</span>, <span class="number">0.006937027</span>, <span class="number">0.006189346</span>, <span class="number">0.00546217</span>,
+<a href=#135 id=135 data-nosnippet>135</a>    <span class="number">0.004756451</span>, <span class="number">0.004072189</span>, <span class="number">0.003411293</span>, <span class="number">0.002774239</span>,
+<a href=#136 id=136 data-nosnippet>136</a>    <span class="number">0.002161503</span>, <span class="number">0.001573563</span>, <span class="number">0.001011848</span>, <span class="number">0.000475883</span>,
+<a href=#137 id=137 data-nosnippet>137</a>    -<span class="number">0.000033379</span>, -<span class="number">0.000515938</span>, -<span class="number">0.000971317</span>, -<span class="number">0.001399517</span>,
+<a href=#138 id=138 data-nosnippet>138</a>    -<span class="number">0.001800537</span>, -<span class="number">0.002174854</span>, -<span class="number">0.002521515</span>, -<span class="number">0.002841473</span>,
+<a href=#139 id=139 data-nosnippet>139</a>    <span class="number">0.003134727</span>, <span class="number">0.003401756</span>, <span class="number">0.003643036</span>, <span class="number">0.003858566</span>,
+<a href=#140 id=140 data-nosnippet>140</a>    <span class="number">0.004049301</span>, <span class="number">0.00421524</span>, <span class="number">0.004357815</span>, <span class="number">0.004477024</span>,
+<a href=#141 id=141 data-nosnippet>141</a>    <span class="number">0.004573822</span>, <span class="number">0.004649162</span>, <span class="number">0.004703045</span>, <span class="number">0.004737377</span>,
+<a href=#142 id=142 data-nosnippet>142</a>    <span class="number">0.004752159</span>, <span class="number">0.004748821</span>, <span class="number">0.004728317</span>, <span class="number">0.004691124</span>,
+<a href=#143 id=143 data-nosnippet>143</a>    <span class="number">0.004638195</span>, <span class="number">0.004570484</span>, <span class="number">0.004489899</span>, <span class="number">0.004395962</span>,
+<a href=#144 id=144 data-nosnippet>144</a>    <span class="number">0.004290581</span>, <span class="number">0.004174709</span>, <span class="number">0.004048824</span>, <span class="number">0.003914356</span>,
+<a href=#145 id=145 data-nosnippet>145</a>    <span class="number">0.003771782</span>, <span class="number">0.003622532</span>, <span class="number">0.003467083</span>, <span class="number">0.003306866</span>,
+<a href=#146 id=146 data-nosnippet>146</a>    <span class="number">0.00314188</span>, <span class="number">0.002974033</span>, <span class="number">0.002803326</span>, <span class="number">0.002630711</span>,
+<a href=#147 id=147 data-nosnippet>147</a>    <span class="number">0.002457142</span>, <span class="number">0.002283096</span>, <span class="number">0.002110004</span>, <span class="number">0.001937389</span>,
+<a href=#148 id=148 data-nosnippet>148</a>    <span class="number">0.001766682</span>, <span class="number">0.001597881</span>, <span class="number">0.001432419</span>, <span class="number">0.001269817</span>,
+<a href=#149 id=149 data-nosnippet>149</a>    <span class="number">0.001111031</span>, <span class="number">0.000956535</span>, <span class="number">0.000806808</span>, <span class="number">0.00066185</span>,
+<a href=#150 id=150 data-nosnippet>150</a>    <span class="number">0.000522137</span>, <span class="number">0.000388145</span>, <span class="number">0.000259876</span>, <span class="number">0.000137329</span>,
+<a href=#151 id=151 data-nosnippet>151</a>    <span class="number">0.000021458</span>, -<span class="number">0.000088215</span>, -<span class="number">0.000191689</span>, -<span class="number">0.000288486</span>,
+<a href=#152 id=152 data-nosnippet>152</a>    -<span class="number">0.000378609</span>, -<span class="number">0.000462532</span>, -<span class="number">0.000539303</span>, -<span class="number">0.000610352</span>,
+<a href=#153 id=153 data-nosnippet>153</a>    -<span class="number">0.000674248</span>, -<span class="number">0.000731945</span>, -<span class="number">0.00078392</span>, -<span class="number">0.00082922</span>,
+<a href=#154 id=154 data-nosnippet>154</a>    -<span class="number">0.000868797</span>, -<span class="number">0.000902653</span>, -<span class="number">0.000930786</span>, -<span class="number">0.000953674</span>,
+<a href=#155 id=155 data-nosnippet>155</a>    <span class="number">0.000971317</span>, <span class="number">0.000983715</span>, <span class="number">0.000991821</span>, <span class="number">0.000995159</span>,
+<a href=#156 id=156 data-nosnippet>156</a>    <span class="number">0.000994205</span>, <span class="number">0.000989437</span>, <span class="number">0.000980854</span>, <span class="number">0.000968933</span>,
+<a href=#157 id=157 data-nosnippet>157</a>    <span class="number">0.000954151</span>, <span class="number">0.000935555</span>, <span class="number">0.000915051</span>, <span class="number">0.000891685</span>,
+<a href=#158 id=158 data-nosnippet>158</a>    <span class="number">0.000866413</span>, <span class="number">0.000838757</span>, <span class="number">0.000809669</span>, <span class="number">0.000779152</span>,
+<a href=#159 id=159 data-nosnippet>159</a>    <span class="number">0.000747204</span>, <span class="number">0.000714302</span>, <span class="number">0.000680923</span>, <span class="number">0.000646591</span>,
+<a href=#160 id=160 data-nosnippet>160</a>    <span class="number">0.000611782</span>, <span class="number">0.000576973</span>, <span class="number">0.000542164</span>, <span class="number">0.000507355</span>,
+<a href=#161 id=161 data-nosnippet>161</a>    <span class="number">0.000472546</span>, <span class="number">0.000438213</span>, <span class="number">0.000404358</span>, <span class="number">0.000371456</span>,
+<a href=#162 id=162 data-nosnippet>162</a>    <span class="number">0.000339031</span>, <span class="number">0.00030756</span>, <span class="number">0.000277042</span>, <span class="number">0.000247478</span>,
+<a href=#163 id=163 data-nosnippet>163</a>    <span class="number">0.000218868</span>, <span class="number">0.000191212</span>, <span class="number">0.000165462</span>, <span class="number">0.00014019</span>,
+<a href=#164 id=164 data-nosnippet>164</a>    <span class="number">0.000116348</span>, <span class="number">0.000093937</span>, <span class="number">0.000072956</span>, <span class="number">0.000052929</span>,
+<a href=#165 id=165 data-nosnippet>165</a>    <span class="number">0.000034332</span>, <span class="number">0.000017166</span>, <span class="number">0.000000954</span>, -<span class="number">0.000013828</span>,
+<a href=#166 id=166 data-nosnippet>166</a>    -<span class="number">0.00002718</span>, -<span class="number">0.000039577</span>, -<span class="number">0.000050545</span>, -<span class="number">0.000060558</span>,
+<a href=#167 id=167 data-nosnippet>167</a>    -<span class="number">0.000069618</span>, -<span class="number">0.000077724</span>, -<span class="number">0.0000844</span>, -<span class="number">0.000090122</span>,
+<a href=#168 id=168 data-nosnippet>168</a>    -<span class="number">0.000095367</span>, -<span class="number">0.000099182</span>, -<span class="number">0.00010252</span>, -<span class="number">0.000105381</span>,
+<a href=#169 id=169 data-nosnippet>169</a>    -<span class="number">0.000106812</span>, -<span class="number">0.000108242</span>, -<span class="number">0.000108719</span>, -<span class="number">0.000108719</span>,
+<a href=#170 id=170 data-nosnippet>170</a>    -<span class="number">0.000108242</span>, -<span class="number">0.000107288</span>, -<span class="number">0.000105858</span>, -<span class="number">0.000103951</span>,
+<a href=#171 id=171 data-nosnippet>171</a>    <span class="number">0.000101566</span>, <span class="number">0.000099182</span>, <span class="number">0.000096321</span>, <span class="number">0.00009346</span>,
+<a href=#172 id=172 data-nosnippet>172</a>    <span class="number">0.000090599</span>, <span class="number">0.000087261</span>, <span class="number">0.000083923</span>, <span class="number">0.000080585</span>,
+<a href=#173 id=173 data-nosnippet>173</a>    <span class="number">0.000076771</span>, <span class="number">0.000073433</span>, <span class="number">0.000070095</span>, <span class="number">0.00006628</span>,
+<a href=#174 id=174 data-nosnippet>174</a>    <span class="number">0.000062943</span>, <span class="number">0.000059605</span>, <span class="number">0.00005579</span>, <span class="number">0.000052929</span>,
+<a href=#175 id=175 data-nosnippet>175</a>    <span class="number">0.000049591</span>, <span class="number">0.000046253</span>, <span class="number">0.000043392</span>, <span class="number">0.000040531</span>,
+<a href=#176 id=176 data-nosnippet>176</a>    <span class="number">0.00003767</span>, <span class="number">0.000034809</span>, <span class="number">0.000032425</span>, <span class="number">0.000030041</span>,
+<a href=#177 id=177 data-nosnippet>177</a>    <span class="number">0.000027657</span>, <span class="number">0.000025272</span>, <span class="number">0.000023365</span>, <span class="number">0.000021458</span>,
+<a href=#178 id=178 data-nosnippet>178</a>    <span class="number">0.00001955</span>, <span class="number">0.00001812</span>, <span class="number">0.000016689</span>, <span class="number">0.000014782</span>,
+<a href=#179 id=179 data-nosnippet>179</a>    <span class="number">0.000013828</span>, <span class="number">0.000012398</span>, <span class="number">0.000011444</span>, <span class="number">0.000010014</span>,
+<a href=#180 id=180 data-nosnippet>180</a>    <span class="number">0.00000906</span>, <span class="number">0.000008106</span>, <span class="number">0.000007629</span>, <span class="number">0.000006676</span>,
+<a href=#181 id=181 data-nosnippet>181</a>    <span class="number">0.000006199</span>, <span class="number">0.000005245</span>, <span class="number">0.000004768</span>, <span class="number">0.000004292</span>,
+<a href=#182 id=182 data-nosnippet>182</a>    <span class="number">0.000003815</span>, <span class="number">0.000003338</span>, <span class="number">0.000003338</span>, <span class="number">0.000002861</span>,
+<a href=#183 id=183 data-nosnippet>183</a>    <span class="number">0.000002384</span>, <span class="number">0.000002384</span>, <span class="number">0.000001907</span>, <span class="number">0.000001907</span>,
+<a href=#184 id=184 data-nosnippet>184</a>    <span class="number">0.000001431</span>, <span class="number">0.000001431</span>, <span class="number">0.000000954</span>, <span class="number">0.000000954</span>,
+<a href=#185 id=185 data-nosnippet>185</a>    <span class="number">0.000000954</span>, <span class="number">0.000000954</span>, <span class="number">0.000000477</span>, <span class="number">0.000000477</span>,
+<a href=#186 id=186 data-nosnippet>186</a>    <span class="number">0.000000477</span>, <span class="number">0.000000477</span>, <span class="number">0.000000477</span>, <span class="number">0.000000477</span>,
+<a href=#187 id=187 data-nosnippet>187</a>];
+<a href=#188 id=188 data-nosnippet>188</a>
+<a href=#189 id=189 data-nosnippet>189</a><span class="kw">const </span>LONG_32: [usize; <span class="number">21</span>] = [
+<a href=#190 id=190 data-nosnippet>190</a>    <span class="number">0</span>, <span class="number">4</span>, <span class="number">8</span>, <span class="number">12</span>, <span class="number">16</span>, <span class="number">20</span>, <span class="number">24</span>, <span class="number">30</span>, <span class="number">36</span>, <span class="number">44</span>, <span class="number">54</span>, <span class="number">66</span>, <span class="number">82</span>, <span class="number">102</span>, <span class="number">126</span>, <span class="number">156</span>, <span class="number">194</span>, <span class="number">240</span>, <span class="number">296</span>, <span class="number">364</span>, <span class="number">448</span>,
+<a href=#191 id=191 data-nosnippet>191</a>];
+<a href=#192 id=192 data-nosnippet>192</a><span class="kw">const </span>SHORT_32: [usize; <span class="number">12</span>] = [
+<a href=#193 id=193 data-nosnippet>193</a>    <span class="number">0</span>, <span class="number">4</span>, <span class="number">8</span>, <span class="number">12</span>, <span class="number">16</span>, <span class="number">22</span>, <span class="number">30</span>, <span class="number">42</span>, <span class="number">58</span>, <span class="number">78</span>, <span class="number">104</span>, <span class="number">138</span>,
+<a href=#194 id=194 data-nosnippet>194</a>];
+<a href=#195 id=195 data-nosnippet>195</a><span class="kw">const </span>LONG_44: [usize; <span class="number">21</span>] = [
+<a href=#196 id=196 data-nosnippet>196</a>    <span class="number">0</span>, <span class="number">4</span>, <span class="number">8</span>, <span class="number">12</span>, <span class="number">16</span>, <span class="number">20</span>, <span class="number">24</span>, <span class="number">30</span>, <span class="number">36</span>, <span class="number">44</span>, <span class="number">52</span>, <span class="number">62</span>, <span class="number">74</span>, <span class="number">90</span>, <span class="number">110</span>, <span class="number">134</span>, <span class="number">162</span>, <span class="number">196</span>, <span class="number">238</span>, <span class="number">288</span>, <span class="number">342</span>,
+<a href=#197 id=197 data-nosnippet>197</a>];
+<a href=#198 id=198 data-nosnippet>198</a><span class="kw">const </span>SHORT_44: [usize; <span class="number">12</span>] = [
+<a href=#199 id=199 data-nosnippet>199</a>    <span class="number">0</span>, <span class="number">4</span>, <span class="number">8</span>, <span class="number">12</span>, <span class="number">16</span>, <span class="number">22</span>, <span class="number">30</span>, <span class="number">40</span>, <span class="number">52</span>, <span class="number">66</span>, <span class="number">84</span>, <span class="number">106</span>,
+<a href=#200 id=200 data-nosnippet>200</a>];
+<a href=#201 id=201 data-nosnippet>201</a><span class="kw">const </span>LONG_48: [usize; <span class="number">21</span>] = [
+<a href=#202 id=202 data-nosnippet>202</a>    <span class="number">0</span>, <span class="number">4</span>, <span class="number">8</span>, <span class="number">12</span>, <span class="number">16</span>, <span class="number">20</span>, <span class="number">24</span>, <span class="number">30</span>, <span class="number">36</span>, <span class="number">42</span>, <span class="number">50</span>, <span class="number">60</span>, <span class="number">72</span>, <span class="number">88</span>, <span class="number">106</span>, <span class="number">128</span>, <span class="number">156</span>, <span class="number">190</span>, <span class="number">230</span>, <span class="number">276</span>, <span class="number">330</span>,
+<a href=#203 id=203 data-nosnippet>203</a>];
+<a href=#204 id=204 data-nosnippet>204</a><span class="kw">const </span>SHORT_48: [usize; <span class="number">12</span>] = [
+<a href=#205 id=205 data-nosnippet>205</a>    <span class="number">0</span>, <span class="number">4</span>, <span class="number">8</span>, <span class="number">12</span>, <span class="number">16</span>, <span class="number">22</span>, <span class="number">28</span>, <span class="number">38</span>, <span class="number">50</span>, <span class="number">64</span>, <span class="number">80</span>, <span class="number">100</span>,
+<a href=#206 id=206 data-nosnippet>206</a>];
+<a href=#207 id=207 data-nosnippet>207</a>
+<a href=#208 id=208 data-nosnippet>208</a><span class="kw">const </span>LONG_END_32: usize = <span class="number">550</span>;
+<a href=#209 id=209 data-nosnippet>209</a><span class="kw">const </span>SHORT_END_32: usize = <span class="number">180</span>;
+<a href=#210 id=210 data-nosnippet>210</a><span class="kw">const </span>LONG_END_44: usize = <span class="number">418</span>;
+<a href=#211 id=211 data-nosnippet>211</a><span class="kw">const </span>SHORT_END_44: usize = <span class="number">136</span>;
+<a href=#212 id=212 data-nosnippet>212</a><span class="kw">const </span>LONG_END_48: usize = <span class="number">384</span>;
+<a href=#213 id=213 data-nosnippet>213</a><span class="kw">const </span>SHORT_END_48: usize = <span class="number">126</span>;
+<a href=#214 id=214 data-nosnippet>214</a>
+<a href=#215 id=215 data-nosnippet>215</a><span class="doccomment">/// Precomputed alias-reduction factors `cs[i]` and `ca[i]`.
+<a href=#216 id=216 data-nosnippet>216</a>///
+<a href=#217 id=217 data-nosnippet>217</a>/// `cs = 1/sqrt(1 + ci^2)`, `ca = ci/sqrt(1 + ci^2)` — derived rather than
+<a href=#218 id=218 data-nosnippet>218</a>/// tabulated, so the two can never drift apart from the `ci` above.
+<a href=#219 id=219 data-nosnippet>219</a></span><span class="kw">pub fn </span>butterfly_coefficients() -&gt; ([f64; <span class="number">8</span>], [f64; <span class="number">8</span>]) {
+<a href=#220 id=220 data-nosnippet>220</a>    <span class="kw">let </span><span class="kw-2">mut </span>cs = [<span class="number">0.0</span>; <span class="number">8</span>];
+<a href=#221 id=221 data-nosnippet>221</a>    <span class="kw">let </span><span class="kw-2">mut </span>ca = [<span class="number">0.0</span>; <span class="number">8</span>];
+<a href=#222 id=222 data-nosnippet>222</a>    <span class="kw">for </span>(i, <span class="kw-2">&amp;</span>c) <span class="kw">in </span>CI.iter().enumerate() {
+<a href=#223 id=223 data-nosnippet>223</a>        <span class="kw">let </span>d = (<span class="number">1.0 </span>+ c * c).sqrt();
+<a href=#224 id=224 data-nosnippet>224</a>        cs[i] = <span class="number">1.0 </span>/ d;
+<a href=#225 id=225 data-nosnippet>225</a>        ca[i] = c / d;
+<a href=#226 id=226 data-nosnippet>226</a>    }
+<a href=#227 id=227 data-nosnippet>227</a>    (cs, ca)
+<a href=#228 id=228 data-nosnippet>228</a>}
+<a href=#229 id=229 data-nosnippet>229</a>
+<a href=#230 id=230 data-nosnippet>230</a><span class="doccomment">/// The four window shapes Layer III applies to a subband's 36 samples.
+<a href=#231 id=231 data-nosnippet>231</a>///
+<a href=#232 id=232 data-nosnippet>232</a>/// Same idea as AAC's, at a twelfth of the size and one stage further down
+<a href=#233 id=233 data-nosnippet>233</a>/// the chain: these are applied inside each of the 32 subbands, not to the
+<a href=#234 id=234 data-nosnippet>234</a>/// PCM. `start` and `stop` are the transition shapes bridging long and short
+<a href=#235 id=235 data-nosnippet>235</a>/// blocks; both must be tested, because a frame the encoder coded as a
+<a href=#236 id=236 data-nosnippet>236</a>/// transition carries its lattice under that shape and no other.
+<a href=#237 id=237 data-nosnippet>237</a></span><span class="kw">pub struct </span>Windows {
+<a href=#238 id=238 data-nosnippet>238</a>    <span class="doccomment">/// Plain long window, 36 samples.
+<a href=#239 id=239 data-nosnippet>239</a>    </span><span class="kw">pub </span>long: Vec&lt;f64&gt;,
+<a href=#240 id=240 data-nosnippet>240</a>    <span class="doccomment">/// Long rising edge, short falling edge.
+<a href=#241 id=241 data-nosnippet>241</a>    </span><span class="kw">pub </span>start: Vec&lt;f64&gt;,
+<a href=#242 id=242 data-nosnippet>242</a>    <span class="doccomment">/// Short rising edge, long falling edge.
+<a href=#243 id=243 data-nosnippet>243</a>    </span><span class="kw">pub </span>stop: Vec&lt;f64&gt;,
+<a href=#244 id=244 data-nosnippet>244</a>    <span class="doccomment">/// Applied to each of the three short transforms, 12 samples.
+<a href=#245 id=245 data-nosnippet>245</a>    </span><span class="kw">pub </span>short: Vec&lt;f64&gt;,
+<a href=#246 id=246 data-nosnippet>246</a>}
+<a href=#247 id=247 data-nosnippet>247</a>
+<a href=#248 id=248 data-nosnippet>248</a><span class="kw">impl </span>Windows {
+<a href=#249 id=249 data-nosnippet>249</a>    <span class="doccomment">/// Build the four shapes. Cheap; built once per worker.
+<a href=#250 id=250 data-nosnippet>250</a>    </span><span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+<a href=#251 id=251 data-nosnippet>251</a>        <span class="kw">let </span>sine = |len: usize, from: usize, count: usize| -&gt; Vec&lt;f64&gt; {
+<a href=#252 id=252 data-nosnippet>252</a>            (from..from + count)
+<a href=#253 id=253 data-nosnippet>253</a>                .map(|n| (std::f64::consts::PI * (n <span class="kw">as </span>f64 + <span class="number">0.5</span>) / len <span class="kw">as </span>f64).sin())
+<a href=#254 id=254 data-nosnippet>254</a>                .collect()
+<a href=#255 id=255 data-nosnippet>255</a>        };
+<a href=#256 id=256 data-nosnippet>256</a>        <span class="kw">const </span>FILL: usize = <span class="number">6</span>;
+<a href=#257 id=257 data-nosnippet>257</a>        <span class="kw">let </span>half_long = N_LONG / <span class="number">2</span>;
+<a href=#258 id=258 data-nosnippet>258</a>        <span class="kw">let </span>half_short = N_SHORT / <span class="number">2</span>;
+<a href=#259 id=259 data-nosnippet>259</a>
+<a href=#260 id=260 data-nosnippet>260</a>        <span class="kw">let </span><span class="kw-2">mut </span>start = sine(N_LONG, <span class="number">0</span>, half_long);
+<a href=#261 id=261 data-nosnippet>261</a>        start.extend(std::iter::repeat_n(<span class="number">1.0</span>, FILL));
+<a href=#262 id=262 data-nosnippet>262</a>        start.extend(sine(N_SHORT, FILL, half_short));
+<a href=#263 id=263 data-nosnippet>263</a>        start.extend(std::iter::repeat_n(<span class="number">0.0</span>, FILL));
+<a href=#264 id=264 data-nosnippet>264</a>
+<a href=#265 id=265 data-nosnippet>265</a>        <span class="kw">let </span><span class="kw-2">mut </span>stop = <span class="macro">vec!</span>[<span class="number">0.0</span>; FILL];
+<a href=#266 id=266 data-nosnippet>266</a>        stop.extend(sine(N_SHORT, <span class="number">0</span>, half_short));
+<a href=#267 id=267 data-nosnippet>267</a>        stop.extend(std::iter::repeat_n(<span class="number">1.0</span>, FILL));
+<a href=#268 id=268 data-nosnippet>268</a>        stop.extend(sine(N_LONG, half_long, half_long));
+<a href=#269 id=269 data-nosnippet>269</a>
+<a href=#270 id=270 data-nosnippet>270</a>        <span class="self">Self </span>{
+<a href=#271 id=271 data-nosnippet>271</a>            long: sine(N_LONG, <span class="number">0</span>, N_LONG),
+<a href=#272 id=272 data-nosnippet>272</a>            start,
+<a href=#273 id=273 data-nosnippet>273</a>            stop,
+<a href=#274 id=274 data-nosnippet>274</a>            short: sine(N_SHORT, <span class="number">0</span>, N_SHORT),
+<a href=#275 id=275 data-nosnippet>275</a>        }
+<a href=#276 id=276 data-nosnippet>276</a>    }
+<a href=#277 id=277 data-nosnippet>277</a>}
+<a href=#278 id=278 data-nosnippet>278</a>
+<a href=#279 id=279 data-nosnippet>279</a>
+<a href=#280 id=280 data-nosnippet>280</a><span class="kw">impl </span>Default <span class="kw">for </span>Windows {
+<a href=#281 id=281 data-nosnippet>281</a>    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+<a href=#282 id=282 data-nosnippet>282</a>        <span class="self">Self</span>::new()
+<a href=#283 id=283 data-nosnippet>283</a>    }
+<a href=#284 id=284 data-nosnippet>284</a>}
+<a href=#285 id=285 data-nosnippet>285</a>
+<a href=#286 id=286 data-nosnippet>286</a><span class="doccomment">/// Long-transform scalefactor bands for `rate_khz`.
+<a href=#287 id=287 data-nosnippet>287</a>///
+<a href=#288 id=288 data-nosnippet>288</a>/// Unlike AAC's, these do **not** tile the whole spectrum: the topmost band
+<a href=#289 id=289 data-nosnippet>289</a>/// stops at 418 of 576 coefficients at 44.1 kHz (384 at 48, 550 at 32). Above
+<a href=#290 id=290 data-nosnippet>290</a>/// that is the region a Layer III encoder discards outright, so there is no
+<a href=#291 id=291 data-nosnippet>291</a>/// lattice up there to find and the standard does not assign it a scalefactor.
+<a href=#292 id=292 data-nosnippet>292</a></span><span class="kw">pub fn </span>long_bands(rate_khz: u32) -&gt; <span class="prelude-ty">Option</span>&lt;Vec&lt;Band&gt;&gt; {
+<a href=#293 id=293 data-nosnippet>293</a>    <span class="kw">let </span>(starts, end): (<span class="kw-2">&amp;</span>[usize], usize) = <span class="kw">match </span>rate_khz {
+<a href=#294 id=294 data-nosnippet>294</a>        <span class="number">32 </span>=&gt; (<span class="kw-2">&amp;</span>LONG_32, LONG_END_32),
+<a href=#295 id=295 data-nosnippet>295</a>        <span class="number">44 </span>=&gt; (<span class="kw-2">&amp;</span>LONG_44, LONG_END_44),
+<a href=#296 id=296 data-nosnippet>296</a>        <span class="number">48 </span>=&gt; (<span class="kw-2">&amp;</span>LONG_48, LONG_END_48),
+<a href=#297 id=297 data-nosnippet>297</a>        <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">None</span>,
+<a href=#298 id=298 data-nosnippet>298</a>    };
+<a href=#299 id=299 data-nosnippet>299</a>    <span class="prelude-val">Some</span>(bands(starts, end))
+<a href=#300 id=300 data-nosnippet>300</a>}
+<a href=#301 id=301 data-nosnippet>301</a>
+<a href=#302 id=302 data-nosnippet>302</a><span class="doccomment">/// Short-transform scalefactor bands for `rate_khz`.
+<a href=#303 id=303 data-nosnippet>303</a></span><span class="kw">pub fn </span>short_bands(rate_khz: u32) -&gt; <span class="prelude-ty">Option</span>&lt;Vec&lt;Band&gt;&gt; {
+<a href=#304 id=304 data-nosnippet>304</a>    <span class="kw">let </span>(starts, end): (<span class="kw-2">&amp;</span>[usize], usize) = <span class="kw">match </span>rate_khz {
+<a href=#305 id=305 data-nosnippet>305</a>        <span class="number">32 </span>=&gt; (<span class="kw-2">&amp;</span>SHORT_32, SHORT_END_32),
+<a href=#306 id=306 data-nosnippet>306</a>        <span class="number">44 </span>=&gt; (<span class="kw-2">&amp;</span>SHORT_44, SHORT_END_44),
+<a href=#307 id=307 data-nosnippet>307</a>        <span class="number">48 </span>=&gt; (<span class="kw-2">&amp;</span>SHORT_48, SHORT_END_48),
+<a href=#308 id=308 data-nosnippet>308</a>        <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">None</span>,
+<a href=#309 id=309 data-nosnippet>309</a>    };
+<a href=#310 id=310 data-nosnippet>310</a>    <span class="prelude-val">Some</span>(bands(starts, end))
+<a href=#311 id=311 data-nosnippet>311</a>}
+<a href=#312 id=312 data-nosnippet>312</a>
+<a href=#313 id=313 data-nosnippet>313</a><span class="kw">fn </span>bands(starts: <span class="kw-2">&amp;</span>[usize], end: usize) -&gt; Vec&lt;Band&gt; {
+<a href=#314 id=314 data-nosnippet>314</a>    starts
+<a href=#315 id=315 data-nosnippet>315</a>        .iter()
+<a href=#316 id=316 data-nosnippet>316</a>        .enumerate()
+<a href=#317 id=317 data-nosnippet>317</a>        .map(|(i, <span class="kw-2">&amp;</span>start)| Band {
+<a href=#318 id=318 data-nosnippet>318</a>            start,
+<a href=#319 id=319 data-nosnippet>319</a>            end: starts.get(i + <span class="number">1</span>).copied().unwrap_or(end),
+<a href=#320 id=320 data-nosnippet>320</a>        })
+<a href=#321 id=321 data-nosnippet>321</a>        .collect()
+<a href=#322 id=322 data-nosnippet>322</a>}
+<a href=#323 id=323 data-nosnippet>323</a>
+<a href=#324 id=324 data-nosnippet>324</a><span class="attr">#[cfg(test)]
+<a href=#325 id=325 data-nosnippet>325</a></span><span class="kw">mod </span>tests {
+<a href=#326 id=326 data-nosnippet>326</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href=#327 id=327 data-nosnippet>327</a>
+<a href=#328 id=328 data-nosnippet>328</a>    <span class="doccomment">/// The property that distinguishes the standard's table from a mistyped
+<a href=#329 id=329 data-nosnippet>329</a>    /// one, and the reason it is asserted rather than trusted: 512 numbers
+<a href=#330 id=330 data-nosnippet>330</a>    /// copied by hand or by script are exactly the kind of thing that goes
+<a href=#331 id=331 data-nosnippet>331</a>    /// wrong silently.
+<a href=#332 id=332 data-nosnippet>332</a>    </span><span class="attr">#[test]
+<a href=#333 id=333 data-nosnippet>333</a>    </span><span class="kw">fn </span>the_analysis_window_is_symmetric_in_magnitude() {
+<a href=#334 id=334 data-nosnippet>334</a>        <span class="kw">for </span>i <span class="kw">in </span><span class="number">1</span>..<span class="number">256 </span>{
+<a href=#335 id=335 data-nosnippet>335</a>            <span class="kw">let </span>a = PQMF_WINDOW[i].abs();
+<a href=#336 id=336 data-nosnippet>336</a>            <span class="kw">let </span>b = PQMF_WINDOW[<span class="number">512 </span>- i].abs();
+<a href=#337 id=337 data-nosnippet>337</a>            <span class="macro">assert!</span>((a - b).abs() &lt; <span class="number">1e-12</span>, <span class="string">"i={i}: {a} vs {b}"</span>);
+<a href=#338 id=338 data-nosnippet>338</a>        }
+<a href=#339 id=339 data-nosnippet>339</a>        <span class="comment">// Its peak sits at the centre.
+<a href=#340 id=340 data-nosnippet>340</a>        </span><span class="kw">let </span>peak = PQMF_WINDOW.iter().map(|v| v.abs()).fold(<span class="number">0.0f64</span>, f64::max);
+<a href=#341 id=341 data-nosnippet>341</a>        <span class="macro">assert!</span>((PQMF_WINDOW[<span class="number">256</span>].abs() - peak).abs() &lt; <span class="number">1e-12</span>);
+<a href=#342 id=342 data-nosnippet>342</a>        <span class="macro">assert_eq!</span>(PQMF_WINDOW[<span class="number">0</span>], <span class="number">0.0</span>);
+<a href=#343 id=343 data-nosnippet>343</a>    }
+<a href=#344 id=344 data-nosnippet>344</a>
+<a href=#345 id=345 data-nosnippet>345</a>    <span class="attr">#[test]
+<a href=#346 id=346 data-nosnippet>346</a>    </span><span class="kw">fn </span>bands_are_contiguous_and_stop_below_the_full_spectrum() {
+<a href=#347 id=347 data-nosnippet>347</a>        <span class="kw">for </span>rate <span class="kw">in </span>[<span class="number">32u32</span>, <span class="number">44</span>, <span class="number">48</span>] {
+<a href=#348 id=348 data-nosnippet>348</a>            <span class="kw">for </span>(b, limit, what) <span class="kw">in </span>[
+<a href=#349 id=349 data-nosnippet>349</a>                (long_bands(rate).expect(<span class="string">"long"</span>), GRANULE_LEN, <span class="string">"long"</span>),
+<a href=#350 id=350 data-nosnippet>350</a>                (short_bands(rate).expect(<span class="string">"short"</span>), GRANULE_LEN / SHORT_COUNT, <span class="string">"short"</span>),
+<a href=#351 id=351 data-nosnippet>351</a>            ] {
+<a href=#352 id=352 data-nosnippet>352</a>                <span class="macro">assert_eq!</span>(b[<span class="number">0</span>].start, <span class="number">0</span>, <span class="string">"{rate}k {what}"</span>);
+<a href=#353 id=353 data-nosnippet>353</a>                <span class="kw">for </span>pair <span class="kw">in </span>b.windows(<span class="number">2</span>) {
+<a href=#354 id=354 data-nosnippet>354</a>                    <span class="macro">assert_eq!</span>(pair[<span class="number">0</span>].end, pair[<span class="number">1</span>].start, <span class="string">"{rate}k {what}: gap"</span>);
+<a href=#355 id=355 data-nosnippet>355</a>                }
+<a href=#356 id=356 data-nosnippet>356</a>                <span class="kw">for </span>x <span class="kw">in </span><span class="kw-2">&amp;</span>b {
+<a href=#357 id=357 data-nosnippet>357</a>                    <span class="macro">assert!</span>(x.width() &gt; <span class="number">0</span>, <span class="string">"{rate}k {what}: empty band {x:?}"</span>);
+<a href=#358 id=358 data-nosnippet>358</a>                }
+<a href=#359 id=359 data-nosnippet>359</a>                <span class="comment">// The defining difference from AAC: coverage stops short.
+<a href=#360 id=360 data-nosnippet>360</a>                </span><span class="kw">let </span>last = b[b.len() - <span class="number">1</span>].end;
+<a href=#361 id=361 data-nosnippet>361</a>                <span class="macro">assert!</span>(last &lt; limit, <span class="string">"{rate}k {what}: {last} should stop below {limit}"</span>);
+<a href=#362 id=362 data-nosnippet>362</a>            }
+<a href=#363 id=363 data-nosnippet>363</a>        }
+<a href=#364 id=364 data-nosnippet>364</a>        <span class="macro">assert!</span>(long_bands(<span class="number">96</span>).is_none());
+<a href=#365 id=365 data-nosnippet>365</a>    }
+<a href=#366 id=366 data-nosnippet>366</a>
+<a href=#367 id=367 data-nosnippet>367</a>    <span class="attr">#[test]
+<a href=#368 id=368 data-nosnippet>368</a>    </span><span class="kw">fn </span>butterfly_factors_satisfy_their_identity() {
+<a href=#369 id=369 data-nosnippet>369</a>        <span class="kw">let </span>(cs, ca) = butterfly_coefficients();
+<a href=#370 id=370 data-nosnippet>370</a>        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..<span class="number">8 </span>{
+<a href=#371 id=371 data-nosnippet>371</a>            <span class="comment">// cs^2 + ca^2 == 1: the butterfly is a rotation, so it preserves
+<a href=#372 id=372 data-nosnippet>372</a>            // energy. A typo in `ci` would break this.
+<a href=#373 id=373 data-nosnippet>373</a>            </span><span class="macro">assert!</span>((cs[i] * cs[i] + ca[i] * ca[i] - <span class="number">1.0</span>).abs() &lt; <span class="number">1e-12</span>, <span class="string">"i={i}"</span>);
+<a href=#374 id=374 data-nosnippet>374</a>            <span class="macro">assert!</span>(cs[i] &gt; <span class="number">0.0 </span>&amp;&amp; ca[i] &lt; <span class="number">0.0</span>, <span class="string">"i={i}: {} {}"</span>, cs[i], ca[i]);
+<a href=#375 id=375 data-nosnippet>375</a>        }
+<a href=#376 id=376 data-nosnippet>376</a>        <span class="comment">// The corrections shrink with distance from the band edge.
+<a href=#377 id=377 data-nosnippet>377</a>        </span><span class="kw">for </span>i <span class="kw">in </span><span class="number">1</span>..<span class="number">8 </span>{
+<a href=#378 id=378 data-nosnippet>378</a>            <span class="macro">assert!</span>(ca[i].abs() &lt; ca[i - <span class="number">1</span>].abs(), <span class="string">"i={i}"</span>);
+<a href=#379 id=379 data-nosnippet>379</a>        }
+<a href=#380 id=380 data-nosnippet>380</a>    }
+<a href=#381 id=381 data-nosnippet>381</a>}
+</code></pre></div></section></main></body></html>

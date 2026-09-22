@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["analysis","convert","decode","dsd","pipeline","playlist","report","scan","tags","types"]};
+window.SIDEBAR_ITEMS = {"mod":["analysis","convert","decode","dsd","hash","pipeline","playlist","relocate","report","scan","tags","transcode","types"]};

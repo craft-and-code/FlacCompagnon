@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["TranscodeState"],"fn":["classify"],"struct":["Detections"]};
+window.SIDEBAR_ITEMS = {"fn":["classify"],"struct":["Detections"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["frame_energies_db","mean_energy_db","mid_side","select_frames","top_frames"]};

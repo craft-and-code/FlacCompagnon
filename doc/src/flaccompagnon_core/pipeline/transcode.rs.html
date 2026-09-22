@@ -1,0 +1,323 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `core/src/pipeline/transcode.rs`."><title>transcode.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-1ed95124.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="flaccompagnon_core" data-themes="" data-resource-suffix="" data-rustdoc-version="1.98.1 (48a229cea 2026-09-01)" data-channel="1.98.1" data-search-js="search-9944d736.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-417ebf0a.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">flaccompagnon_core/pipeline/</div>transcode.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! The bridge between a file on disk and the lattice detectors.
+<a href=#2 id=2 data-nosnippet>2</a>//!
+<a href=#3 id=3 data-nosnippet>3</a>//! [`crate::transcode`] is deliberately pure: it takes samples and returns a
+<a href=#4 id=4 data-nosnippet>4</a>//! verdict, touches no filesystem, and can therefore be tested on synthetic
+<a href=#5 id=5 data-nosnippet>5</a>//! signals with no fixtures. Getting the samples to it is this file's job, and
+<a href=#6 id=6 data-nosnippet>6</a>//! it lives in the pipeline because that is where decoding and orchestration
+<a href=#7 id=7 data-nosnippet>7</a>//! already belong.
+<a href=#8 id=8 data-nosnippet>8</a>//!
+<a href=#9 id=9 data-nosnippet>9</a>//! # Why this decodes a second time
+<a href=#10 id=10 data-nosnippet>10</a>//!
+<a href=#11 id=11 data-nosnippet>11</a>//! The main analysis pass streams: it consumes packets, folds each into
+<a href=#12 id=12 data-nosnippet>12</a>//! running statistics, and drops them. That is what lets a 200-track folder be
+<a href=#13 id=13 data-nosnippet>13</a>//! analyzed in parallel without filling memory.
+<a href=#14 id=14 data-nosnippet>14</a>//!
+<a href=#15 id=15 data-nosnippet>15</a>//! The detectors cannot work that way. They re-measure the same frames at
+<a href=#16 id=16 data-nosnippet>16</a>//! 1024 different sample alignments, so they need the whole signal resident,
+<a href=#17 id=17 data-nosnippet>17</a>//! in `f64`, for the duration. A five-minute stereo track at 44.1 kHz is about
+<a href=#18 id=18 data-nosnippet>18</a>//! 210 MB in that form — acceptable for one file at a time, ruinous for a
+<a href=#19 id=19 data-nosnippet>19</a>//! dozen decoded in parallel.
+<a href=#20 id=20 data-nosnippet>20</a>//!
+<a href=#21 id=21 data-nosnippet>21</a>//! The file is decoded again here and the buffer is released after its
+<a href=#22 id=22 data-nosnippet>22</a>//! sweeps. Concurrent callers each hold their own buffer; this function
+<a href=#23 id=23 data-nosnippet>23</a>//! does not serialize them or impose a global memory ceiling.
+<a href=#24 id=24 data-nosnippet>24</a>
+<a href=#25 id=25 data-nosnippet>25</a></span><span class="kw">use </span>std::path::Path;
+<a href=#26 id=26 data-nosnippet>26</a>
+<a href=#27 id=27 data-nosnippet>27</a><span class="kw">use </span><span class="kw">crate</span>::decode::decode_to_pcm;
+<a href=#28 id=28 data-nosnippet>28</a><span class="kw">use </span><span class="kw">crate</span>::transcode::{
+<a href=#29 id=29 data-nosnippet>29</a>    aac, mp3, supported_rate_khz, AacParams, LatticeResult, LatticeSkip, Mp3Params,
+<a href=#30 id=30 data-nosnippet>30</a>    TranscodeEvidence,
+<a href=#31 id=31 data-nosnippet>31</a>};
+<a href=#32 id=32 data-nosnippet>32</a>
+<a href=#33 id=33 data-nosnippet>33</a><span class="doccomment">/// How many channels the detectors look at.
+<a href=#34 id=34 data-nosnippet>34</a>///
+<a href=#35 id=35 data-nosnippet>35</a>/// Two: a stereo master's content is in the first pair, and the detectors
+<a href=#36 id=36 data-nosnippet>36</a>/// already test that pair four ways (L, R, M, S). Surround channels would
+<a href=#37 id=37 data-nosnippet>37</a>/// multiply the cost of the most expensive step in the app for content that
+<a href=#38 id=38 data-nosnippet>38</a>/// carries the same lattice as the front pair.
+<a href=#39 id=39 data-nosnippet>39</a></span><span class="kw">const </span>MAX_CHANNELS: usize = <span class="number">2</span>;
+<a href=#40 id=40 data-nosnippet>40</a>
+<a href=#41 id=41 data-nosnippet>41</a><span class="doccomment">/// Decode `path` and ask **every** codec detector whether the audio sits on
+<a href=#42 id=42 data-nosnippet>42</a>/// its lattice, returning the strongest evidence found.
+<a href=#43 id=43 data-nosnippet>43</a>///
+<a href=#44 id=44 data-nosnippet>44</a>/// Both detectors run, and both must: they look in different transforms, so a
+<a href=#45 id=45 data-nosnippet>45</a>/// file the AAC sweep calls clean can still be an MP3 transcode, and vice
+<a href=#46 id=46 data-nosnippet>46</a>/// versa. Measured on a real 128 kbps MP3 re-wrapped as FLAC, the MP3 sweep
+<a href=#47 id=47 data-nosnippet>47</a>/// scored 0.184 against its threshold while the AAC sweep scored 0.011 against
+<a href=#48 id=48 data-nosnippet>48</a>/// its own 0.0125 — the AAC detector would have declared that file genuine on
+<a href=#49 id=49 data-nosnippet>49</a>/// its own.
+<a href=#50 id=50 data-nosnippet>50</a>///
+<a href=#51 id=51 data-nosnippet>51</a>/// Doubling the sweep doubles the cost, which is the most expensive step in
+<a href=#52 id=52 data-nosnippet>52</a>/// the app. It is not optional all the same: half a detector is a detector
+<a href=#53 id=53 data-nosnippet>53</a>/// that reports "clean" for the wrong reason.
+<a href=#54 id=54 data-nosnippet>54</a>///
+<a href=#55 id=55 data-nosnippet>55</a>/// `Err` when the file could not be decoded, its sample rate has no
+<a href=#56 id=56 data-nosnippet>56</a>/// tabulated bands, it is too short, or `cancelled` fired. An `Err` is not
+<a href=#57 id=57 data-nosnippet>57</a>/// "clean" — it is "no answer" — and it says which of those happened, because
+<a href=#58 id=58 data-nosnippet>58</a>/// a bare "no answer" is exactly as unactionable in a bug report as it is in
+<a href=#59 id=59 data-nosnippet>59</a>/// the results table.
+<a href=#60 id=60 data-nosnippet>60</a></span><span class="kw">pub fn </span>detect(
+<a href=#61 id=61 data-nosnippet>61</a>    path: <span class="kw-2">&amp;</span>Path,
+<a href=#62 id=62 data-nosnippet>62</a>    aac_params: <span class="kw-2">&amp;</span>AacParams,
+<a href=#63 id=63 data-nosnippet>63</a>    mp3_params: <span class="kw-2">&amp;</span>Mp3Params,
+<a href=#64 id=64 data-nosnippet>64</a>    cancelled: <span class="kw-2">&amp;</span>(<span class="kw">dyn </span>Fn() -&gt; bool + Sync),
+<a href=#65 id=65 data-nosnippet>65</a>) -&gt; LatticeResult {
+<a href=#66 id=66 data-nosnippet>66</a>    <span class="kw">if </span>cancelled() {
+<a href=#67 id=67 data-nosnippet>67</a>        <span class="kw">return </span><span class="prelude-val">Err</span>(LatticeSkip::Cancelled);
+<a href=#68 id=68 data-nosnippet>68</a>    }
+<a href=#69 id=69 data-nosnippet>69</a>    <span class="comment">// Check the decoded rate before either sweep so the reason is
+<a href=#70 id=70 data-nosnippet>70</a>    // the *specific* one: the detectors would refuse an untabulated rate too,
+<a href=#71 id=71 data-nosnippet>71</a>    // but by then it is indistinguishable from every other refusal.
+<a href=#72 id=72 data-nosnippet>72</a>    </span><span class="kw">let </span>pcm = decode_to_pcm(path).map_err(|e| LatticeSkip::Undecodable(e.to_string()))<span class="question-mark">?</span>;
+<a href=#73 id=73 data-nosnippet>73</a>    <span class="kw">if </span>supported_rate_khz(pcm.sample_rate).is_none() {
+<a href=#74 id=74 data-nosnippet>74</a>        <span class="kw">return </span><span class="prelude-val">Err</span>(LatticeSkip::UnsupportedRate(pcm.sample_rate));
+<a href=#75 id=75 data-nosnippet>75</a>    }
+<a href=#76 id=76 data-nosnippet>76</a>    <span class="kw">let </span>channels = deinterleave(<span class="kw-2">&amp;</span>pcm.samples, pcm.channels).ok_or(LatticeSkip::NoSamples)<span class="question-mark">?</span>;
+<a href=#77 id=77 data-nosnippet>77</a>    <span class="comment">// Dropped before the sweep starts: the interleaved `f32` copy is dead
+<a href=#78 id=78 data-nosnippet>78</a>    // weight from here on, and this is the one place in the app where holding
+<a href=#79 id=79 data-nosnippet>79</a>    // an extra copy of a whole track actually matters.
+<a href=#80 id=80 data-nosnippet>80</a>    </span>drop(pcm.samples);
+<a href=#81 id=81 data-nosnippet>81</a>
+<a href=#82 id=82 data-nosnippet>82</a>    <span class="kw">let </span>found_aac = aac::detect(<span class="kw-2">&amp;</span>channels, pcm.sample_rate, aac_params, cancelled);
+<a href=#83 id=83 data-nosnippet>83</a>    <span class="kw">if </span>cancelled() {
+<a href=#84 id=84 data-nosnippet>84</a>        <span class="kw">return </span><span class="prelude-val">Err</span>(LatticeSkip::Cancelled);
+<a href=#85 id=85 data-nosnippet>85</a>    }
+<a href=#86 id=86 data-nosnippet>86</a>    <span class="kw">let </span>found_mp3 = mp3::detect(<span class="kw-2">&amp;</span>channels, pcm.sample_rate, mp3_params, cancelled);
+<a href=#87 id=87 data-nosnippet>87</a>    <span class="kw">if </span>cancelled() {
+<a href=#88 id=88 data-nosnippet>88</a>        <span class="kw">return </span><span class="prelude-val">Err</span>(LatticeSkip::Cancelled);
+<a href=#89 id=89 data-nosnippet>89</a>    }
+<a href=#90 id=90 data-nosnippet>90</a>    combine(
+<a href=#91 id=91 data-nosnippet>91</a>        found_aac,
+<a href=#92 id=92 data-nosnippet>92</a>        found_mp3,
+<a href=#93 id=93 data-nosnippet>93</a>        aac_params.significance,
+<a href=#94 id=94 data-nosnippet>94</a>        mp3_params.significance,
+<a href=#95 id=95 data-nosnippet>95</a>    )
+<a href=#96 id=96 data-nosnippet>96</a>}
+<a href=#97 id=97 data-nosnippet>97</a>
+<a href=#98 id=98 data-nosnippet>98</a><span class="kw">fn </span>combine(
+<a href=#99 id=99 data-nosnippet>99</a>    found_aac: <span class="prelude-ty">Option</span>&lt;TranscodeEvidence&gt;,
+<a href=#100 id=100 data-nosnippet>100</a>    found_mp3: <span class="prelude-ty">Option</span>&lt;TranscodeEvidence&gt;,
+<a href=#101 id=101 data-nosnippet>101</a>    aac_threshold: f64,
+<a href=#102 id=102 data-nosnippet>102</a>    mp3_threshold: f64,
+<a href=#103 id=103 data-nosnippet>103</a>) -&gt; LatticeResult {
+<a href=#104 id=104 data-nosnippet>104</a>    <span class="comment">// A positive from either codec wins outright — the likelihoods are *not*
+<a href=#105 id=105 data-nosnippet>105</a>    // comparable across detectors, since each is a fraction measured against
+<a href=#106 id=106 data-nosnippet>106</a>    // its own threshold, and the two thresholds differ. Comparing the raw
+<a href=#107 id=107 data-nosnippet>107</a>    // numbers would let a near-miss on one codec outrank a clear hit on the
+<a href=#108 id=108 data-nosnippet>108</a>    // other.
+<a href=#109 id=109 data-nosnippet>109</a>    </span><span class="kw">match </span>(found_aac, found_mp3) {
+<a href=#110 id=110 data-nosnippet>110</a>        (<span class="prelude-val">Some</span>(a), <span class="prelude-val">Some</span>(m)) =&gt; <span class="prelude-val">Ok</span>(<span class="kw">match </span>(a.detected, m.detected) {
+<a href=#111 id=111 data-nosnippet>111</a>            (<span class="bool-val">true</span>, <span class="bool-val">false</span>) =&gt; a,
+<a href=#112 id=112 data-nosnippet>112</a>            (<span class="bool-val">false</span>, <span class="bool-val">true</span>) =&gt; m,
+<a href=#113 id=113 data-nosnippet>113</a>            <span class="comment">// Both agree: report whichever is further past its own threshold.
+<a href=#114 id=114 data-nosnippet>114</a>            </span><span class="kw">_ </span>=&gt; {
+<a href=#115 id=115 data-nosnippet>115</a>                <span class="kw">let </span>margin = |e: <span class="kw-2">&amp;</span>TranscodeEvidence, lambda: f64| e.likelihood / lambda;
+<a href=#116 id=116 data-nosnippet>116</a>                <span class="kw">if </span>margin(<span class="kw-2">&amp;</span>m, mp3_threshold) &gt; margin(<span class="kw-2">&amp;</span>a, aac_threshold) {
+<a href=#117 id=117 data-nosnippet>117</a>                    m
+<a href=#118 id=118 data-nosnippet>118</a>                } <span class="kw">else </span>{
+<a href=#119 id=119 data-nosnippet>119</a>                    a
+<a href=#120 id=120 data-nosnippet>120</a>                }
+<a href=#121 id=121 data-nosnippet>121</a>            }
+<a href=#122 id=122 data-nosnippet>122</a>        }),
+<a href=#123 id=123 data-nosnippet>123</a>        <span class="comment">// One positive is useful evidence, but one negative cannot clear a
+<a href=#124 id=124 data-nosnippet>124</a>        // codec that lacked enough frames to run its calibrated search.
+<a href=#125 id=125 data-nosnippet>125</a>        </span>(<span class="prelude-val">Some</span>(e), <span class="prelude-val">None</span>) | (<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(e)) <span class="kw">if </span>e.detected =&gt; <span class="prelude-val">Ok</span>(e),
+<a href=#126 id=126 data-nosnippet>126</a>        <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(LatticeSkip::TooShort),
+<a href=#127 id=127 data-nosnippet>127</a>    }
+<a href=#128 id=128 data-nosnippet>128</a>}
+<a href=#129 id=129 data-nosnippet>129</a>
+<a href=#130 id=130 data-nosnippet>130</a><span class="doccomment">/// Split interleaved samples into one `f64` buffer per channel, keeping at
+<a href=#131 id=131 data-nosnippet>131</a>/// most [`MAX_CHANNELS`].
+<a href=#132 id=132 data-nosnippet>132</a>///
+<a href=#133 id=133 data-nosnippet>133</a>/// `None` for a zero-channel or empty decode — both mean there is nothing to
+<a href=#134 id=134 data-nosnippet>134</a>/// analyze, and neither should reach the detector as an empty channel list it
+<a href=#135 id=135 data-nosnippet>135</a>/// would have to guess about.
+<a href=#136 id=136 data-nosnippet>136</a></span><span class="kw">fn </span>deinterleave(samples: <span class="kw-2">&amp;</span>[f32], channels: usize) -&gt; <span class="prelude-ty">Option</span>&lt;Vec&lt;Vec&lt;f64&gt;&gt;&gt; {
+<a href=#137 id=137 data-nosnippet>137</a>    <span class="kw">if </span>channels == <span class="number">0 </span>|| samples.is_empty() {
+<a href=#138 id=138 data-nosnippet>138</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
+<a href=#139 id=139 data-nosnippet>139</a>    }
+<a href=#140 id=140 data-nosnippet>140</a>    <span class="kw">let </span>kept = channels.min(MAX_CHANNELS);
+<a href=#141 id=141 data-nosnippet>141</a>    <span class="comment">// Integer division: a truncated final frame (a decoder returning half a
+<a href=#142 id=142 data-nosnippet>142</a>    // frame at EOF) is dropped rather than padded with silence, which would
+<a href=#143 id=143 data-nosnippet>143</a>    // put a discontinuity into the very last analysis window.
+<a href=#144 id=144 data-nosnippet>144</a>    </span><span class="kw">let </span>frames = samples.len() / channels;
+<a href=#145 id=145 data-nosnippet>145</a>    <span class="kw">if </span>frames == <span class="number">0 </span>{
+<a href=#146 id=146 data-nosnippet>146</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
+<a href=#147 id=147 data-nosnippet>147</a>    }
+<a href=#148 id=148 data-nosnippet>148</a>
+<a href=#149 id=149 data-nosnippet>149</a>    <span class="kw">let </span><span class="kw-2">mut </span>out = <span class="macro">vec!</span>[Vec::with_capacity(frames); kept];
+<a href=#150 id=150 data-nosnippet>150</a>    <span class="kw">for </span>f <span class="kw">in </span><span class="number">0</span>..frames {
+<a href=#151 id=151 data-nosnippet>151</a>        <span class="kw">for </span>(c, buf) <span class="kw">in </span>out.iter_mut().enumerate() {
+<a href=#152 id=152 data-nosnippet>152</a>            <span class="comment">// `get` rather than indexing: `samples` comes from a decoded file,
+<a href=#153 id=153 data-nosnippet>153</a>            // and this crate does not panic on anything a file produced.
+<a href=#154 id=154 data-nosnippet>154</a>            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(s) = samples.get(f * channels + c) {
+<a href=#155 id=155 data-nosnippet>155</a>                buf.push(<span class="kw-2">*</span>s <span class="kw">as </span>f64);
+<a href=#156 id=156 data-nosnippet>156</a>            }
+<a href=#157 id=157 data-nosnippet>157</a>        }
+<a href=#158 id=158 data-nosnippet>158</a>    }
+<a href=#159 id=159 data-nosnippet>159</a>    <span class="prelude-val">Some</span>(out)
+<a href=#160 id=160 data-nosnippet>160</a>}
+<a href=#161 id=161 data-nosnippet>161</a>
+<a href=#162 id=162 data-nosnippet>162</a><span class="attr">#[cfg(test)]
+<a href=#163 id=163 data-nosnippet>163</a></span><span class="kw">mod </span>tests {
+<a href=#164 id=164 data-nosnippet>164</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href=#165 id=165 data-nosnippet>165</a>
+<a href=#166 id=166 data-nosnippet>166</a>    <span class="attr">#[test]
+<a href=#167 id=167 data-nosnippet>167</a>    </span><span class="kw">fn </span>a_missing_codec_cannot_be_cleared_by_the_other_codecs_negative() {
+<a href=#168 id=168 data-nosnippet>168</a>        <span class="kw">let </span>negative = || TranscodeEvidence {
+<a href=#169 id=169 data-nosnippet>169</a>            likelihood: <span class="number">0.01</span>,
+<a href=#170 id=170 data-nosnippet>170</a>            offset: <span class="number">0</span>,
+<a href=#171 id=171 data-nosnippet>171</a>            detected: <span class="bool-val">false</span>,
+<a href=#172 id=172 data-nosnippet>172</a>        };
+<a href=#173 id=173 data-nosnippet>173</a>        <span class="macro">assert!</span>(<span class="macro">matches!</span>(
+<a href=#174 id=174 data-nosnippet>174</a>            combine(<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(negative()), <span class="number">0.0125</span>, <span class="number">0.031</span>),
+<a href=#175 id=175 data-nosnippet>175</a>            <span class="prelude-val">Err</span>(LatticeSkip::TooShort)
+<a href=#176 id=176 data-nosnippet>176</a>        ));
+<a href=#177 id=177 data-nosnippet>177</a>        <span class="macro">assert!</span>(<span class="macro">matches!</span>(
+<a href=#178 id=178 data-nosnippet>178</a>            combine(<span class="prelude-val">Some</span>(negative()), <span class="prelude-val">None</span>, <span class="number">0.0125</span>, <span class="number">0.031</span>),
+<a href=#179 id=179 data-nosnippet>179</a>            <span class="prelude-val">Err</span>(LatticeSkip::TooShort)
+<a href=#180 id=180 data-nosnippet>180</a>        ));
+<a href=#181 id=181 data-nosnippet>181</a>        <span class="macro">assert!</span>(
+<a href=#182 id=182 data-nosnippet>182</a>            !combine(<span class="prelude-val">Some</span>(negative()), <span class="prelude-val">Some</span>(negative()), <span class="number">0.0125</span>, <span class="number">0.031</span>)
+<a href=#183 id=183 data-nosnippet>183</a>                .unwrap()
+<a href=#184 id=184 data-nosnippet>184</a>                .detected
+<a href=#185 id=185 data-nosnippet>185</a>        );
+<a href=#186 id=186 data-nosnippet>186</a>    }
+<a href=#187 id=187 data-nosnippet>187</a>
+<a href=#188 id=188 data-nosnippet>188</a>    <span class="attr">#[test]
+<a href=#189 id=189 data-nosnippet>189</a>    </span><span class="kw">fn </span>a_positive_remains_useful_when_the_other_codec_cannot_run() {
+<a href=#190 id=190 data-nosnippet>190</a>        <span class="kw">let </span>positive = || TranscodeEvidence {
+<a href=#191 id=191 data-nosnippet>191</a>            likelihood: <span class="number">0.1</span>,
+<a href=#192 id=192 data-nosnippet>192</a>            offset: <span class="number">7</span>,
+<a href=#193 id=193 data-nosnippet>193</a>            detected: <span class="bool-val">true</span>,
+<a href=#194 id=194 data-nosnippet>194</a>        };
+<a href=#195 id=195 data-nosnippet>195</a>        <span class="macro">assert!</span>(
+<a href=#196 id=196 data-nosnippet>196</a>            combine(<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(positive()), <span class="number">0.0125</span>, <span class="number">0.031</span>)
+<a href=#197 id=197 data-nosnippet>197</a>                .unwrap()
+<a href=#198 id=198 data-nosnippet>198</a>                .detected
+<a href=#199 id=199 data-nosnippet>199</a>        );
+<a href=#200 id=200 data-nosnippet>200</a>        <span class="macro">assert!</span>(
+<a href=#201 id=201 data-nosnippet>201</a>            combine(<span class="prelude-val">Some</span>(positive()), <span class="prelude-val">None</span>, <span class="number">0.0125</span>, <span class="number">0.031</span>)
+<a href=#202 id=202 data-nosnippet>202</a>                .unwrap()
+<a href=#203 id=203 data-nosnippet>203</a>                .detected
+<a href=#204 id=204 data-nosnippet>204</a>        );
+<a href=#205 id=205 data-nosnippet>205</a>    }
+<a href=#206 id=206 data-nosnippet>206</a>
+<a href=#207 id=207 data-nosnippet>207</a>    <span class="attr">#[test]
+<a href=#208 id=208 data-nosnippet>208</a>    </span><span class="kw">fn </span>deinterleave_splits_channels_in_order() {
+<a href=#209 id=209 data-nosnippet>209</a>        <span class="comment">// L R L R L R
+<a href=#210 id=210 data-nosnippet>210</a>        </span><span class="kw">let </span>inter = [<span class="number">1.0f32</span>, -<span class="number">1.0</span>, <span class="number">2.0</span>, -<span class="number">2.0</span>, <span class="number">3.0</span>, -<span class="number">3.0</span>];
+<a href=#211 id=211 data-nosnippet>211</a>        <span class="kw">let </span>got = deinterleave(<span class="kw-2">&amp;</span>inter, <span class="number">2</span>).expect(<span class="string">"two channels"</span>);
+<a href=#212 id=212 data-nosnippet>212</a>        <span class="macro">assert_eq!</span>(got.len(), <span class="number">2</span>);
+<a href=#213 id=213 data-nosnippet>213</a>        <span class="macro">assert_eq!</span>(got[<span class="number">0</span>], <span class="macro">vec!</span>[<span class="number">1.0</span>, <span class="number">2.0</span>, <span class="number">3.0</span>]);
+<a href=#214 id=214 data-nosnippet>214</a>        <span class="macro">assert_eq!</span>(got[<span class="number">1</span>], <span class="macro">vec!</span>[-<span class="number">1.0</span>, -<span class="number">2.0</span>, -<span class="number">3.0</span>]);
+<a href=#215 id=215 data-nosnippet>215</a>    }
+<a href=#216 id=216 data-nosnippet>216</a>
+<a href=#217 id=217 data-nosnippet>217</a>    <span class="attr">#[test]
+<a href=#218 id=218 data-nosnippet>218</a>    </span><span class="kw">fn </span>mono_stays_one_channel() {
+<a href=#219 id=219 data-nosnippet>219</a>        <span class="kw">let </span>got = deinterleave(<span class="kw-2">&amp;</span>[<span class="number">1.0f32</span>, <span class="number">2.0</span>, <span class="number">3.0</span>], <span class="number">1</span>).expect(<span class="string">"mono"</span>);
+<a href=#220 id=220 data-nosnippet>220</a>        <span class="macro">assert_eq!</span>(got.len(), <span class="number">1</span>);
+<a href=#221 id=221 data-nosnippet>221</a>        <span class="macro">assert_eq!</span>(got[<span class="number">0</span>], <span class="macro">vec!</span>[<span class="number">1.0</span>, <span class="number">2.0</span>, <span class="number">3.0</span>]);
+<a href=#222 id=222 data-nosnippet>222</a>    }
+<a href=#223 id=223 data-nosnippet>223</a>
+<a href=#224 id=224 data-nosnippet>224</a>    <span class="doccomment">/// Surround is truncated to the front pair, and — the part worth
+<a href=#225 id=225 data-nosnippet>225</a>    /// asserting — the front pair must still be the *right* samples, not
+<a href=#226 id=226 data-nosnippet>226</a>    /// whatever the first two slots of a 6-channel frame happen to hold after
+<a href=#227 id=227 data-nosnippet>227</a>    /// a stride mistake.
+<a href=#228 id=228 data-nosnippet>228</a>    </span><span class="attr">#[test]
+<a href=#229 id=229 data-nosnippet>229</a>    </span><span class="kw">fn </span>surround_keeps_the_front_pair_correctly_strided() {
+<a href=#230 id=230 data-nosnippet>230</a>        <span class="kw">let </span><span class="kw-2">mut </span>inter = Vec::new();
+<a href=#231 id=231 data-nosnippet>231</a>        <span class="kw">for </span>f <span class="kw">in </span><span class="number">0</span>..<span class="number">4 </span>{
+<a href=#232 id=232 data-nosnippet>232</a>            <span class="kw">for </span>c <span class="kw">in </span><span class="number">0</span>..<span class="number">6 </span>{
+<a href=#233 id=233 data-nosnippet>233</a>                inter.push((f * <span class="number">10 </span>+ c) <span class="kw">as </span>f32);
+<a href=#234 id=234 data-nosnippet>234</a>            }
+<a href=#235 id=235 data-nosnippet>235</a>        }
+<a href=#236 id=236 data-nosnippet>236</a>        <span class="kw">let </span>got = deinterleave(<span class="kw-2">&amp;</span>inter, <span class="number">6</span>).expect(<span class="string">"surround"</span>);
+<a href=#237 id=237 data-nosnippet>237</a>        <span class="macro">assert_eq!</span>(got.len(), MAX_CHANNELS);
+<a href=#238 id=238 data-nosnippet>238</a>        <span class="macro">assert_eq!</span>(got[<span class="number">0</span>], <span class="macro">vec!</span>[<span class="number">0.0</span>, <span class="number">10.0</span>, <span class="number">20.0</span>, <span class="number">30.0</span>]);
+<a href=#239 id=239 data-nosnippet>239</a>        <span class="macro">assert_eq!</span>(got[<span class="number">1</span>], <span class="macro">vec!</span>[<span class="number">1.0</span>, <span class="number">11.0</span>, <span class="number">21.0</span>, <span class="number">31.0</span>]);
+<a href=#240 id=240 data-nosnippet>240</a>    }
+<a href=#241 id=241 data-nosnippet>241</a>
+<a href=#242 id=242 data-nosnippet>242</a>    <span class="doccomment">/// A decoder returning a partial final frame must not produce channels of
+<a href=#243 id=243 data-nosnippet>243</a>    /// unequal length: the detector zips them against each other.
+<a href=#244 id=244 data-nosnippet>244</a>    </span><span class="attr">#[test]
+<a href=#245 id=245 data-nosnippet>245</a>    </span><span class="kw">fn </span>a_truncated_final_frame_is_dropped_not_padded() {
+<a href=#246 id=246 data-nosnippet>246</a>        <span class="comment">// Five samples across two channels: two whole frames plus a stray.
+<a href=#247 id=247 data-nosnippet>247</a>        </span><span class="kw">let </span>got = deinterleave(<span class="kw-2">&amp;</span>[<span class="number">1.0f32</span>, <span class="number">2.0</span>, <span class="number">3.0</span>, <span class="number">4.0</span>, <span class="number">5.0</span>], <span class="number">2</span>).expect(<span class="string">"ragged"</span>);
+<a href=#248 id=248 data-nosnippet>248</a>        <span class="macro">assert_eq!</span>(got[<span class="number">0</span>].len(), got[<span class="number">1</span>].len(), <span class="string">"channels must match in length"</span>);
+<a href=#249 id=249 data-nosnippet>249</a>        <span class="macro">assert_eq!</span>(got[<span class="number">0</span>], <span class="macro">vec!</span>[<span class="number">1.0</span>, <span class="number">3.0</span>]);
+<a href=#250 id=250 data-nosnippet>250</a>        <span class="macro">assert_eq!</span>(got[<span class="number">1</span>], <span class="macro">vec!</span>[<span class="number">2.0</span>, <span class="number">4.0</span>]);
+<a href=#251 id=251 data-nosnippet>251</a>    }
+<a href=#252 id=252 data-nosnippet>252</a>
+<a href=#253 id=253 data-nosnippet>253</a>    <span class="attr">#[test]
+<a href=#254 id=254 data-nosnippet>254</a>    </span><span class="kw">fn </span>degenerate_inputs_are_refused_without_panicking() {
+<a href=#255 id=255 data-nosnippet>255</a>        <span class="macro">assert!</span>(deinterleave(<span class="kw-2">&amp;</span>[], <span class="number">2</span>).is_none(), <span class="string">"empty"</span>);
+<a href=#256 id=256 data-nosnippet>256</a>        <span class="macro">assert!</span>(deinterleave(<span class="kw-2">&amp;</span>[<span class="number">1.0</span>, <span class="number">2.0</span>], <span class="number">0</span>).is_none(), <span class="string">"zero channels"</span>);
+<a href=#257 id=257 data-nosnippet>257</a>        <span class="comment">// Fewer samples than one frame: nothing to analyze.
+<a href=#258 id=258 data-nosnippet>258</a>        </span><span class="macro">assert!</span>(deinterleave(<span class="kw-2">&amp;</span>[<span class="number">1.0</span>], <span class="number">2</span>).is_none(), <span class="string">"partial single frame"</span>);
+<a href=#259 id=259 data-nosnippet>259</a>    }
+<a href=#260 id=260 data-nosnippet>260</a>
+<a href=#261 id=261 data-nosnippet>261</a>    <span class="doccomment">/// The reason matters as much as the refusal: these two used to be the
+<a href=#262 id=262 data-nosnippet>262</a>    /// same `None` as "clean-but-short", and that ambiguity is what made a
+<a href=#263 id=263 data-nosnippet>263</a>    /// dash in the Lattice column impossible to act on.
+<a href=#264 id=264 data-nosnippet>264</a>    </span><span class="attr">#[test]
+<a href=#265 id=265 data-nosnippet>265</a>    </span><span class="kw">fn </span>an_undecodable_file_says_so_rather_than_giving_a_verdict() {
+<a href=#266 id=266 data-nosnippet>266</a>        <span class="kw">let </span>dir = tempfile::tempdir().expect(<span class="string">"tempdir"</span>);
+<a href=#267 id=267 data-nosnippet>267</a>        <span class="kw">let </span>path = dir.path().join(<span class="string">"not-audio.flac"</span>);
+<a href=#268 id=268 data-nosnippet>268</a>        std::fs::write(<span class="kw-2">&amp;</span>path, <span class="string">b"this is not a FLAC file"</span>).expect(<span class="string">"write"</span>);
+<a href=#269 id=269 data-nosnippet>269</a>        <span class="macro">assert!</span>(<span class="macro">matches!</span>(
+<a href=#270 id=270 data-nosnippet>270</a>            detect(<span class="kw-2">&amp;</span>path, <span class="kw-2">&amp;</span>AacParams::default(), <span class="kw-2">&amp;</span>Mp3Params::default(), <span class="kw-2">&amp;</span>|| {
+<a href=#271 id=271 data-nosnippet>271</a>                <span class="bool-val">false
+<a href=#272 id=272 data-nosnippet>272</a>            </span>}),
+<a href=#273 id=273 data-nosnippet>273</a>            <span class="prelude-val">Err</span>(LatticeSkip::Undecodable(<span class="kw">_</span>))
+<a href=#274 id=274 data-nosnippet>274</a>        ));
+<a href=#275 id=275 data-nosnippet>275</a>        <span class="comment">// A missing file, too.
+<a href=#276 id=276 data-nosnippet>276</a>        </span><span class="macro">assert!</span>(<span class="macro">matches!</span>(
+<a href=#277 id=277 data-nosnippet>277</a>            detect(
+<a href=#278 id=278 data-nosnippet>278</a>                dir.path().join(<span class="string">"absent.wav"</span>).as_path(),
+<a href=#279 id=279 data-nosnippet>279</a>                <span class="kw-2">&amp;</span>AacParams::default(),
+<a href=#280 id=280 data-nosnippet>280</a>                <span class="kw-2">&amp;</span>Mp3Params::default(),
+<a href=#281 id=281 data-nosnippet>281</a>                <span class="kw-2">&amp;</span>|| <span class="bool-val">false
+<a href=#282 id=282 data-nosnippet>282</a>            </span>),
+<a href=#283 id=283 data-nosnippet>283</a>            <span class="prelude-val">Err</span>(LatticeSkip::Undecodable(<span class="kw">_</span>))
+<a href=#284 id=284 data-nosnippet>284</a>        ));
+<a href=#285 id=285 data-nosnippet>285</a>    }
+<a href=#286 id=286 data-nosnippet>286</a>
+<a href=#287 id=287 data-nosnippet>287</a>    <span class="attr">#[test]
+<a href=#288 id=288 data-nosnippet>288</a>    </span><span class="kw">fn </span>cancellation_is_checked_before_the_decode() {
+<a href=#289 id=289 data-nosnippet>289</a>        <span class="kw">let </span>dir = tempfile::tempdir().expect(<span class="string">"tempdir"</span>);
+<a href=#290 id=290 data-nosnippet>290</a>        <span class="kw">let </span>path = dir.path().join(<span class="string">"whatever.flac"</span>);
+<a href=#291 id=291 data-nosnippet>291</a>        <span class="macro">assert_eq!</span>(
+<a href=#292 id=292 data-nosnippet>292</a>            detect(<span class="kw-2">&amp;</span>path, <span class="kw-2">&amp;</span>AacParams::default(), <span class="kw-2">&amp;</span>Mp3Params::default(), <span class="kw-2">&amp;</span>|| {
+<a href=#293 id=293 data-nosnippet>293</a>                <span class="bool-val">true
+<a href=#294 id=294 data-nosnippet>294</a>            </span>}),
+<a href=#295 id=295 data-nosnippet>295</a>            <span class="prelude-val">Err</span>(LatticeSkip::Cancelled)
+<a href=#296 id=296 data-nosnippet>296</a>        );
+<a href=#297 id=297 data-nosnippet>297</a>    }
+<a href=#298 id=298 data-nosnippet>298</a>
+<a href=#299 id=299 data-nosnippet>299</a>    <span class="doccomment">/// Every reason must read as a sentence a user can act on — an empty or
+<a href=#300 id=300 data-nosnippet>300</a>    /// duplicated one would leave the table saying nothing again.
+<a href=#301 id=301 data-nosnippet>301</a>    </span><span class="attr">#[test]
+<a href=#302 id=302 data-nosnippet>302</a>    </span><span class="kw">fn </span>every_skip_reason_is_distinct_and_non_empty() {
+<a href=#303 id=303 data-nosnippet>303</a>        <span class="kw">let </span>all = [
+<a href=#304 id=304 data-nosnippet>304</a>            LatticeSkip::Undecodable(<span class="string">"boom"</span>.into()),
+<a href=#305 id=305 data-nosnippet>305</a>            LatticeSkip::NoSamples,
+<a href=#306 id=306 data-nosnippet>306</a>            LatticeSkip::UnsupportedRate(<span class="number">96_000</span>),
+<a href=#307 id=307 data-nosnippet>307</a>            LatticeSkip::TooShort,
+<a href=#308 id=308 data-nosnippet>308</a>            LatticeSkip::Cancelled,
+<a href=#309 id=309 data-nosnippet>309</a>        ];
+<a href=#310 id=310 data-nosnippet>310</a>        <span class="kw">let </span>texts: Vec&lt;String&gt; = all.iter().map(|s| s.to_string()).collect();
+<a href=#311 id=311 data-nosnippet>311</a>        <span class="kw">for </span>t <span class="kw">in </span><span class="kw-2">&amp;</span>texts {
+<a href=#312 id=312 data-nosnippet>312</a>            <span class="macro">assert!</span>(!t.is_empty());
+<a href=#313 id=313 data-nosnippet>313</a>        }
+<a href=#314 id=314 data-nosnippet>314</a>        <span class="kw">for </span>(i, a) <span class="kw">in </span>texts.iter().enumerate() {
+<a href=#315 id=315 data-nosnippet>315</a>            <span class="kw">for </span>b <span class="kw">in </span>texts.iter().skip(i + <span class="number">1</span>) {
+<a href=#316 id=316 data-nosnippet>316</a>                <span class="macro">assert_ne!</span>(a, b);
+<a href=#317 id=317 data-nosnippet>317</a>            }
+<a href=#318 id=318 data-nosnippet>318</a>        }
+<a href=#319 id=319 data-nosnippet>319</a>        <span class="macro">assert!</span>(texts[<span class="number">0</span>].contains(<span class="string">"boom"</span>), <span class="string">"{}"</span>, texts[<span class="number">0</span>]);
+<a href=#320 id=320 data-nosnippet>320</a>        <span class="macro">assert!</span>(texts[<span class="number">2</span>].contains(<span class="string">"96.0 kHz"</span>), <span class="string">"{}"</span>, texts[<span class="number">2</span>]);
+<a href=#321 id=321 data-nosnippet>321</a>    }
+<a href=#322 id=322 data-nosnippet>322</a>}
+</code></pre></div></section></main></body></html>

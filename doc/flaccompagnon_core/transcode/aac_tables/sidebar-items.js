@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["LONG_LEN","SF_BIAS","SHORT_COUNT","SHORT_LEN","SHORT_OFFSET"],"fn":["long_bands","short_bands"],"struct":["Windows"]};
