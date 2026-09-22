@@ -37,6 +37,7 @@ const NO_FFMPEG: &str = "ffmpeg was not found on your system. Install it and try
 pub async fn generate_spectrograms(
     app: AppHandle,
     targets: Vec<String>,
+    size: Option<crate::spectrogram::SpectrogramSize>,
 ) -> Result<SpectroSummary, String> {
     if targets.is_empty() {
         return Err("Nothing to render.".to_string());
@@ -51,6 +52,7 @@ pub async fn generate_spectrograms(
         return Err("No supported audio files found.".to_string());
     }
     let total = paths.len();
+    let size = size.unwrap_or_default();
 
     reset_cancel();
     let app_bg = app.clone();
@@ -87,7 +89,7 @@ pub async fn generate_spectrograms(
             let out = spectrogram_dir.join(format!("{stem}.png"));
             let info = core::probe_info(p).ok();
 
-            match spectrogram::render(&ffmpeg, p, &out, info.as_ref()) {
+            match spectrogram::render(&ffmpeg, p, &out, info.as_ref(), size) {
                 Ok(()) => rendered += 1,
                 Err(e) => errors.push(format!("{}: {e}", file_name(p))),
             }

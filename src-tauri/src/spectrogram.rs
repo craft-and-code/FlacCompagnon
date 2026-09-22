@@ -17,9 +17,36 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 use flaccompagnon_core::BasicInfo;
+use serde::Deserialize;
 
-const SPECTRUM: &str =
-    "showspectrumpic=s=1800x940:mode=combined:legend=1:color=intensity:scale=log:gain=3";
+/// Output dimensions for a generated spectrogram.
+///
+/// `Half` is Aède's default: 900×470, exactly half of the full frame in both
+/// directions. `Full` preserves FlacCompagnon's former 1800×940 output for
+/// detailed inspection or direct comparison with older images.
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum SpectrogramSize {
+    #[default]
+    Half,
+    Full,
+}
+
+impl SpectrogramSize {
+    fn dimensions(self) -> &'static str {
+        match self {
+            Self::Half => "900x470",
+            Self::Full => "1800x940",
+        }
+    }
+}
+
+fn spectrum(size: SpectrogramSize) -> String {
+    format!(
+        "showspectrumpic=s={}:mode=combined:legend=1:color=intensity:scale=log:gain=3",
+        size.dimensions()
+    )
+}
 
 /// Locate a working `ffmpeg` executable, or `None` if none is found.
 pub fn resolve_ffmpeg() -> Option<String> {
@@ -116,16 +143,18 @@ pub fn render(
     input: &Path,
     output: &Path,
     info: Option<&BasicInfo>,
+    size: SpectrogramSize,
 ) -> Result<(), String> {
     let input_s = input.to_string_lossy().to_string();
     let output_s = output.to_string_lossy().to_string();
 
+    let base = spectrum(size);
     let filter_with_text = match info {
         Some(i) => format!(
-            "{SPECTRUM},drawtext=text='{}':fontcolor=white:fontsize=24:x=14:y=12:box=1:boxcolor=black@0.55",
+            "{base},drawtext=text='{}':fontcolor=white:fontsize=24:x=14:y=12:box=1:boxcolor=black@0.55",
             caption(i)
         ),
-        None => SPECTRUM.to_string(),
+        None => base.clone(),
     };
 
     // Preferred: spectrum + caption. Fall back to spectrum-only if drawtext
@@ -133,7 +162,7 @@ pub fn render(
     if run(ffmpeg, &input_s, &filter_with_text, &output_s).is_ok() {
         return Ok(());
     }
-    run(ffmpeg, &input_s, SPECTRUM, &output_s)
+    run(ffmpeg, &input_s, &base, &output_s)
 }
 
 fn run(ffmpeg: &str, input: &str, filter: &str, output: &str) -> Result<(), String> {
@@ -294,5 +323,12 @@ mod tests {
     fn probing_a_nonexistent_binary_is_false() {
         assert!(!ffmpeg_works("/definitely/not/a/binary/anywhere"));
         assert!(!ffmpeg_works(""));
+    }
+
+    #[test]
+    fn default_and_full_dimensions_match_aede() {
+        assert_eq!(SpectrogramSize::default(), SpectrogramSize::Half);
+        assert!(spectrum(SpectrogramSize::Half).contains("s=900x470"));
+        assert!(spectrum(SpectrogramSize::Full).contains("s=1800x940"));
     }
 }

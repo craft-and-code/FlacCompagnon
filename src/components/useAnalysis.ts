@@ -8,7 +8,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import type { FolderReport, Progress } from "../types";
+import type { FolderReport, Progress, SpectrogramSize } from "../types";
 import * as api from "../api";
 
 export interface UseAnalysisArgs {
@@ -211,11 +211,14 @@ export function useAnalysis({ onToast, onFilesChanged }: UseAnalysisArgs) {
     [],
   );
 
-  const generateSpectrograms = useCallback(async () => {
+  const generateSpectrograms = useCallback(async (size: SpectrogramSize = "half") => {
     if (busy || targets.length === 0) return;
-    startTask("Rendering spectrograms…", true); // keep the table visible
+    startTask(
+      size === "full" ? "Rendering full-size spectrograms…" : "Rendering spectrograms…",
+      true,
+    ); // keep the table visible
     try {
-      const s = await api.generateSpectrograms(targets);
+      const s = await api.generateSpectrograms(targets, size);
       if (userCancelled.current) {
         onToast(`Spectrograms cancelled — ${s.rendered}/${s.total} rendered.`);
       } else {

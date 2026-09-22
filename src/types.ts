@@ -100,6 +100,8 @@ export interface SpectroSummary {
   errors: string[];
 }
 
+export type SpectrogramSize = "half" | "full";
+
 export type Theme = "auto" | "light" | "dark";
 
 // --- Tags (editor panel + thumbnail column) ----------------------------------

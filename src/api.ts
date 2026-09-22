@@ -1,6 +1,7 @@
 // Thin typed wrappers around the Tauri backend commands.
 
 import { invoke } from "@tauri-apps/api/core";
+import { emit } from "@tauri-apps/api/event";
 import type {
   AddableTag,
   ConvertSettings,
@@ -15,6 +16,7 @@ import type {
   Relocation,
   RenameResult,
   SpectroSummary,
+  SpectrogramSize,
   TagEdits,
   TagReadResult,
   TagWriteSummary,
@@ -23,8 +25,13 @@ import type {
 export const analyzePaths = (targets: string[]) =>
   invoke<FolderReport>("analyze_paths", { targets });
 
-export const generateSpectrograms = (targets: string[]) =>
-  invoke<SpectroSummary>("generate_spectrograms", { targets });
+export const generateSpectrograms = (
+  targets: string[],
+  size: SpectrogramSize = "half",
+) => invoke<SpectroSummary>("generate_spectrograms", { targets, size });
+
+export const syncSpectrogramSize = (size: SpectrogramSize) =>
+  emit("spectrogram://size", size);
 
 // Report export is two separate commands (not one that always writes both)
 // so the menu bar's standalone "Export CSV"/"Export JSON" can write just one

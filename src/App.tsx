@@ -38,6 +38,7 @@ import {
   useSelection,
   type SelectionModifiers,
 } from "./components/useSelection";
+import { useSpectrogramSize } from "./components/useSpectrogramSize";
 import { useRenameFile } from "./components/useRenameFile";
 import { useRenumberTracks } from "./components/useRenumberTracks";
 import { useGlobalShortcut } from "./components/useGlobalShortcut";
@@ -56,6 +57,7 @@ export function App() {
   // "click twice on the name" rename. `null` for every row rendering its
   // plain name cell as usual.
   const [editingPath, setEditingPath] = useState<string | null>(null);
+  const spectrogram = useSpectrogramSize();
 
   const cache = useTagCache();
   const { clear: clearCache, invalidate } = cache;
@@ -386,9 +388,9 @@ export function App() {
         analysis.reset();
         setSearchQuery("");
       },
-      generateSpectrograms: () => void analysis.generateSpectrograms(),
+      setSpectrogramSize: spectrogram.setSize,
     }),
-    [exports, analysis, playback],
+    [exports, analysis, playback, spectrogram.setSize],
   );
   useMenuActions(menuActions);
 
@@ -582,7 +584,7 @@ export function App() {
         onPick={() => void pickFolder()}
         onSave={() => void exports.saveReport()}
         onExportPlaylist={() => setPlaylistModalOpen(true)}
-        onGenerateSpectrograms={() => void analysis.generateSpectrograms()}
+        onGenerateSpectrograms={() => void analysis.generateSpectrograms(spectrogram.size)}
         onReset={menuActions.reset}
         onOpenConvert={convert.togglePanel}
         onRefreshPresence={() => void presence.refresh()}

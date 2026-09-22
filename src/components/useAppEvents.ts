@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-import type { Progress } from "../types";
+import type { Progress, SpectrogramSize } from "../types";
 import { useLatest } from "./useLatest";
 
 export interface MenuActions {
@@ -14,7 +14,7 @@ export interface MenuActions {
   exportCsv: () => void;
   exportJson: () => void;
   reset: () => void;
-  generateSpectrograms: () => void;
+  setSpectrogramSize: (size: SpectrogramSize) => void;
 }
 
 /// Native menu bar (built in src-tauri/src/lib.rs). Each item only emits its
@@ -41,8 +41,11 @@ export function useMenuActions(actions: MenuActions) {
         case "reset":
           a.reset();
           break;
-        case "generate_spectrograms":
-          a.generateSpectrograms();
+        case "spectrogram_size_small":
+          a.setSpectrogramSize("half");
+          break;
+        case "spectrogram_size_full":
+          a.setSpectrogramSize("full");
           break;
       }
     });
