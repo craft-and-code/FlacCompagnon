@@ -443,10 +443,11 @@ export function App() {
     ev.preventDefault();
 
     const down = ev.key === "ArrowDown";
-    const current = selection.selectedPaths;
-    // The row to move *from* is the last one selected, so extending a
-    // selection downward and then reversing behaves the way a list should.
-    const from = current.length > 0 ? paths.indexOf(current[current.length - 1]) : -1;
+    // Step from the selection's moving end, not from its last stored entry:
+    // the selection is kept in display order, so its last entry is its bottom
+    // row and never moves while extending upwards. See `useSelection`'s
+    // `cursor`.
+    const from = selection.cursor == null ? -1 : paths.indexOf(selection.cursor);
     const next =
       from === -1
         ? down
@@ -454,7 +455,9 @@ export function App() {
           : paths.length - 1
         : Math.min(paths.length - 1, Math.max(0, from + (down ? 1 : -1)));
     const path = paths[next];
-    if (path == null || path === current[current.length - 1]) return;
+    // Already at the end of the list: nothing to move to, and re-selecting
+    // the same row would collapse a Shift-extended selection back to one.
+    if (path == null || path === selection.cursor) return;
 
     guardedSelectRow(path, {
       shiftKey: ev.shiftKey,

@@ -42,7 +42,7 @@ pub async fn analyze_paths(app: AppHandle, targets: Vec<String>) -> Result<Folde
         let files = parallel_map_ordered(
             &paths,
             cancelled,
-            |path| core::analyze_file(path, &opts),
+            |path| core::analyze_file_cancellable(path, &opts, &cancelled),
             |done, path| {
                 let _ = app_bg.emit(
                     "analyze://progress",

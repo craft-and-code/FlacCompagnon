@@ -37,7 +37,7 @@
 //!
 //! ```no_run
 //! use std::path::Path;
-//! use flaccompagnon_core::{analyze_file, ScanOptions, TranscodeState};
+//! use flaccompagnon_core::{analyze_file, ScanOptions};
 //!
 //! let report = analyze_file(Path::new("track.flac"), &ScanOptions::default());
 //!
@@ -49,7 +49,7 @@
 //!         println!("  declared {:?} bits, really {:?}",
 //!                  report.declared_bits, report.real_bit_depth);
 //!     }
-//!     if report.detections.transcoding == TranscodeState::Detected {
+//!     if report.detections.transcoding {
 //!         println!("  lossy source: {}", report.detections.detail);
 //!     }
 //! }
@@ -82,15 +82,20 @@ pub mod analysis;
 pub mod convert;
 pub mod decode;
 pub mod dsd;
+pub mod hash;
 pub mod pipeline;
 pub mod playlist;
+pub mod relocate;
 pub mod report;
 pub mod scan;
 pub mod tags;
+pub mod transcode;
 pub mod types;
 
-pub use analysis::detections::{Detections, TranscodeState};
+pub use analysis::detections::Detections;
 pub use decode::{probe_info, BasicInfo, FlacMd5Status};
-pub use pipeline::analyze_file;
+pub use hash::{file_digest, FileDigest};
+pub use pipeline::{analyze_file, analyze_file_cancellable};
+pub use relocate::{match_moved_files, Relocation};
 pub use scan::{analyze_folder, is_supported_audio, list_audio_files, SUPPORTED_EXTENSIONS};
 pub use types::{AnalysisError, ClippingInfo, FileAnalysis, FolderReport, ScanOptions};

@@ -43,9 +43,6 @@
 .chip.v-transcoded {
   color: var(--transcoded);
 }
-.chip.v-suspected {
-  color: var(--transcoded);
-}
 .chip.v-bad {
   color: var(--bad);
 }

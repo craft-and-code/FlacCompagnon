@@ -11,12 +11,12 @@
 
 **A cross-platform desktop tool that checks whether your "lossless" audio is actually lossless.**
 
-> **Note about the Detection column**:
-> For the time being, please do not rely on the values shown in the **Detection** column. These results are not yet considered reliable. The rest of the analysis has been verified and can be trusted, but the detection logic still requires further work.
-> I am currently in discussion with a member of the **Lossless Audio Checker** team regarding access to part of the original algorithm, which may eventually be released as open source. My goal is to reproduce the original detection logic as faithfully as possible in Rust.
-> Until significant progress has been made on this part of the project, you may want to hide the **Detection** column.
+> [!NOTE]
+> **Transcoding detection is statistical and still being validated.** The AAC and MP3 detectors follow Olivier Derrien's papers and MATLAB reference. Their scores are not probabilities or proof of a file's origin. A clean result means no significant evidence was found; an incomplete search is reported as **Unknown** unless another detection already flags the file.
+>
+> An audit found false positives on almost-identical stereo channels and a pure 24-bit sine wave. Trials that quantize entirely to zero are now excluded from positive evidence, and short files must supply the full configured frame count. The tonal counterexample remains unresolved. A synthesized noise signal encoded with FFmpeg AAC at 128 kbit/s and decoded to 24-bit PCM also remains below the AAC detection threshold (0.01222); this false negative is unchanged by the audit fixes. The MP3 threshold of 0.031 is provisional; the MATLAB reference uses 0.025. The 0.025–0.032 range in the 2019 article concerns AAC and does not validate the MP3 setting.
 
-> **About this project.** FlacCompagnon was built with an AI assistant, as an experiment: how far can AI-assisted development go on a real, non-trivial piece of software — signal processing, a native desktop app, tests, CI, documentation? It also serves as a working case study on how to use AI effectively: every detection algorithm was validated against independently computed ground truth (reference encoders, real files, bit-exact replicas) before being trusted, and the limitations that remain are documented rather than hidden. The AAC transcoding detection notably implements the re-quantization method described in the peer-reviewed study _"Lossless Audio Checker: A Software for the Detection of Upscaling, Upsampling, and Transcoding in Lossless Musical Tracks"_ by Julien Lacroix, Yann Prime, Alexandre Remy and Olivier Derrien (AES 139th Convention, Paper 9416, 2015).
+> **About this project.** FlacCompagnon was built with an AI assistant, as an experiment: how far can AI-assisted development go on a real, non-trivial piece of software — signal processing, a native desktop app, tests, CI, documentation? It also serves as a working case study on how to use AI effectively: every detection algorithm was validated against independently computed ground truth (reference encoders, real files, bit-exact replicas) before being trusted, and the limitations that remain are documented rather than hidden. The transcoding detection implements the re-quantization method published by Olivier Derrien (JAES 67(3), 2019), who also shared his reference MATLAB implementation for this port; the wider tool it belongs to is described in _"Lossless Audio Checker: A Software for the Detection of Upscaling, Upsampling, and Transcoding in Lossless Musical Tracks"_ by Julien Lacroix, Yann Prime, Alexandre Remy and Olivier Derrien (AES 139th Convention, Paper 9416, 2015).
 
 FlacCompagnon is a from-scratch, open-source successor to the discontinued _Lossless Audio Checker_. Drop a folder **or a single audio file** onto the window and it runs the same three independent detections as the original — **Upscaling**, **Upsampling**, and **Transcoding** (including the **AAC re-quantization** test, which catches AAC sources at every bitrate) — verifies **FLAC MD5** signatures, flags **fake stereo** files, detects **clipping**, and can render a **spectrogram** for each track.
 
@@ -32,13 +32,13 @@ Built with **Rust** and **Tauri v2**, it compiles to a small native app for **Li
 
 FlacCompagnon runs the same three **independent** detections as the original Lossless Audio Checker. A file can trip none, one, or several; if none fire it is reported **Clean**. The **Detections** column shows a coloured tag per finding, and hovering it explains the reasoning.
 
-| Detection       | Meaning                                                                                                                                                                                                                                                                                                                                                                                                         |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Upscaling**   | Fake resolution: a ≤16-bit signal stored at 24-bit (the low bits carry no real information).                                                                                                                                                                                                                                                                                                                    |
-| **Upsampling**  | Fake sample rate: a high-rate container (e.g. 96 kHz) whose content stops sharply around the CD range (~22 kHz).                                                                                                                                                                                                                                                                                                |
-| **Transcoding** | Lossy source re-wrapped as lossless. Three signatures, strongest first: the **AAC re-quantization grid** (coefficients snap onto AAC's quantization grid at a synchronized MDCT alignment — near-conclusive, catches every bitrate), an MDCT-domain high-frequency dead zone, and a brick-wall spectral cut-off. Shown as _Transcoded_ (detected) or _Transcoded?_ (a gentle early roll-off that is ambiguous). |
+| Detection       | Meaning                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Upscaling**   | Unused precision: integer samples have zero low bits and fit exactly in fewer bits than declared.                                                                                                                                                                                                                                                                                                                  |
+| **Upsampling**  | Possible resampling: a high-rate container with limited bandwidth, which is an indicator rather than proof of origin.                                                                                                                                                                                                                                                                                              |
+| **Transcoding** | Lossy source re-wrapped as lossless. Detected from the codec's own **quantization lattice**: rounding is irreversible, so a decoded lossy signal still sits exactly where its encoder put it, and re-wrapping it as FLAC preserves that. The statistical search can produce false positives, including on tonal signals. An incomplete search is reported as Unknown. |
 
-See [Detection algorithms](#detection-algorithms) below for how each works, and its limitations. Like the original, these are informed heuristics, not cryptographic proof — the spectrogram is the final arbiter.
+See [Detection algorithms](#detection-algorithms) below for how each works, and its limitations. The three are not equally strong, and the difference matters: **Upscaling** is exact (the low bits are zero or they are not), **Transcoding** is statistical evidence requiring validation, while **Upsampling** remains a spectral heuristic. A spectrogram can illustrate limited bandwidth but cannot prove the sampling history.
 
 A **search field** above the table filters which rows are shown — type a format, a bit depth, a detection name, anything a column displays. It only ever affects the display: playback order, the current selection, drag-reordering, and every export (CSV, JSON, M3U) all keep working off the full list, filtered or not.
 
@@ -46,7 +46,13 @@ A **search field** above the table filters which rows are shown — type a forma
 
 The **File** column supports Mp3tag/Finder-style inline renaming: click a row to select it, then click its name again (not a double-click) to edit it. Only the file's stem is editable — the extension is fixed and shown next to it as plain text, so a rename can never accidentally turn a `.flac` into a `.mp3` without actually transcoding it. **Enter** renames the file on disk; **Escape**, or clicking anywhere else, discards the edit and leaves the file untouched.
 
-### 2. FLAC MD5 verification
+### 2. File fingerprints (MD5 + CRC32)
+
+Every analyzed file also gets the **MD5 and CRC32 of its bytes** — tags and cover art included — computed in one read alongside its size and modification time. Two hidden-by-default columns, **File MD5** and **File CRC32**, show them; both are in the CSV and JSON reports, and both are searchable, so pasting a CRC32 out of an `.sfv` finds its file.
+
+These answer a different question from the **MD5** column described next. This one identifies the _file as an object_ (checksum comparison, duplicate hunting, verifying a download); that one verifies the _audio_ against the signature FLAC stores in its own header, and is unaffected by retagging. A file can have an intact FLAC signature and still fail a `.sfv` check, and that is not a contradiction.
+
+### 3. FLAC MD5 verification
 
 Every FLAC file stores an MD5 hash of its decoded audio in the STREAMINFO block. FlacCompagnon reads it natively (no external `flac` binary required) and, by fully decoding the file, recomputes the hash to confirm the audio is intact — the same integrity check as `flac -t`.
 
@@ -56,28 +62,37 @@ The **MD5** column only appears when the analysis actually includes FLAC files, 
 - **Mismatch** — signature present but the audio does **not** match (corruption or a non-conforming encoder).
 - **No signature** — the file was encoded without an MD5 (nothing to verify against).
 
-### 3. Spectrogram generation
+### 4. Spectrogram generation
 
-Click **Generate spectrograms** to render a high-resolution spectrogram image for every track using **ffmpeg** installed on your system (resolved automatically at runtime — see prerequisites). For each folder that contains audio, a `spectres/` sub-folder is created next to the files, and one PNG is written per track. The image includes a labelled **frequency axis** (its top equals Nyquist = sample-rate ÷ 2) and a caption spelling out the **sample rate**, bit depth, channel count, and format — so the cutoff and the sampling are visible at a glance.
+Click **Generate spectrograms** to render a high-resolution spectrogram image for every track using **ffmpeg** installed on your system (resolved automatically at runtime — see prerequisites). For each folder that contains audio, a `spectrograms/` sub-folder is created next to the files, and one PNG is written per track. The image includes a labelled **frequency axis** (its top equals Nyquist = sample-rate ÷ 2) and a caption spelling out the **sample rate**, bit depth, channel count, and format — so the cutoff and the sampling are visible at a glance.
 
-### 4. Extra integrity checks
+### 5. Extra integrity checks
 
 - **Fake stereo** — detects "stereo" files that are really dual-mono (both channels identical).
 - **Clipping** — counts full-scale sample runs (each _event_ = ≥3 consecutive samples at 0 dBFS) and reports the peak level in dBFS. This flags an over-loud master; it is independent of whether the file is lossless.
-- **True peak** — a separate column reporting the **true peak in dBTP** (ITU-R BS.1770-style: the audio is 4×-oversampled through a 48-tap polyphase FIR, revealing **inter-sample peaks** — places where the waveform a DAC reconstructs overshoots full scale _between_ stored samples). It is shown for every track, clipped or not: a track can read −0.6 dBTP with a perfectly clean sample-domain signal (safe headroom, no problem) or read −0.2 dBFS sample peak yet **+1 dBTP** true peak — an "inter-sample over" that the classic clipping counter never sees because no single stored sample hits full scale.
+- **True peak** — a separate column reporting the **true peak in dBTP** (ITU-R BS.1770-style: the audio is 4×-oversampled through a 48-tap polyphase FIR, revealing **inter-sample peaks** — places where the waveform a DAC reconstructs overshoots full scale _between_ stored samples). It is shown for every track, clipped or not: a track can read −0.6 dBTP with a perfectly clean sample-domain signal (safe headroom, no problem) or read −0.2 dBFS sample peak yet **+1 dBTP** true peak — an "inter-sample over" that the classic clipping counter never sees because no single stored sample hits full scale. The colour follows the delivery specs rather than the arithmetic: **green at or below −1 dBTP** (the EBU R128 ceiling that Spotify, Apple Music and Tidal adopted), neutral up to 0, **amber up to +1** (real overs, but small — nearly every modern master is here), and **red only above +1 dBTP**, where a lossy encoder's own added overshoot can push the result into audible distortion.
 - **Dynamics (DR)** — a DR-meter-style estimate of each track's dynamic range: the peak level against the RMS of the loudest 20% of ~3 s blocks (the crest factor of the loud passages). High values (≥ 12 dB, shown green) indicate a dynamic master such as a Full Dynamic Range edition; low values (< 8 dB, shown amber) betray a loudness-war master. Like clipping, this is independent of losslessness.
 - **File size** — read straight from the filesystem by the Rust core, never derived from bitrate × duration, so it matches what your file manager reports for the same file. Displayed with **decimal** units (1 kB = 1000 bytes, as macOS Finder and most Linux file managers do); hovering the cell shows the exact byte count. Note that Windows Explorer labels _binary_ units "KB"/"MB", so it will show a slightly smaller number for the same file.
 
-### 5. Save & reload (on demand)
+### 6. Save & reload (on demand)
 
 Analysis never writes anything by itself. When you want to keep the results, click **Save…** and pick a name and location — nothing is dropped into your music folders unless you ask for it. One dialog pick writes **two files, same stem, same folder**:
 
-- a spreadsheet-friendly **`.csv`** (all columns: status, upscaling, upsampling, transcoding, cutoff, bit depth, file size, clipping, true peak, dynamics, MD5, codec, bitrate, modification time, …) — the size is exported as a raw byte count so it can be summed and sorted, and every column the table can show is present regardless of which ones are currently visible or how they're ordered on screen;
+- a spreadsheet-friendly **`.csv`** — status, upscaling, upsampling, transcoding, lattice score, cutoff, bit depth, file size, clipping, true peak, dynamics, FLAC MD5, codec, bitrate, modification time, and the two file fingerprints. The size is a raw byte count, so a spreadsheet can sum and sort it;
 - a **`.json`** that round-trips the _entire_ analysis — every field, including the nested per-detection detail — so it can be reloaded later.
+
+**Both files follow the table's row order**, including a manual drag-reorder. Beyond that the two behave differently on purpose:
+
+|         | rows         | columns                                                                                                                                                                                                   |
+| ------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.csv`  | as displayed | **fixed order, always complete** — hiding or reordering columns on screen does not change the file. Tag columns (Artist, Album, …) are not exported: they come from the tag panel, not from the analysis. |
+| `.json` | as displayed | every analysis field, always. A hidden column's value is still in there.                                                                                                                                  |
+
+The JSON's completeness is not a formatting preference — it is what reloading depends on. A saved analysis that dropped whatever happened to be hidden at save time would lose data rather than merely look different.
 
 To reload a saved analysis, **drop the `.json` file onto the window**, same gesture as dropping a folder — there's no separate button for it. The table renders instantly from the file, with no audio re-decoded. This also means the export reflects exactly what's on screen: rows removed with the trash icon before saving are **not** included in either file, and won't come back on reload.
 
-### 6. Tag editing
+### 7. Tag editing
 
 Selecting rows opens a **tag panel** on the left — the one place in the app that can write to your audio files, and only when you click **Save** in that panel.
 
@@ -104,7 +119,7 @@ Results from both sources are listed with a source badge. Picking one shows its 
 
 **Discogs** requires your own free personal access token (discogs.com → Settings → Developers), pasted once into the panel inside the search pop-in; it is kept locally in the app and never sent anywhere but Discogs. Without a token, only MusicBrainz is searched. **MusicBrainz needs no key.**
 
-### 7. Playlist export (M3U)
+### 8. Playlist export (M3U)
 
 Click the export-playlist icon next to the renumber icon (or use the **Export** menu) to write the current list to an M3U playlist, **in the order shown on screen** — including any manual reordering you did by dragging rows, and excluding rows you deleted with the trash icon. Two formats are offered, Extended by default:
 
@@ -113,7 +128,7 @@ Click the export-playlist icon next to the renumber icon (or use the **Export** 
 
 Paths are written **absolute**, so the playlist plays from anywhere on the machine, but it will break if you later move the audio files.
 
-### 8. Playback
+### 9. Playback
 
 Click the play icon on any row to preview it — no tag panel or selection required. A footer bar carries the transport: **Previous / Play-Pause / Next**, a seek bar (click or drag anywhere on the track), and a volume control (the slider stays hidden until you hover it, so it never crowds the seek bar; click the speaker icon to mute, click again to restore full volume).
 
@@ -125,7 +140,7 @@ Pressing the footer's Play button decides what to play next from the selection *
 
 Previous/Next and the natural advance once a track finishes both follow whichever of those applies. That choice is made once, when Play starts — **changing the selection while something is already playing has no effect on the playback in progress**, only on the next time Play is pressed. Clicking the play icon on an individual row previews it directly (no tag panel or selection required) and follows the same rule for what it plays next.
 
-### 9. Conversion
+### 10. Conversion
 
 A second panel, mirroring the tag panel on the right, converts audio files to another format — entirely separate from the results table: what you drop into its own drop zone is analyzed for nothing, just converted. Open it from the toolbar's convert icon; the same **×** closes it as everywhere else.
 
@@ -185,7 +200,7 @@ flowchart LR
     end
 
     save["Save…<br/>CSV + JSON"]
-    spectro["Spectrograms<br/>▸ system ffmpeg ▸ spectres/"]
+    spectro["Spectrograms<br/>▸ system ffmpeg ▸ spectrograms/"]
     m3u["Export playlist…<br/>M3U / Extended M3U"]
 
     subgraph tagging["Tag panel — the only writer"]
@@ -218,19 +233,29 @@ The project is a Cargo workspace with two crates:
 
 ## Detection algorithms
 
-These mirror the three tests described by the authors of the original Lossless Audio Checker, Julien Lacroix & Yann Prime, in their AES papers (see [references](#references)). FlacCompagnon is an independent re-implementation of the _principles_ — the original engine is closed-source and the papers are paywalled, so exact thresholds differ and are tunable in `core/`.
+These mirror the three tests described by the authors of the original Lossless Audio Checker, Julien Lacroix & Yann Prime, in their AES papers (see [references](#references)). FlacCompagnon is an independent re-implementation of the _principles_ — the transcoding implementation was compared with the author-provided MATLAB reference and papers; its thresholds remain tunable in `core/`.
 
-**Upscaling (fake resolution).** Every integer sample is OR-ed together; the number of low bits that are _always_ zero is the padding. If a file declares 24-bit but its effective depth is ≤16 bits, it is a 16-bit signal padded to 24-bit. This works for WAV/AIFF (raw bytes) and, because the check is done on the decoded samples, for FLAC/ALAC too. Shown green in the **Real bits** column when it matches the declared depth, red when it does not.
+**Upscaling (unused integer precision).** Every decoded integer sample from every channel is checked against lower-depth quantization grids. Exact zero-padding is recovered bit-for-bit; a 16-bit grid hidden by the very low-level dither used by 24-bit exports is detected separately. Digital silence has no measurable effective depth: it is reported as **Unknown**, with no Hi-Res badge, rather than as Clean or a 1-bit recording. Integers are checked without a floating-point round-trip, including 32-bit PCM; floating-point sources have no integer padding verdict. Noise or later processing can still erase the grid, so absence of a finding does **not** prove a native high-resolution recording. The **Real bits** column reports the detected grid; hover the Detection cell to distinguish exact padding from dithering. **Clean** means no tested signature was found, not a verified recording history. The format term for exact padding is [wasted bits per sample](https://www.rfc-editor.org/rfc/rfc9639.html#section-9.2.2).
 
-**Upsampling (fake sample rate).** The decoded signal is transformed by a Hann-windowed FFT (8192-point), averaged over the whole track. The **cut-off frequency** is the highest frequency still carrying content (above a floor set relative to the spectral peak). If the sample rate is "hi-res" (> 48 kHz) but the content stops sharply around the CD range (~22 kHz), the extra bandwidth is empty — the file was up-sampled from a lower rate.
+**Upsampling (bandwidth heuristic).** The verdict uses the MDCT high-frequency dead zone, independently of the displayed FFT cutoff. At rates above 48 kHz, it flags a dead zone in at least 70% of analyzed MDCT frames, a mean cutoff below 90% of Nyquist and at most 30 kHz, and a mean dead-zone level below −75 dB relative to the frame peak. These are heuristic thresholds, not a certainty test. Native recordings subjected to low-pass filtering can trigger the same result; added ultrasonic noise can hide a resampled source. The detail therefore says “Possible upsampling”. Neither this test nor a spectrogram can establish the history of two identical signals.
 
-**Transcoding (lossy source).** Three signatures, from strongest to weakest:
+**Transcoding (lossy source).** A port of Olivier Derrien's method (JAES 67(3), 2019 — see [references](#references)), reimplemented in Rust from the papers and from the author's own MATLAB, which he shared for this purpose.
 
-1. _AAC re-quantization grid (the LAC method, per Derrien's 2019 JAES paper)_ — an AAC encoder quantizes MDCT coefficients per scale-factor band on the grid `|X| = n^(4/3)·Δ`, and decoding to PCM preserves that structure. FlacCompagnon re-analyzes the audio with AAC's own transform — **both block sizes**: the long 2048-sample MDCT and the 8 short 256-sample sub-blocks of an EIGHT_SHORT_SEQUENCE frame (encoders switch to short blocks on transients, which a long-window analysis cannot see) — with both sine and KBD window shapes and all four channel representations L/R/M/S, sweeping **all 1024 possible frame alignments at one-sample resolution**: only the encoder's exact alignment makes the coefficients snap back onto the quantization grid, and a single sample of misalignment destroys the effect. For each band the detector sweeps 16 candidate scalefactors across the paper's dead-zone window (δ ∈ [0.3, 0.7] of `φdz = 16/3 + 4·log₂(max|X|)`) and applies the statistical criterion `E(s) < τ(s)` — the rounding-error energy against the threshold derived from the Gaussian model of uniform quantization noise (eq. 8, P = 0.005) — plus a scale-free fallback estimator for coarse grids. The file's score is the **3rd-highest per-frame likelihood** over the 16 most energetic frames at the best alignment (a transcode repeats at its onset in every frame; genuine flukes don't). Calibrated on real AAC→FLAC transcodes (16-bit chain) at **128/192/256/320 kbps**: transcodes score **0.28–1.0**, genuine material stays **≤ 0.23** even on pathological synthetic signals (≤ 0.15 on realistic material); the λ = 0.25 threshold yielded **zero false positives and 24/24 recall** — the short-block analysis is what recovers extremely bright, transient-dense content at high bitrates (measured: 0.13 → 0.82 on such a file at 320 kbps). This is the only signature able to catch high-bitrate AAC, which keeps the full audio bandwidth. Runs at 44.1/48 kHz (the rates covered by the AAC scale-factor band tables, per the papers).
-2. _AAC dead zone (MDCT domain)_ — at low-to-mid bitrates the encoder zeroes whole high-frequency coefficient bands, leaving a flat, sharply-bounded dead zone in the MDCT domain that survives the decode. Catches ~128–192 kbps AAC cheaply.
-3. _Spectral brick-wall_ — a sharp cut-off well below Nyquist that drops into a flat, low "dead zone" is characteristic of an MP3/AAC low-pass (≈16 kHz at 128 kbps, ≈19 kHz at 192, ≈20 kHz at 320). A gentle roll-off with no cliff is reported only as _Transcoded?_ (suspected), because it can also be natural.
+The idea in one sentence: a lossy encoder quantizes its transform coefficients onto a lattice, and decoding to PCM does not move them off it. So the detector reproduces the codec's analysis chain, scales each scalefactor band by a candidate scalefactor, rounds, and measures how far the coefficients had to move. The statistical model assumes uniform rounding error on genuine lossless audio (an assumption that can fail on tonal or near-silent signals); on a transcode it collapses toward zero, because the values were already on the grid.
 
-The re-quantization likelihood is exported in the CSV as the `aac_grid` column (empty when the check did not run).
+Two codecs are searched, and both must be, because they look in different transforms — a file the AAC sweep calls clean can still be an MP3 transcode:
+
+- **AAC** — MDCT straight onto the PCM, 2048-sample long windows and 256-sample short ones, four window shapes, all **1024** sample alignments. Only the encoder's exact alignment makes the coefficients snap back onto the lattice; one sample off and the effect is gone.
+- **MP3** — the hybrid filterbank: a 512-tap polyphase bank into 32 subbands, an 18-point MDCT per subband, then the alias-reduction butterflies. **576** alignments, one granule.
+
+Each codec keeps its own parameters (scalefactor bias, δ range, significance threshold) as the standards and the author's tuning define them; they are not interchangeable. The score is the fraction of (band, scalefactor) trials whose rounding error fell below its statistical threshold, pooled across selected frames after choosing each frame's best window shape, then maximised over alignments and tested channel modes (L/R/M/S). It runs at 32/44.1/48 kHz, the rates the scalefactor band tables cover.
+
+> [!WARNING]
+> **Calibration is preliminary.** AAC uses 64 frames × 64 scalefactors and λ = 0.0125; MP3 uses 8 × 8 and the provisional λ = 0.031. Both now reuse one frame selection across channel modes. A detector that lacks its full frame count abstains rather than reusing its threshold on fewer observations. Rejecting all-zero quantization trials changes the statistic and needs corpus validation of sensitivity as well as false positives. A pure lossless 24-bit sine can still cross the AAC threshold. The score is not proof of provenance.
+
+The score is exported in the CSV as `lattice_score`, and shown in the Detection column's tooltip. An empty value means the search did not complete — which is not the same as a low score — and the tooltip gives the reason (untabulated sample rate, file too short, decode failure, cancelled).
+
+The spectral cut-off is still **measured and displayed**, but no longer produces a verdict. A sharp drop below Nyquist is consistent with a lossy low-pass, and equally consistent with an acoustic master, a 1960s tape or a deliberately filtered signal; no threshold separates them. It is information, not an accusation.
 
 **DSD authenticity (fake-DSD detection).** DSF/DFF headers are parsed natively (magic bytes, 1-bit rate → DSD64/128/256, channels, DST flag) — that authenticates the container exactly. The content check decodes the stream through ffmpeg and looks for a _digital brick wall_ at a PCM source's Nyquist frequency: genuine DSD blends smoothly into the sigma-delta noise shaping (measured ≈ 3 dB step across 22.05 kHz on ground-truth files synthesized with a delta-sigma modulator), while DSD converted from 44.1/48 kHz PCM shows a ≈ 50 dB cliff there. A drop ≥ 30 dB flags the file as **Upsampled** (PCM-sourced DSD).
 
@@ -238,7 +263,7 @@ The re-quantization likelihood is exported in the CSV as the `aac_grid` column (
 
 ### Known limitation: naturally "dark" recordings
 
-All cut-off-based detection — LAC included — assumes genuine music has energy up near Nyquist. Acoustic, classical, and older (ADD / analog-tape) recordings often have almost nothing above ~16–18 kHz _by nature_, so their spectrum rolls off early and can read as **Upsampled** or **Transcoded?** even though they are perfectly lossless. FlacCompagnon mitigates this by only calling a hard _Transcoded_ when there is a genuine sharp cliff into a dead zone (a codec signature), leaving gentle roll-offs as the softer _Transcoded?_. When in doubt, look at the spectrogram.
+All cut-off-based detection assumes genuine music has energy up near Nyquist. Acoustic, classical and older (ADD / analog-tape) recordings often have almost nothing above ~16–18 kHz _by nature_, so their spectrum rolls off early. This used to make them read as **Transcoded?**, which is why that verdict no longer exists: the transcoding test now looks only for a codec's quantization lattice, which a dark master does not have. The cut-off is still shown, and the spectrogram is still the place to look when something seems off.
 
 ---
 
@@ -357,6 +382,16 @@ Tag reading/writing and playlist building are tested there too — the tag tests
 cargo test            # the whole workspace
 ```
 
+### Probing one real file by hand
+
+The transcoding detectors are the hardest part to reason about from a test suite alone: they need real transcodes, which cannot live in the repository. `core/examples/probe.rs` runs them on a single file and prints what each codec found, without going through the app:
+
+```bash
+cargo run --release -p flaccompagnon-core --example probe -- "/path/to/track.flac"
+```
+
+It reports the likelihood, the winning sample alignment and the verdict for **both** the AAC and MP3 sweeps, plus per-channel MP3 scores. Use it when the app's Detection column says something surprising — it runs the same detector code, so it separates "the algorithm is wrong" from "the app I am running was built before the algorithm changed". `--release` matters: a debug build takes minutes.
+
 The **network is never touched by the test suite**: the lookup's HTTP calls are not exercised, only the pure input-validation around them, so `cargo test` stays fast and works offline.
 
 ---
@@ -381,12 +416,12 @@ Analysis alone writes **nothing**. The only files FlacCompagnon creates are the 
 My Album/
 ├── 01 - Track.flac
 ├── 02 - Track.flac
-└── spectres/              ← only created when you generate spectrograms
+└── spectrograms/         ← only created when you generate spectrograms
     ├── 01 - Track.png
     └── 02 - Track.png
 ```
 
-Sub-folders that contain audio each get their own `spectres/` folder next to their files.
+Sub-folders that contain audio each get their own `spectrograms/` folder next to their files.
 
 ### Your audio is only ever modified when you ask
 
@@ -399,7 +434,7 @@ There are **two** exceptions, both explicit, deliberate actions that never happe
 
 If you want the guarantee that nothing can ever be written, simply don't use the tag panel's Save button and don't rename any file — every other feature is read-only.
 
-The **conversion panel** (see [above](#9-conversion)) is a separate case: it always writes **new** files, under a destination folder you explicitly pick each time — the sources it reads from are never modified or moved.
+The **conversion panel** (see [above](#10-conversion)) is a separate case: it always writes **new** files, under a destination folder you explicitly pick each time — the sources it reads from are never modified or moved.
 
 ### Network use & privacy
 
@@ -416,16 +451,16 @@ Requests carry a descriptive `User-Agent` (as MusicBrainz's usage policy require
 
 ## Limitations & notes
 
-- The spectral detections are **heuristics** (as in the original). See [Detection algorithms](#detection-algorithms) — in particular, naturally dark/acoustic recordings can read as _Upsampled_ or _Transcoded?_; always sanity-check with the spectrogram. The AAC re-quantization detection, in contrast, is close to a proof: it requires the audio to snap onto AAC's exact quantization grid at a synchronized frame alignment, which genuine audio essentially never does.
+- **Upsampling** remains a heuristic and can misfire on unusual material; a spectrogram cannot prove the original sample rate. **Transcoding** is a statistical test with known tonal false positives and a provisional calibration. **Upscaling** is exact for integer sources — the low bits are either always zero or they are not.
 - **AAC transcode detection covers all bitrates at 44.1/48 kHz** (validated on real 128/192/256/320 kbps AAC→FLAC transcodes against their originals: zero false positives, 24/24 recall, including transient-dense content via the short-block analysis). **MP3 sources** are still only caught through the spectral brick-wall signature, so high-bitrate MP3 (320 kbps) can pass — MP3 uses a different filterbank (hybrid PQMF + 576-point MDCT) and would need its own re-quantization detector.
-- Effective bit-depth reconstruction is exact for ≤ 24-bit integer sources.
+- Effective bit-depth measurement uses integer samples directly, through 32 bits. Digital silence and float sources return no effective integer depth.
 - FLAC files are decoded **once**: a fused pass feeds the analysis and hashes the MD5 from the same raw integer samples (bit-identical to `flac -t`), so MD5 verification adds only a negligible hashing cost on top of the analysis.
 - Files are analyzed **in parallel**: a worker pool sized to the machine (one worker per CPU core, minus one to keep the UI responsive) processes independent files concurrently, so analyzing an album scales with your core count.
 - **Extended tags only offer a curated list of fields to add**, not a free-text custom key. lofty (the tagging library) can only write one of its own known tag keys, not an arbitrary made-up frame the way some tools' TXXX editors can, so a free-text field would silently do nothing for a name it doesn't recognize.
 - **The online lookup matches by text, not by audio.** It uses an existing MusicBrainz ID when the files carry one, otherwise the tags, otherwise a guess from the file name. It does **not** fingerprint the audio, so a badly-named, untagged file may need the query typed by hand.
 - **Playlists store absolute paths**, so they survive being opened from anywhere on the machine but break if the audio files are moved afterwards.
 - **Conversion's WAV output is fixed at 16-bit PCM**, not the source's own bit depth (unlike FLAC output, which preserves it) — deliberately, to keep the encoder call unambiguous; 24-bit WAV output may follow later. **AIFF is not offered** as a conversion target despite early planning around "WAV/AIFF" — WAV alone already covers the "guaranteed-honest PCM copy" use case, and adding a second PCM container didn't carry its own weight.
-- **Conversion doesn't support DSD sources** (`.dsf`/`.dff`) yet — see [Conversion](#9-conversion) above.
+- **Conversion doesn't support DSD sources** (`.dsf`/`.dff`) yet — see [Conversion](#10-conversion) above.
 
 ## Roadmap ideas
 

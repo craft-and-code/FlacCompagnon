@@ -20,11 +20,9 @@
 //! * [`container`] — what the file *actually* is, from its magic bytes, versus
 //!   what its extension claims.
 //!
-//! Every path exposes audio as normalized `f32`. For integer PCM sources the
-//! exact integer sample values are reconstructed from those floats (the
-//! conversion is lossless for ≤ 24-bit content, since an `f32` mantissa
-//! represents every integer up to 2^24 exactly) and fed to the bit-depth
-//! estimator alongside.
+//! Every path exposes audio as normalized `f32` for spectral analysis.
+//! Integer PCM sources also supply exact integers directly to the bit-depth
+//! measurement, without a float round-trip that could discard low bits.
 //!
 //! [`StreamAnalyzer`]: crate::analysis::analyzer::StreamAnalyzer
 
@@ -40,7 +38,7 @@ use crate::analysis::analyzer::StreamAnalyzer;
 
 pub use container::{detect_container, ext_canonical};
 pub use dsd::decode_and_analyze_dsd;
-pub use flac::decode_and_analyze_flac;
+pub use flac::{decode_and_analyze_flac, decode_flac_to_pcm};
 pub use flac_md5::FlacMd5Status;
 pub use playback::{decode_to_pcm, PcmAudio, PcmStreamDecoder};
 pub use probe::{probe_info, BasicInfo};

@@ -12,9 +12,82 @@ use std::path::Path;
 use md5::{Digest, Md5};
 
 use super::DecodeOutcome;
-use crate::analysis::analyzer::StreamAnalyzer;
 use super::FlacMd5Status;
+use crate::analysis::analyzer::StreamAnalyzer;
 use crate::AnalysisError;
+
+/// Decode a FLAC into an interleaved `f32` buffer using claxon.
+///
+/// # Why this exists next to the Symphonia path
+///
+/// [`super::decode_to_pcm`] normally goes through Symphonia, which handles
+/// every format the app accepts. Symphonia is also the stricter of the two
+/// FLAC readers, and it refuses streams that claxon and ffmpeg accept — a
+/// STREAMINFO that reports a variable block size while the frame headers say
+/// fixed, for one, which is a file this app used to produce itself (see
+/// `convert::flac::declare_fixed_block_size`). That bug is fixed at the
+/// source now, but files written before the fix are on users' disks, and the
+/// transcoding detector reported them as un-analysable.
+///
+/// So FLAC — the format this app is named after and the one it is most often
+/// pointed at — gets decoded by the same library that already decodes it for
+/// analysis and MD5 verification everywhere else. Symphonia stays as the
+/// fallback, which keeps a claxon-specific failure from being fatal either.
+///
+/// Deliberately *not* merged with [`decode_and_analyze_flac`]: that function
+/// exists to hash and analyse in one pass and would have to grow a mode flag
+/// and a discarded output to serve this caller. The two share a library, not
+/// a reason to change.
+pub fn decode_flac_to_pcm(path: &Path) -> Result<crate::decode::PcmAudio, AnalysisError> {
+    let mut reader = claxon::FlacReader::open(path)
+        .map_err(|e| AnalysisError::Decode(format!("flac open failed: {e}")))?;
+    let info = reader.streaminfo();
+    let (sample_rate, channels, bits) = (
+        info.sample_rate,
+        info.channels as usize,
+        info.bits_per_sample,
+    );
+    if sample_rate == 0 || channels == 0 || bits == 0 || bits > 32 {
+        return Err(AnalysisError::Decode("invalid FLAC stream info".into()));
+    }
+    let scale = 1.0f32 / (1u64 << (bits - 1)) as f32;
+
+    let mut samples: Vec<f32> = Vec::new();
+    // `info.samples` is a hint from a header this crate does not trust, so it
+    // sizes the allocation but never bounds the loop.
+    if let Some(total) = info.samples {
+        if let Ok(n) = usize::try_from(total) {
+            samples.reserve(n.saturating_mul(channels).min(1 << 28));
+        }
+    }
+
+    let mut blocks = reader.blocks();
+    let mut buffer: Vec<i32> = Vec::new();
+    loop {
+        let block = match blocks.read_next_or_eof(buffer) {
+            Ok(Some(b)) => b,
+            Ok(None) => break,
+            Err(e) => return Err(AnalysisError::Decode(format!("flac decode error: {e}"))),
+        };
+        for t in 0..block.duration() as usize {
+            for c in 0..channels {
+                // `channel()` panics on an out-of-range index, so the channel
+                // count is taken from STREAMINFO and validated above rather
+                // than from the block.
+                samples.push(block.channel(c as u32)[t] as f32 * scale);
+            }
+        }
+        buffer = block.into_buffer();
+    }
+    if samples.is_empty() {
+        return Err(AnalysisError::Decode("no audio data decoded".into()));
+    }
+    Ok(crate::decode::PcmAudio {
+        samples,
+        sample_rate,
+        channels,
+    })
+}
 
 /// Fused single-pass FLAC decode.
 ///
@@ -133,7 +206,18 @@ mod tests {
         for bits in [8u32, 12, 16, 20, 24] {
             let scale = 1.0f32 / (1u64 << (bits - 1)) as f32;
             let max = (1i64 << (bits - 1)) - 1;
-            let probes = [0i64, 1, -1, 2, -2, max, -max - 1, max / 3, -(max / 7), max - 1];
+            let probes = [
+                0i64,
+                1,
+                -1,
+                2,
+                -2,
+                max,
+                -max - 1,
+                max / 3,
+                -(max / 7),
+                max - 1,
+            ];
             for &s in &probes {
                 let f = s as f32 * scale;
                 let back = (f / scale).round() as i64;
@@ -146,14 +230,7 @@ mod tests {
     /// `ceil(bits/8)` for every depth the format allows.
     #[test]
     fn bytes_per_sample_matches_the_spec() {
-        for (bits, expected) in [
-            (8u32, 1usize),
-            (12, 2),
-            (16, 2),
-            (20, 3),
-            (24, 3),
-            (32, 4),
-        ] {
+        for (bits, expected) in [(8u32, 1usize), (12, 2), (16, 2), (20, 3), (24, 3), (32, 4)] {
             assert_eq!(bits.div_ceil(8) as usize, expected, "bits={bits}");
         }
     }

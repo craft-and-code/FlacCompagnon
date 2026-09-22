@@ -55,7 +55,14 @@ export function ExtendedTagRow({
   }, [editing, row.value, row.mixed]);
 
   return (
-    <div className={selected ? "ext-row selected" : "ext-row"} onClick={onSelect}>
+    // `data-key` is what keyboard navigation scrolls to — see
+    // useExtendedTagsKeyboard. Kept on the row rather than looked up by
+    // index so it survives the list being filtered or reordered.
+    <div
+      className={selected ? "ext-row selected" : "ext-row"}
+      data-key={row.key}
+      onClick={onSelect}
+    >
       <div className="ext-key">{row.key}</div>
       {editing ? (
         <input

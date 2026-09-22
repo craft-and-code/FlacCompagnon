@@ -30,7 +30,7 @@ use rustfft::{num_complex::Complex, Fft, FftPlanner};
 
 use super::mdct::{Mdct, AAC_N};
 use super::truepeak::TruePeak;
-use super::{bitdepth, clipping, requant, spectrum};
+use super::{bitdepth, clipping, spectrum};
 use crate::ClippingInfo;
 
 /// Full-scale detection threshold (normalized). Samples with |value| at or
@@ -47,10 +47,6 @@ const MDCT_STRIDE: u64 = 4;
 const MDCT_MAX_FRAMES: u32 = 240;
 /// A dead zone only "exists" if the per-frame cutoff is below this fraction of N.
 const MDCT_DEAD_TOP_RATIO: f32 = 0.92;
-
-// --- Re-quantization detector segment buffers -------------------------------
-/// Preferred segment start (sample index; multiple of 1024 ≈ 8 s at 44.1 kHz).
-const REQ_MAIN_START: u64 = 344 * 1024;
 
 // --- Dynamics (DR) ----------------------------------------------------------
 /// Frames per RMS block (~3 s at 44.1 kHz). The exact wall-clock length is not
@@ -80,8 +76,11 @@ pub struct AnalysisSummary {
     /// enough) for long enough to suggest a mono source duplicated to stereo.
     pub fake_stereo: bool,
     /// The bit depth actually used by the samples, when it could be
-    /// determined from an integer PCM source (`None` for float sources).
+    /// determined from integer PCM (`None` for float sources or digital silence).
     pub real_bit_depth: Option<u32>,
+    /// `true` when a 24-bit stream follows a 16-bit grid hidden by low-level
+    /// dither rather than having exactly zero low bits.
+    pub bit_depth_dithered: bool,
 
     /// Dynamic-range estimate in dB: peak level vs the RMS of the loudest 20%
     /// of ~3 s blocks (crest factor of the loud passages, DR-meter style).
@@ -97,10 +96,8 @@ pub struct AnalysisSummary {
     /// Fraction of analyzed MDCT frames that showed a high-frequency dead zone.
     pub mdct_dead_fraction: Option<f32>,
 
-    // --- AAC re-quantization evidence (strongest transcode proof) ---
-    /// Hit-rate of on-grid bands at the best synchronized MDCT onset (0..1).
-    /// ≥ [`requant::DETECT_RATE`] means an AAC source. `None` when the check
-    /// did not run (unsupported rate or file too short).
+    /// Legacy detector result, retained for API compatibility. Always `None`;
+    /// transcoding is now evaluated by `crate::transcode` in the pipeline.
     pub requant_rate: Option<f32>,
 }
 
@@ -142,6 +139,7 @@ pub struct StreamAnalyzer {
     // --- bit depth ---
     int_or_mask: u32,
     saw_integer: bool,
+    grid16: bitdepth::Grid16Evidence,
 
     // --- MDCT (AAC-SIN) ---
     mdct: &'static Mdct,
@@ -154,12 +152,6 @@ pub struct StreamAnalyzer {
     mdct_dead_frames: u32,
     mdct_cutoff_ratio_sum: f64,
     mdct_dead_db_sum: f64,
-
-    // --- Re-quantization segment buffers (L/R as f64) ---
-    req_early_l: Vec<f64>,
-    req_early_r: Vec<f64>,
-    req_main_l: Vec<f64>,
-    req_main_r: Vec<f64>,
 
     // --- dynamics (DR) ---
     dyn_block_sumsq: f64, // running sum of per-frame mean squares
@@ -194,6 +186,7 @@ impl StreamAnalyzer {
             total_frames: 0,
             int_or_mask: 0,
             saw_integer: false,
+            grid16: bitdepth::Grid16Evidence::default(),
             mdct: Mdct::shared(),
             mdct_prev: Vec::with_capacity(AAC_N),
             mdct_fill: Vec::with_capacity(AAC_N),
@@ -204,10 +197,6 @@ impl StreamAnalyzer {
             mdct_dead_frames: 0,
             mdct_cutoff_ratio_sum: 0.0,
             mdct_dead_db_sum: 0.0,
-            req_early_l: Vec::with_capacity(requant::SEGMENT_LEN),
-            req_early_r: Vec::with_capacity(requant::SEGMENT_LEN),
-            req_main_l: Vec::with_capacity(requant::SEGMENT_LEN),
-            req_main_r: Vec::with_capacity(requant::SEGMENT_LEN),
             dyn_block_sumsq: 0.0,
             dyn_block_frames: 0,
             dyn_blocks: Vec::new(),
@@ -221,26 +210,7 @@ impl StreamAnalyzer {
         if samples.is_empty() {
             return;
         }
-        let idx = self.total_frames; // sample index of this frame
         self.total_frames += 1;
-
-        // Capture the re-quantization segments (first two channels, f64).
-        // Both segment starts are multiples of 1024, preserving AAC frame
-        // alignment modulo the block length.
-        let l = samples[0] as f64;
-        let r = if samples.len() >= 2 { samples[1] as f64 } else { l };
-        if self.req_early_l.len() < requant::SEGMENT_LEN {
-            self.req_early_l.push(l);
-            if self.channels >= 2 {
-                self.req_early_r.push(r);
-            }
-        }
-        if idx >= REQ_MAIN_START && self.req_main_l.len() < requant::SEGMENT_LEN {
-            self.req_main_l.push(l);
-            if self.channels >= 2 {
-                self.req_main_r.push(r);
-            }
-        }
 
         // Clipping + peak (per channel), and the frame's mean square for the
         // dynamics blocks.
@@ -278,6 +248,7 @@ impl StreamAnalyzer {
             self.saw_integer = true;
             for &v in ints {
                 self.int_or_mask |= v as u32;
+                self.grid16.push(v);
             }
         }
 
@@ -367,10 +338,7 @@ impl StreamAnalyzer {
             .frame_buf
             .iter()
             .zip(self.hann.iter())
-            .map(|(&s, &w)| Complex {
-                re: s * w,
-                im: 0.0,
-            })
+            .map(|(&s, &w)| Complex { re: s * w, im: 0.0 })
             .collect();
         self.fft.process(&mut buf);
         for (bin, c) in buf.iter().take(self.power_acc.len()).enumerate() {
@@ -437,27 +405,18 @@ impl StreamAnalyzer {
             false
         };
 
-        let real_bit_depth = match (self.saw_integer, declared_bits) {
-            (true, Some(declared)) => Some(bitdepth::effective_bits(self.int_or_mask, declared)),
+        let exact_bit_depth = match (self.saw_integer, declared_bits) {
+            (true, Some(declared)) if self.int_or_mask != 0 && (1..=32).contains(&declared) => {
+                Some(bitdepth::effective_bits(self.int_or_mask, declared))
+            }
             _ => None,
         };
-
-        // AAC re-quantization check — only meaningful at the AAC frame rates
-        // covered by the 44.1/48 kHz scale-factor band table.
-        let requant_rate = if sample_rate == 44_100 || sample_rate == 48_000 {
-            let (seg_l, seg_r) = if self.req_main_l.len() >= requant::SEGMENT_LEN {
-                (&self.req_main_l, &self.req_main_r)
-            } else {
-                (&self.req_early_l, &self.req_early_r)
-            };
-            let right = if self.channels >= 2 && seg_r.len() >= requant::SEGMENT_LEN {
-                Some(seg_r.as_slice())
-            } else {
-                None
-            };
-            requant::analyze_segment(seg_l, right).map(|r| r.rate)
+        let bit_depth_dithered = declared_bits
+            .is_some_and(|bits| exact_bit_depth == Some(bits) && self.grid16.detected(bits));
+        let real_bit_depth = if bit_depth_dithered {
+            Some(16)
         } else {
-            None
+            exact_bit_depth
         };
 
         let (mdct_cutoff_ratio, mdct_dead_db, mdct_dead_fraction) = if self.mdct_frames > 0 {
@@ -484,11 +443,12 @@ impl StreamAnalyzer {
             clipping,
             fake_stereo,
             real_bit_depth,
+            bit_depth_dithered,
             dr_db,
             mdct_cutoff_ratio,
             mdct_dead_db,
             mdct_dead_fraction,
-            requant_rate,
+            requant_rate: None,
         }
     }
 }

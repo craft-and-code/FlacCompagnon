@@ -29,6 +29,7 @@ import {
   ClippingCell,
   DetectionsCell,
   DynamicRangeCell,
+  FileHashCell,
   Md5Cell,
   QualityBadgeCell,
   RealBitsCell,
@@ -53,6 +54,8 @@ export type ColumnKey =
   | "stereo"
   | "clipping"
   | "truePeak"
+  | "fileMd5"
+  | "fileCrc32"
   | "dynamics"
   | "artist"
   | "album"
@@ -277,5 +280,24 @@ export const ALL_COLUMNS: ColumnDef[] = [
     defaultVisible: true,
     conditional: "md5",
     render: (f) => <Md5Cell m={f.flac_md5} />,
+  },
+  // Last, and hidden by default: fingerprints of the file's bytes, for
+  // checksum comparison and duplicate hunting. Distinct from the MD5 column
+  // above, which is FLAC's own signature over the decoded *audio* — hence the
+  // "File " prefix on both labels rather than a bare "MD5" that would sit two
+  // columns away from a different MD5.
+  {
+    key: "fileMd5",
+    label: "File MD5",
+    sort: "fileMd5",
+    defaultVisible: false,
+    render: (f) => <FileHashCell hash={f.file_md5} />,
+  },
+  {
+    key: "fileCrc32",
+    label: "File CRC32",
+    sort: "fileCrc32",
+    defaultVisible: false,
+    render: (f) => <FileHashCell hash={f.file_crc32} />,
   },
 ];

@@ -240,14 +240,14 @@ export function playlistNameFrom(
 
 // --- Search filter (TopBar) --------------------------------------------------
 
-function detectionSearchWords(d: Detections): string {
+/** Shared detection labels for the table, sorting and search. */
+export function detectionLabels(d: Detections): string[] {
   const tags: string[] = [];
-  if (d.upscaling) tags.push("upscaled");
-  if (d.upsampling) tags.push("upsampled");
-  if (d.transcoding === "detected") tags.push("transcoded");
-  else if (d.transcoding === "suspected") tags.push("transcoded suspected");
-  if (tags.length === 0) tags.push("clean");
-  return tags.join(" ");
+  if (d.upscaling) tags.push("Upscaled");
+  if (d.upsampling) tags.push("Upsampled");
+  if (d.transcoding) tags.push("Transcoded");
+  if (tags.length === 0) tags.push(d.summary === "Clean" ? "Clean" : "Unknown");
+  return tags;
 }
 
 function md5SearchWords(m: FlacMd5Status | null): string {
@@ -300,10 +300,16 @@ export function fileSearchText(f: FileAnalysis): string {
       ? `${f.clipping.true_peak_dbtp.toFixed(1)} dbtp true peak`
       : "",
     f.dr_db != null && Number.isFinite(f.dr_db) ? `${f.dr_db.toFixed(1)} db dynamics` : "",
-    detectionSearchWords(f.detections),
+    detectionLabels(f.detections).join(" ").toLowerCase(),
     f.detections.detail,
     f.badge ?? "",
     md5SearchWords(f.flac_md5),
+    // The whole-file fingerprints, so pasting a CRC32 from an .sfv (or an
+    // MD5 from anywhere) finds its file — which is most of the reason to
+    // have them at all. Included even though both columns are hidden by
+    // default: the search filters files, not visible cells.
+    f.file_md5 ?? "",
+    f.file_crc32 ?? "",
     f.error ?? "",
   ];
   return parts.filter(Boolean).join(" | ").toLowerCase();

@@ -40,7 +40,21 @@ pub struct PcmAudio {
 /// costs one `Vec` per packet over a hand-rolled version, which is invisible
 /// next to decoding the file at all, and it means a fix to the packet loop
 /// cannot land in one of the two paths and miss the other.
+///
+/// FLAC is the exception, and takes claxon first — see
+/// [`super::decode_flac_to_pcm`] for why. Symphonia still runs if claxon
+/// declines, so neither library being unhappy with a particular file is on
+/// its own fatal.
 pub fn decode_to_pcm(path: &Path) -> Result<PcmAudio, AnalysisError> {
+    let is_flac = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("flac"));
+    if is_flac {
+        if let Ok(pcm) = super::decode_flac_to_pcm(path) {
+            return Ok(pcm);
+        }
+    }
     let mut decoder = PcmStreamDecoder::open(path)?;
     let sample_rate = decoder.sample_rate;
     let channels = decoder.channels;

@@ -1,12 +1,16 @@
 // Types mirroring the Rust `serde` payloads exchanged with the Tauri backend.
 
-export type TranscodeState = "none" | "suspected" | "detected";
-
 export interface Detections {
   upscaling: boolean;
   upsampling: boolean;
-  transcoding: TranscodeState;
+  // A plain boolean like its two siblings above. It used to be a three-state
+  // enum whose middle value, "suspected", was raised by a gentle spectral
+  // roll-off — which is what naturally dark acoustic and analog-tape masters
+  // look like, so it accused a whole genre. Transcoding is now decided only
+  // by the codec-lattice detectors, which either find the lattice or don't.
+  transcoding: boolean;
   detail: string;
+  // "Clean", "Flagged", or "Unknown" when the analysis is incomplete.
   summary: string;
 }
 
@@ -52,13 +56,28 @@ export interface FileAnalysis {
   cutoff_hz: number | null;
   cutoff_ratio: number | null;
   real_bit_depth: number | null;
-  requant_rate: number | null;
+  // The transcoding evidence, 0..1 — see Rust's `FileAnalysis::lattice_score`.
+  // `null` means the search did not run, which is not the same as a low score.
+  lattice_score: number | null;
   fake_stereo: boolean | null;
   badge: string | null;
   clipping: ClippingInfo;
   dr_db: number | null;
   flac_md5: FlacMd5Status | null;
+  // Fingerprints of the *file's bytes* — tags and cover art included — as
+  // lowercase hex. Not to be confused with `flac_md5`, which is about the
+  // decoded audio: see Rust's `core::hash` module docs. `null` when the file
+  // could not be read.
+  file_md5: string | null;
+  file_crc32: string | null;
   error: string | null;
+}
+
+// One file's move, found by `relocate_paths` — mirrors Rust's
+// `core::relocate::Relocation`.
+export interface Relocation {
+  from: string;
+  to: string;
 }
 
 export interface FolderReport {
@@ -77,7 +96,7 @@ export interface SpectroSummary {
   total: number;
   rendered: number;
   failed: number;
-  spectres_dirs: string[];
+  spectrogram_dirs: string[];
   errors: string[];
 }
 

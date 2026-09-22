@@ -118,8 +118,21 @@ pub struct FileAnalysis {
 
     /// Estimated *effective* bit depth (integer sources only).
     pub real_bit_depth: Option<u32>,
-    /// AAC re-quantization hit-rate (0..1); high values prove an AAC source.
-    pub requant_rate: Option<f32>,
+    /// How strongly the audio sits on a lossy codec's quantization lattice,
+    /// in `0..1` — the criterion `L` of [`crate::transcode`], maximised over
+    /// every alignment, frame, window shape and stereo mode tried, and over
+    /// both codecs.
+    ///
+    /// This is the *evidence*, where `Detections::transcoding` is only the
+    /// verdict. Shown as its own column because the two answer different
+    /// questions: "is this file transcoded" and "how sure are we". A file at
+    /// 0.19 against a 0.031 threshold and one at 0.032 are both "Transcoded",
+    /// and they do not deserve the same confidence.
+    ///
+    /// `None` means the search did not run — an untabulated sample rate, a
+    /// file too short, or a decode that failed. **Not** the same as a low
+    /// score, and the reason this is an `Option` rather than a `0.0`.
+    pub lattice_score: Option<f32>,
     /// `true` when a >= 2 channel file is actually dual-mono.
     pub fake_stereo: Option<bool>,
     /// Verified quality badge: `Some("Hi-Res")` for > 48 kHz or > 16-bit PCM,
@@ -137,6 +150,18 @@ pub struct FileAnalysis {
 
     /// FLAC MD5 signature status. `None` for non-FLAC files (no column shown).
     pub flac_md5: Option<crate::decode::FlacMd5Status>,
+
+    /// MD5 of the **file's bytes**, lowercase hex — tags and cover art
+    /// included. Deliberately not the same thing as [`Self::flac_md5`], which
+    /// is about the decoded audio; see [`crate::hash`] for the distinction
+    /// and why both exist. `None` when the file could not be read.
+    #[serde(default)]
+    pub file_md5: Option<String>,
+
+    /// CRC32 of the file's bytes, 8 lowercase hex characters — the `.sfv`
+    /// variant. `None` when the file could not be read.
+    #[serde(default)]
+    pub file_crc32: Option<String>,
 
     /// Populated when analysis failed; other fields hold best-effort defaults.
     pub error: Option<String>,

@@ -1,4 +1,4 @@
-//! Batch spectrogram rendering: one PNG per track, in a `spectres/` folder
+//! Batch spectrogram rendering: one PNG per track, in a `spectrograms/` folder
 //! next to the source file.
 //!
 //! The spectrogram is the final arbiter when a detection is ambiguous, so this
@@ -21,7 +21,7 @@ pub struct SpectroSummary {
     total: usize,
     rendered: usize,
     failed: usize,
-    spectres_dirs: Vec<String>,
+    spectrogram_dirs: Vec<String>,
     errors: Vec<String>,
 }
 
@@ -57,7 +57,7 @@ pub async fn generate_spectrograms(
     let summary = tauri::async_runtime::spawn_blocking(move || {
         let mut rendered = 0usize;
         let mut errors: Vec<String> = Vec::new();
-        let mut spectres_dirs: Vec<String> = Vec::new();
+        let mut spectrogram_dirs: Vec<String> = Vec::new();
 
         for (i, p) in paths.iter().enumerate() {
             if cancelled() {
@@ -73,18 +73,18 @@ pub async fn generate_spectrograms(
             );
 
             let parent = p.parent().unwrap_or_else(|| Path::new("."));
-            let spectres_dir = parent.join("spectres");
-            if let Err(e) = std::fs::create_dir_all(&spectres_dir) {
+            let spectrogram_dir = parent.join("spectrograms");
+            if let Err(e) = std::fs::create_dir_all(&spectrogram_dir) {
                 errors.push(format!("{}: {e}", file_name(p)));
                 continue;
             }
-            let dir_str = spectres_dir.to_string_lossy().to_string();
-            if !spectres_dirs.contains(&dir_str) {
-                spectres_dirs.push(dir_str);
+            let dir_str = spectrogram_dir.to_string_lossy().to_string();
+            if !spectrogram_dirs.contains(&dir_str) {
+                spectrogram_dirs.push(dir_str);
             }
 
             let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("track");
-            let out = spectres_dir.join(format!("{stem}.png"));
+            let out = spectrogram_dir.join(format!("{stem}.png"));
             let info = core::probe_info(p).ok();
 
             match spectrogram::render(&ffmpeg, p, &out, info.as_ref()) {
@@ -100,7 +100,7 @@ pub async fn generate_spectrograms(
             // were incremented separately before, which is one edit away from
             // reporting a failure count that doesn't match the error list.
             failed: errors.len(),
-            spectres_dirs,
+            spectrogram_dirs,
             errors,
         }
     })

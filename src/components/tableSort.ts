@@ -11,6 +11,7 @@
 // means the natural/drag order, which is what the table opens in.
 
 import type { FileAnalysis } from "../types";
+import { detectionLabels } from "../format";
 
 export type SortColumn =
   | "file"
@@ -30,6 +31,8 @@ export type SortColumn =
   | "stereo"
   | "clipping"
   | "truePeak"
+  | "fileMd5"
+  | "fileCrc32"
   | "dynamics"
   | "md5";
 
@@ -38,17 +41,6 @@ export type SortDirection = "asc" | "desc";
 export interface SortState {
   column: SortColumn;
   direction: SortDirection;
-}
-
-/// Mirrors `DetectionsCell`'s own tag text exactly, so sorting this column
-/// groups rows by literally what's printed in the cell.
-function detectionsLabel(f: FileAnalysis): string {
-  const tags: string[] = [];
-  if (f.detections.upscaling) tags.push("Upscaled");
-  if (f.detections.upsampling) tags.push("Upsampled");
-  if (f.detections.transcoding === "detected") tags.push("Transcoded");
-  else if (f.detections.transcoding === "suspected") tags.push("Transcoded?");
-  return tags.length ? tags.join(" ") : "Clean";
 }
 
 /// Mirrors `StereoCell`'s displayed text.
@@ -101,6 +93,12 @@ function sortValue(f: FileAnalysis, col: SortColumn): string | number | null {
       return f.declared_bits;
     case "realBits":
       return f.real_bit_depth;
+    // Hex strings sort lexicographically, which for a fixed-width hex value
+    // is the same order as sorting the number it encodes.
+    case "fileMd5":
+      return f.file_md5;
+    case "fileCrc32":
+      return f.file_crc32;
     case "bitrate":
       return f.bitrate_kbps;
     case "length":
@@ -110,7 +108,7 @@ function sortValue(f: FileAnalysis, col: SortColumn): string | number | null {
     case "size":
       return f.size_bytes;
     case "detections":
-      return detectionsLabel(f).toLowerCase();
+      return detectionLabels(f.detections).join(" ").toLowerCase();
     case "cutoff":
       return f.cutoff_hz;
     case "channels":

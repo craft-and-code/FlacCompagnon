@@ -17,9 +17,12 @@
 }
 /* One colour per detection, identical to the landing page and ordered by
    severity: Clean = green, Upscaled = amber, Upsampled = orange,
-   Transcoded = red. "Transcoded?" (suspected) reuses the transcoded hue with a
-   fainter fill — same family, weaker claim. Colours come from the theme
-   variables, so light mode gets legible equivalents automatically. */
+   Transcoded = red. Colours come from the theme variables, so light mode gets
+   legible equivalents automatically.
+
+   There were five: a fainter "Transcoded?" shared the transcoded hue to
+   signal a weaker claim. That verdict is gone — the app either finds a
+   codec's lattice or it does not — and its rule went with it. */
 .tag.t-clean {
   color: var(--clean);
   background: color-mix(in srgb, var(--clean) 14%, transparent);
@@ -39,11 +42,6 @@
   color: var(--transcoded);
   background: color-mix(in srgb, var(--transcoded) 14%, transparent);
   border-color: color-mix(in srgb, var(--transcoded) 42%, transparent);
-}
-.tag.t-suspected {
-  color: var(--transcoded);
-  background: color-mix(in srgb, var(--transcoded) 8%, transparent);
-  border-color: color-mix(in srgb, var(--transcoded) 28%, transparent);
 }
 
 /* Verified quality badge (Hi-Res / DSD64...) — same shape as `.tag` above
@@ -75,4 +73,16 @@
   color: var(--muted);
   background: var(--bg-elev2);
   border-color: var(--border);
+}
+
+/* Whole-file MD5/CRC32. Monospaced and tabular so the columns of hex line up
+   between rows; without that, comparing two fingerprints by eye is hopeless.
+   `user-select: all` makes one click select the whole value — these exist to
+   be copied into an .sfv or a checksum comparison, never to be read. */
+.file-hash {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  white-space: nowrap;
+  user-select: all;
 }

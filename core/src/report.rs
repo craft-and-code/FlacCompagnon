@@ -8,7 +8,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{FlacMd5Status, FolderReport, TranscodeState};
+use crate::{FlacMd5Status, FolderReport};
 
 /// Default file name suggested when saving a report.
 pub const CSV_FILE_NAME: &str = "FlacCompagnon.csv";
@@ -36,10 +36,14 @@ struct JsonReport {
 /// `headers`), not the order fields were originally added to this struct —
 /// so a column's position here means the same thing it means on screen.
 /// Fields the table folds into a single cell (Detections: `status` +
-/// `upscaling`/`upsampling`/`transcoding`/`aac_grid`; Clipping: `clipped` +
+/// `upscaling`/`upsampling`/`transcoding`/`lattice_score`; Clipping: `clipped` +
 /// `clip_events`/`peak_dbfs`) are grouped together at that cell's position
 /// rather than split across the row. No column is dropped — every field the
 /// old order exported is still here, just reordered.
+///
+/// `file_md5` and `file_crc32` are the exception to that mirroring: they are
+/// appended at the end because their columns are hidden by default in the
+/// table, so there is no on-screen position to mirror.
 ///
 /// `codec` and `bitrate_kbps` are deliberately slotted mid-row — right after
 /// `format` and right before `sample_rate` respectively — rather than at the
@@ -54,9 +58,9 @@ pub fn build_csv(report: &FolderReport) -> String {
     let mut out = String::new();
     out.push_str(
         "file,format,codec,badge,bitrate_kbps,sample_rate,declared_bits,real_bit_depth,\
-         duration_s,size_bytes,status,upscaling,upsampling,transcoding,aac_grid,cutoff_hz,\
+         duration_s,size_bytes,status,upscaling,upsampling,transcoding,lattice_score,cutoff_hz,\
          cutoff_ratio,channels,fake_stereo,clipped,clip_events,peak_dbfs,true_peak_dbtp,dr_db,\
-         md5,modified_unix\n",
+         md5,modified_unix,file_md5,file_crc32\n",
     );
     for f in &report.files {
         let md5 = f
@@ -70,13 +74,8 @@ pub fn build_csv(report: &FolderReport) -> String {
                 FlacMd5Status::Error(_) => "error",
             })
             .unwrap_or("");
-        let transcoding = match f.detections.transcoding {
-            TranscodeState::None => "none",
-            TranscodeState::Suspected => "suspected",
-            TranscodeState::Detected => "detected",
-        };
         out.push_str(&format!(
-            "{},{},{},{},{},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{},{},{},{:.2},{:.2},{},{},{}\n",
+            "{},{},{},{},{},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{},{},{},{:.2},{:.2},{},{},{},{},{}\n",
             csv_escape(&f.file_name),
             f.format,
             f.codec.clone().unwrap_or_default(),
@@ -92,8 +91,8 @@ pub fn build_csv(report: &FolderReport) -> String {
             f.detections.summary,
             f.detections.upscaling,
             f.detections.upsampling,
-            transcoding,
-            f.requant_rate.map(|v| format!("{v:.3}")).unwrap_or_default(),
+            f.detections.transcoding,
+            f.lattice_score.map(|v| format!("{v:.4}")).unwrap_or_default(),
             f.cutoff_hz.map(|v| format!("{v:.0}")).unwrap_or_default(),
             f.cutoff_ratio.map(|v| format!("{v:.3}")).unwrap_or_default(),
             f.channels,
@@ -105,6 +104,8 @@ pub fn build_csv(report: &FolderReport) -> String {
             f.dr_db.map(|v| format!("{v:.1}")).unwrap_or_default(),
             md5,
             opt(f.modified_unix),
+            f.file_md5.clone().unwrap_or_default(),
+            f.file_crc32.clone().unwrap_or_default(),
         ));
     }
     out
@@ -118,6 +119,16 @@ pub fn write_csv(dest: &Path, report: &FolderReport) -> std::io::Result<()> {
 
 /// Build the JSON text for a folder report (pretty-printed, wrapped with a
 /// format marker and version — see `JsonReport`).
+///
+/// # Complete, always
+///
+/// Unlike the CSV, this is a full serialization of every [`FileAnalysis`]
+/// field, in the order the files are given (which is the table's display
+/// order — the frontend hands them over already sorted). **What the user has
+/// chosen to show or hide in the table has no effect here**: a hidden column's
+/// value is still in the JSON, because this file is what a saved analysis is
+/// reloaded from, and a reload that lost whatever happened to be hidden at
+/// save time would be a data-loss bug rather than a formatting choice.
 pub fn build_json(report: &FolderReport) -> serde_json::Result<String> {
     let wrapped = JsonReport {
         format: JSON_FORMAT_MARKER.to_string(),
@@ -188,7 +199,7 @@ fn opt_bool(v: Option<bool>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analysis::detections::{Detections, TranscodeState};
+    use crate::analysis::detections::Detections;
     use crate::{ClippingInfo, FileAnalysis};
 
     fn sample_file() -> FileAnalysis {
@@ -208,14 +219,14 @@ mod tests {
             detections: Detections {
                 upscaling: false,
                 upsampling: false,
-                transcoding: TranscodeState::None,
+                transcoding: false,
                 detail: "Clean.".into(),
                 summary: "Clean".into(),
             },
             cutoff_hz: Some(21000.0),
             cutoff_ratio: Some(0.95),
             real_bit_depth: Some(16),
-            requant_rate: None,
+            lattice_score: None,
             fake_stereo: Some(false),
             badge: None,
             clipping: ClippingInfo {
@@ -229,6 +240,8 @@ mod tests {
             },
             dr_db: Some(12.3),
             flac_md5: Some(FlacMd5Status::Match),
+            file_md5: Some("0123456789abcdef0123456789abcdef".into()),
+            file_crc32: Some("0a1b2c3d".into()),
             error: None,
         }
     }
@@ -245,7 +258,10 @@ mod tests {
         assert_eq!(lines.len(), 2);
         assert!(lines[0].starts_with("file,format"));
         assert!(lines[0].contains(",md5,"));
-        assert!(lines[0].trim_end().ends_with(",modified_unix"));
+        // `modified_unix` used to be the last column and this asserted on the
+        // end of the header; the fingerprints now follow it, and which columns
+        // sit at the end has its own test. Here it only has to be present.
+        assert!(lines[0].contains(",modified_unix,"));
         assert!(lines[1].contains("a.flac"));
         assert!(lines[1].contains("ok"));
         // The size is exported as a raw byte count, not a formatted string,
@@ -259,6 +275,112 @@ mod tests {
             lines[1].split(',').count(),
             "CSV header and row column counts must match"
         );
+    }
+
+    /// The JSON is the archival format, so it must carry every field
+    /// regardless of what the table was showing. Written as an explicit list
+    /// rather than a count, so adding a field to `FileAnalysis` without
+    /// thinking about the report is a failing test rather than a silent gap.
+    #[test]
+    fn the_json_carries_every_analysis_field() {
+        let report = FolderReport {
+            root: "/music".into(),
+            files: vec![sample_file()],
+            has_flac: true,
+        };
+        let json = build_json(&report).expect("serialize");
+        for key in [
+            "path", "file_name", "format", "codec", "ext_mismatch", "sample_rate",
+            "channels", "declared_bits", "duration_secs", "size_bytes", "bitrate_kbps",
+            "modified_unix", "detections", "cutoff_hz", "cutoff_ratio", "real_bit_depth",
+            "lattice_score", "fake_stereo", "badge", "clipping", "dr_db", "flac_md5",
+            "file_md5", "file_crc32", "error",
+        ] {
+            assert!(
+                json.contains(&format!("\"{key}\"")),
+                "the JSON report is missing `{key}`"
+            );
+        }
+        // And the nested detection detail, which is the part a CSV cell folds
+        // away and the JSON must not.
+        assert!(json.contains("\"upscaling\""));
+        assert!(json.contains("\"transcoding\""));
+        assert!(json.contains("\"detail\""));
+    }
+
+    /// Files come out in the order they went in — the table's display order,
+    /// not any sort the backend might have applied while scanning.
+    #[test]
+    fn the_json_keeps_the_given_file_order() {
+        let mut a = sample_file();
+        a.file_name = "zzz.flac".into();
+        a.path = "/music/zzz.flac".into();
+        let mut b = sample_file();
+        b.file_name = "aaa.flac".into();
+        b.path = "/music/aaa.flac".into();
+        let report = FolderReport {
+            root: "/music".into(),
+            files: vec![a, b],
+            has_flac: true,
+        };
+        let json = build_json(&report).expect("serialize");
+        let first = json.find("zzz.flac").expect("first file");
+        let second = json.find("aaa.flac").expect("second file");
+        assert!(first < second, "the report reordered the files");
+    }
+
+    /// The two fingerprint columns are appended at the end, and both hold
+    /// the file's own hash — not FLAC's `md5` column, which sits earlier and
+    /// means something else entirely.
+    #[test]
+    fn the_file_fingerprints_are_the_last_two_columns() {
+        let report = FolderReport {
+            root: "/music".into(),
+            files: vec![sample_file()],
+            has_flac: true,
+        };
+        let csv = build_csv(&report);
+        let lines: Vec<&str> = csv.lines().collect();
+        let cols: Vec<&str> = lines[0].trim_end().split(',').collect();
+        assert_eq!(&cols[cols.len() - 2..], &["file_md5", "file_crc32"]);
+        let row: Vec<&str> = lines[1].trim_end().split(',').collect();
+        assert_eq!(row[cols.len() - 1], "0a1b2c3d");
+        // The FLAC signature column is still its own thing, further left.
+        let md5_at = cols.iter().position(|c| *c == "md5").expect("md5 column");
+        assert!(md5_at < cols.len() - 2);
+        assert_eq!(row[md5_at], "ok");
+    }
+
+    /// The three detections are one family and must read as one family.
+    ///
+    /// `transcoding` briefly shipped as `yes`/`no` while its two siblings
+    /// were `true`/`false` — defensible on its own terms (a spreadsheet
+    /// coerces and localises `TRUE`), indefensible next to them, and worse
+    /// still for anything consuming the CSV alongside the JSON report, where
+    /// all three are JSON booleans. Whichever spelling wins, it wins for all
+    /// three at once.
+    #[test]
+    fn the_three_detection_columns_share_one_spelling() {
+        let mut f = sample_file();
+        f.detections.upscaling = true;
+        f.detections.upsampling = false;
+        f.detections.transcoding = true;
+        let report = FolderReport {
+            root: "/music".into(),
+            files: vec![f],
+            has_flac: true,
+        };
+        let csv = build_csv(&report);
+        let lines: Vec<&str> = csv.lines().collect();
+        let cols: Vec<&str> = lines[0].split(',').collect();
+        let row: Vec<&str> = lines[1].split(',').collect();
+        let at = |name: &str| {
+            let i = cols.iter().position(|c| *c == name).expect(name);
+            row[i]
+        };
+        assert_eq!(at("upscaling"), "true");
+        assert_eq!(at("upsampling"), "false");
+        assert_eq!(at("transcoding"), "true");
     }
 
     /// Locks in the maintainer's explicit request to move `codec` and

@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use flaccompagnon_core::{analyze_file, ScanOptions, TranscodeState};
+use flaccompagnon_core::{analyze_file, ScanOptions};
 use rustfft::{num_complex::Complex, FftPlanner};
 
 /// Synthesize genuinely band-limited noise: build a spectrum that is random
@@ -26,6 +26,42 @@ fn band_limited_noise(n: usize, sr: u32, cutoff_hz: f32, seed: u64) -> Vec<i32> 
     let time: Vec<f32> = spec.iter().map(|c| c.re).collect();
     let peak = time.iter().fold(0f32, |m, &v| m.max(v.abs())).max(1e-6);
     let scale = 8_000_000.0 / peak; // ~ -0.4 dBFS in the 24-bit range
+    time.iter().map(|v| (v * scale) as i32).collect()
+}
+
+/// Noise with a **gradual** high-frequency roll-off — a naturally dark master.
+///
+/// Deliberately not [`band_limited_noise`], which zeroes its upper bins
+/// outright. That produces a region at −105 dB, which is a *mathematical*
+/// zero: no microphone, no converter and no codec ever emits one. Scaled by
+/// its own peak such a region falls entirely inside the quantizer's dead zone
+/// and matches every scalefactor, so the detector calls it transcoded — and
+/// is not wrong to, in the sense that the input is not audio.
+///
+/// This is what the real case looks like: an acoustic or analog-tape master
+/// rolling off from 12 kHz at 3 dB/kHz, reaching about −25 dB near Nyquist.
+/// Quiet, but present. That is the signal the removal of the spectral
+/// heuristics was meant to stop accusing.
+fn dark_master_noise(n: usize, sr: u32, knee_hz: f32, seed: u64) -> Vec<i32> {
+    let mut spec = vec![Complex { re: 0.0f32, im: 0.0 }; n];
+    let mut rng = Lcg(seed);
+    for k in 1..n / 2 {
+        let hz = k as f32 * sr as f32 / n as f32;
+        // −3 dB per kHz above the knee; flat below it.
+        let gain = if hz <= knee_hz {
+            1.0
+        } else {
+            10f32.powf(-((hz - knee_hz) / 1000.0) * 3.0 / 20.0)
+        };
+        let re = rng.next_f32() * gain;
+        let im = rng.next_f32() * gain;
+        spec[k] = Complex { re, im };
+        spec[n - k] = Complex { re, im: -im };
+    }
+    FftPlanner::<f32>::new().plan_fft_inverse(n).process(&mut spec);
+    let time: Vec<f32> = spec.iter().map(|c| c.re).collect();
+    let peak = time.iter().fold(0f32, |m, &v| m.max(v.abs())).max(1e-6);
+    let scale = 8_000_000.0 / peak;
     time.iter().map(|v| (v * scale) as i32).collect()
 }
 
@@ -93,32 +129,52 @@ fn full_band_noise_is_clean() {
     std::fs::remove_file(&path).ok();
 }
 
+/// The regression that motivated replacing the spectral heuristics.
+///
+/// A naturally dark master — content rolling off from 12 kHz — used to be
+/// reported as *transcoded* on the strength of its spectrum alone. An
+/// acoustic recording, a 1960s tape master or a deliberately filtered signal
+/// all look like this, and the app accused every one of them. The verdict now
+/// comes only from a codec's quantization lattice, which this file has none
+/// of, so it must come back clean.
 #[test]
-fn band_limited_signal_is_transcoded() {
-    // Band-limited to 15 kHz -> a hard dead zone well below the 22.05 kHz
-    // Nyquist, the signature of a lossy source at a standard rate.
+fn a_dark_master_is_not_accused_of_transcoding() {
     let sr = 44_100;
     let n = sr as usize * 2;
-    let ints = band_limited_noise(n, sr, 15_000.0, 12345);
-    let path = tmp("transcoded.wav");
+    let ints = dark_master_noise(n, sr, 12_000.0, 12345);
+    let path = tmp("dark_master.wav");
     write_wav_i24(&path, sr, 1, &ints);
 
     let r = analyze_file(&path, &ScanOptions::default());
     assert!(r.error.is_none(), "error: {:?}", r.error);
-    assert_eq!(
-        r.detections.transcoding,
-        TranscodeState::Detected,
+    assert!(
+        !r.detections.transcoding,
         "cutoff {:?} ratio {:?} detail {}",
         r.cutoff_hz,
         r.cutoff_ratio,
         r.detections.detail
     );
+    // The cut-off is still *measured* and still reported — it stopped being a
+    // verdict, it did not stop being information.
+    //
+    // It reads full-band (22.05 kHz) here, and that is correct rather than a
+    // failure: the cut-off detector looks for a cliff, and a 3 dB/kHz slope
+    // has none. Content reaches Nyquist, merely 27 dB down. Asserting it
+    // would land *below* Nyquist was the mistake — it assumed a gentle
+    // roll-off and a brick wall look alike to that metric, which is precisely
+    // the confusion that made the old spectral verdict unusable.
+    assert!(
+        r.cutoff_hz.is_some_and(|c| c > 0.0),
+        "the cut-off must still be measured: {:?}",
+        r.cutoff_hz
+    );
     std::fs::remove_file(&path).ok();
 }
 
 #[test]
-fn cd_content_in_96k_is_upsampled() {
-    // Content only up to 18 kHz but placed in a 96 kHz container.
+fn native_band_limited_96k_triggers_only_an_upsampling_heuristic() {
+    // Synthesized directly at 96 kHz: no resampling occurred. Limited
+    // bandwidth alone still triggers the legacy flag, so it must be qualified.
     let sr = 96_000;
     let n = sr as usize; // 1 second
     let ints = band_limited_noise(n, sr, 18_000.0, 999);
@@ -132,6 +188,7 @@ fn cd_content_in_96k_is_upsampled() {
         "cutoff {:?}, detail {}",
         r.cutoff_hz, r.detections.detail
     );
+    assert!(r.detections.detail.contains("not proof of resampling"));
     std::fs::remove_file(&path).ok();
 }
 

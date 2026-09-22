@@ -19,6 +19,7 @@ import { Minus, Plus } from "lucide-react";
 import type { AddableTag, FieldEdit } from "../types";
 import * as api from "../api";
 import { copyText } from "../clipboard";
+import { useExtendedTagsKeyboard } from "./useExtendedTagsKeyboard";
 import { AddTagPicker } from "./AddTagPicker";
 import { ExtendedTagRow } from "./ExtendedTagRow";
 import { IconButton } from "./IconButton";
@@ -158,13 +159,34 @@ export function ExtendedTagsModal({
   // confirmation dialog — like Mp3tag's own grouped +/−, this only ever
   // touches the local draft, and Cancel discards the whole session in one
   // click if it was a mistake.
+  //
+  // The highlight moves to the row that takes the deleted one's place, or to
+  // the new last row when the deleted one was at the bottom. Clearing the
+  // selection instead — which is what this did — means clearing several tags
+  // in a row costs a click between every keystroke, and Down would restart
+  // from the top of the list rather than resume where you were.
   const removeSelected = useCallback(() => {
     if (!selectedKey) return;
+    const at = displayRows.findIndex((r) => r.key === selectedKey);
     if (newRow?.key === selectedKey) setNewRow(null);
     else setDraft((prev) => ({ ...prev, [selectedKey]: "Clear" }));
     if (editingKey === selectedKey) setEditingKey(null);
-    setSelectedKey(null);
-  }, [selectedKey, newRow, editingKey]);
+    // Computed against the list *before* the removal, so index `at` is the
+    // row below and `at - 1` the row above; `null` only when nothing is left.
+    const after = displayRows.filter((r) => r.key !== selectedKey);
+    setSelectedKey(after[Math.min(at, after.length - 1)]?.key ?? null);
+  }, [selectedKey, newRow, editingKey, displayRows]);
+
+  // Same keys as the results table behind this pop-in: Up/Down walk the list,
+  // Delete/Backspace removes. Disabled while a row is being edited or the "+"
+  // list is open — see the hook for why the picker in particular has to win.
+  useExtendedTagsKeyboard({
+    keys: displayRows.map((r) => r.key),
+    selectedKey,
+    onSelect: setSelectedKey,
+    onRemove: removeSelected,
+    enabled: open && !pickerOpen && editingKey == null && newRow == null,
+  });
 
   const formatLabel =
     formats.length === 0

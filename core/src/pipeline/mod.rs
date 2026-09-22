@@ -7,21 +7,26 @@
 //! here is choosing *which* path a file takes and assembling the result.
 //!
 //! This file holds the PCM path (FLAC's fused pass, or the generic Symphonia
-//! one); the DSD path is `dsd`, which shares almost nothing with it.
+//! one); the DSD path is `dsd`, which shares almost nothing with it, and the
+//! filesystem-level parts of the record (size, modification time, the
+//! whole-file fingerprints, the bitrate derived from them) are `record`.
 //!
 //! [`analyze_file`] never returns an `Err`: a file that cannot be decoded comes
 //! back with [`FileAnalysis::error`] set and best-effort defaults elsewhere, so
 //! one bad file never aborts a batch.
 
 mod dsd;
+mod record;
+pub mod transcode;
 
 use std::path::Path;
 
+use crate::analysis::detections;
 use crate::decode;
-use crate::analysis::detections::{self, Detections, TranscodeState};
-use crate::dsd as dsd_format;
 use crate::decode::FlacMd5Status;
-use crate::types::{ClippingInfo, FileAnalysis, ScanOptions};
+use crate::dsd as dsd_format;
+use crate::types::{FileAnalysis, ScanOptions};
+use record::{bitrate_kbps, skeleton};
 
 /// Analyze a single audio file end-to-end.
 ///
@@ -38,7 +43,7 @@ use crate::types::{ClippingInfo, FileAnalysis, ScanOptions};
 /// // one, or several of them.
 /// println!("upscaled:   {}", r.detections.upscaling);
 /// println!("upsampled:  {}", r.detections.upsampling);
-/// println!("transcoded: {:?}", r.detections.transcoding);
+/// println!("transcoded: {}", r.detections.transcoding);
 ///
 /// // Integrity extras.
 /// if matches!(r.flac_md5, Some(FlacMd5Status::Mismatch)) {
@@ -49,6 +54,16 @@ use crate::types::{ClippingInfo, FileAnalysis, ScanOptions};
 /// }
 /// ```
 pub fn analyze_file(path: &Path, opts: &ScanOptions) -> FileAnalysis {
+    analyze_file_cancellable(path, opts, &|| false)
+}
+
+/// Analyze a file, allowing the expensive codec sweeps to stop between alignments.
+/// The initial streaming decode does not yet support cancellation.
+pub fn analyze_file_cancellable(
+    path: &Path,
+    opts: &ScanOptions,
+    cancelled: &(dyn Fn() -> bool + Sync),
+) -> FileAnalysis {
     let mut result = skeleton(path);
 
     let ext = path
@@ -90,7 +105,23 @@ pub fn analyze_file(path: &Path, opts: &ScanOptions) -> FileAnalysis {
     // Sigma-delta noise heritage of a DSD master, when found in hi-res PCM.
     let mut dsd_heritage: Option<f32> = None;
     match decoded {
-        Ok(outcome) => dsd_heritage = apply_outcome(outcome, &mut result),
+        Ok(outcome) => {
+            // Computed here, not inside `apply_outcome`: that function maps a
+            // finished decode onto the result and has no business opening a
+            // file. This is the only caller that knows the path.
+            //
+            // Two similar names on the next line, deliberately spelled out:
+            // `transcode::detect` is this module's own bridge (decode, then
+            // ask), while `crate::transcode` is the detector crate-module it
+            // bridges to.
+            let transcoded = transcode::detect(
+                path,
+                &crate::transcode::AacParams::default(),
+                &crate::transcode::Mp3Params::default(),
+                cancelled,
+            );
+            dsd_heritage = apply_outcome(outcome, &mut result, transcoded);
+        }
         Err(e) => result.error = Some(e.to_string()),
     }
 
@@ -107,70 +138,13 @@ pub fn analyze_file(path: &Path, opts: &ScanOptions) -> FileAnalysis {
     result
 }
 
-/// The record we can already fill in before decoding anything, so an
-/// unreadable file still produces a useful row.
-fn skeleton(path: &Path) -> FileAnalysis {
-    // Read once, up front, from the filesystem: available even for a file
-    // whose audio fails to decode, so an unreadable track still reports an
-    // honest size (and modification time) in the table. One `metadata` call
-    // rather than two separate ones for size and mtime.
-    let meta = std::fs::metadata(path).ok();
-    let size_bytes = meta.as_ref().map(|m| m.len()).unwrap_or(0);
-    let modified_unix = meta.as_ref().and_then(|m| m.modified().ok()).and_then(|t| {
-        t.duration_since(std::time::UNIX_EPOCH)
-            .ok()
-            .and_then(|d| i64::try_from(d.as_secs()).ok())
-    });
-
-    FileAnalysis {
-        path: path.to_string_lossy().to_string(),
-        file_name: path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("")
-            .to_string(),
-        format: String::new(),
-        codec: None,
-        ext_mismatch: false,
-        sample_rate: 0,
-        channels: 0,
-        declared_bits: None,
-        duration_secs: 0.0,
-        size_bytes,
-        bitrate_kbps: None, // filled in once `duration_secs` is known — see `analyze_file`
-        modified_unix,
-        detections: Detections::unknown(),
-        cutoff_hz: None,
-        cutoff_ratio: None,
-        real_bit_depth: None,
-        requant_rate: None,
-        fake_stereo: None,
-        badge: None,
-        clipping: ClippingInfo::unmeasured(),
-        dr_db: None,
-        flac_md5: None,
-        error: None,
-    }
-}
-
-/// Average bitrate in kbps from the file's own size and duration — see
-/// [`FileAnalysis::bitrate_kbps`] for why this (not a codec-reported figure)
-/// is what's shown.
-fn bitrate_kbps(size_bytes: u64, duration_secs: f64) -> Option<u32> {
-    if duration_secs <= 0.0 {
-        return None;
-    }
-    let kbps = (size_bytes as f64 * 8.0) / duration_secs / 1000.0;
-    if kbps.is_finite() && kbps >= 0.0 {
-        Some(kbps.round() as u32)
-    } else {
-        None
-    }
-}
-
 /// Fold a successful decode into `result`, and return the DSD-heritage rise
 /// (in dB) if the ultrasonic content shows one.
-fn apply_outcome(outcome: decode::DecodeOutcome, result: &mut FileAnalysis) -> Option<f32> {
+fn apply_outcome(
+    outcome: decode::DecodeOutcome,
+    result: &mut FileAnalysis,
+    transcoded: crate::transcode::LatticeResult,
+) -> Option<f32> {
     result.format = outcome.format;
     result.codec = outcome.codec;
     result.sample_rate = outcome.sample_rate;
@@ -184,7 +158,12 @@ fn apply_outcome(outcome: decode::DecodeOutcome, result: &mut FileAnalysis) -> O
 
     result.cutoff_hz = Some(summary.cutoff_hz);
     result.cutoff_ratio = Some(summary.cutoff_ratio);
-    result.requant_rate = summary.requant_rate;
+    // The *old* detector's `summary.requant_rate` is no longer surfaced: it
+    // came from the spectral machinery this rewrite replaced. What the column
+    // shows now is the lattice search's own score.
+    // Borrowed, not consumed: `classify` needs the same value below, and
+    // `LatticeResult` carries a `String` in its error case so it is not `Copy`.
+    result.lattice_score = transcoded.as_ref().ok().map(|e| e.likelihood as f32);
     result.clipping = summary.clipping.clone();
     result.dr_db = summary.dr_db;
 
@@ -198,11 +177,16 @@ fn apply_outcome(outcome: decode::DecodeOutcome, result: &mut FileAnalysis) -> O
         }
         _ => None,
     };
+    // `transcoded` is handed in — see the call site for why. An `Err` there
+    // means "no answer" (unsupported rate, too short, undecodable), never
+    // "clean": an un-run test must leave the flag down and say why, which is
+    // what carrying the reason all the way here buys.
     result.detections = detections::classify(
         &summary,
         outcome.sample_rate,
         outcome.declared_bits,
         real_bits,
+        transcoded,
     );
 
     dsd_format::dsd_heritage_check(
@@ -250,15 +234,19 @@ const LOSSY_CODECS: &[&str] = &["AAC", "MP1", "MP2", "MP3", "Opus", "Vorbis"];
 
 /// Verified Hi-Res badge: hi-res specs that no detection contradicts.
 fn hires_badge(result: &FileAnalysis, dsd_heritage: Option<f32>) -> Option<String> {
-    let hires_specs =
-        result.sample_rate > 48_000 || result.declared_bits.is_some_and(|b| b > 16);
-    let lossy_codec = result.codec.as_deref().is_some_and(|c| LOSSY_CODECS.contains(&c));
+    let hires_specs = result.sample_rate > 48_000 || result.declared_bits.is_some_and(|b| b > 16);
+    let lossy_codec = result
+        .codec
+        .as_deref()
+        .is_some_and(|c| LOSSY_CODECS.contains(&c));
     if !hires_specs
         || lossy_codec
         || result.error.is_some()
+        || result.detections.summary != "Clean"
+        || result.real_bit_depth.is_none()
         || result.detections.upscaling
         || result.detections.upsampling
-        || result.detections.transcoding == TranscodeState::Detected
+        || result.detections.transcoding
     {
         return None;
     }
@@ -273,6 +261,8 @@ fn hires_badge(result: &FileAnalysis, dsd_heritage: Option<f32>) -> Option<Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::analysis::detections::Detections;
+    use crate::types::ClippingInfo;
 
     /// Hi-res-on-paper specs (96 kHz/24-bit) with everything else clean —
     /// only `codec` varies between the test cases below.
@@ -293,19 +283,21 @@ mod tests {
             detections: Detections {
                 upscaling: false,
                 upsampling: false,
-                transcoding: TranscodeState::None,
+                transcoding: false,
                 detail: String::new(),
                 summary: "Clean".into(),
             },
             cutoff_hz: None,
             cutoff_ratio: None,
             real_bit_depth: Some(24),
-            requant_rate: None,
+            lattice_score: None,
             fake_stereo: Some(false),
             badge: None,
             clipping: ClippingInfo::unmeasured(),
             dr_db: Some(14.0),
             flac_md5: None,
+            file_md5: None,
+            file_crc32: None,
             error: None,
         }
     }
@@ -320,12 +312,28 @@ mod tests {
         assert_eq!(hires_badge(&hires_pcm(Some("MP3")), None), None);
     }
 
+    #[test]
+    fn unknown_or_unmeasurable_resolution_never_earns_a_hires_badge() {
+        let mut file = hires_pcm(None);
+        file.detections.summary = "Unknown".into();
+        assert_eq!(hires_badge(&file, None), None);
+        file.detections.summary = "Clean".into();
+        file.real_bit_depth = None;
+        assert_eq!(hires_badge(&file, None), None);
+    }
+
     /// Same specs, lossless (or unresolved — FLAC/DSD always report `codec:
     /// None`) codec: the guard must not become a blanket "no badge for a
     /// multi-codec container" rule.
     #[test]
     fn hires_badge_still_grants_lossless_codecs() {
-        assert_eq!(hires_badge(&hires_pcm(Some("ALAC")), None), Some("Hi-Res".to_string()));
-        assert_eq!(hires_badge(&hires_pcm(None), None), Some("Hi-Res".to_string()));
+        assert_eq!(
+            hires_badge(&hires_pcm(Some("ALAC")), None),
+            Some("Hi-Res".to_string())
+        );
+        assert_eq!(
+            hires_badge(&hires_pcm(None), None),
+            Some("Hi-Res".to_string())
+        );
     }
 }

@@ -149,18 +149,10 @@ pub(super) fn codec_label(codec: CodecType) -> Option<&'static str> {
         CODEC_TYPE_MP3 => "MP3",
         CODEC_TYPE_OPUS => "Opus",
         CODEC_TYPE_VORBIS => "Vorbis",
-        CODEC_TYPE_PCM_S8
-        | CODEC_TYPE_PCM_U8
-        | CODEC_TYPE_PCM_S16LE
-        | CODEC_TYPE_PCM_S16BE
-        | CODEC_TYPE_PCM_S24LE
-        | CODEC_TYPE_PCM_S24BE
-        | CODEC_TYPE_PCM_S32LE
-        | CODEC_TYPE_PCM_S32BE
-        | CODEC_TYPE_PCM_F32LE
-        | CODEC_TYPE_PCM_F32BE
-        | CODEC_TYPE_PCM_F64LE
-        | CODEC_TYPE_PCM_F64BE => "PCM",
+        CODEC_TYPE_PCM_S8 | CODEC_TYPE_PCM_U8 | CODEC_TYPE_PCM_S16LE | CODEC_TYPE_PCM_S16BE
+        | CODEC_TYPE_PCM_S24LE | CODEC_TYPE_PCM_S24BE | CODEC_TYPE_PCM_S32LE
+        | CODEC_TYPE_PCM_S32BE | CODEC_TYPE_PCM_F32LE | CODEC_TYPE_PCM_F32BE
+        | CODEC_TYPE_PCM_F64LE | CODEC_TYPE_PCM_F64BE => "PCM",
         _ => return None,
     })
 }

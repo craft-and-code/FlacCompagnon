@@ -35,6 +35,7 @@ export function ResultsSummary({
   onToast,
 }: ResultsSummaryProps) {
   let clean = 0;
+  let unknown = 0;
   let upscaled = 0;
   let upsampled = 0;
   let transcoded = 0;
@@ -44,6 +45,7 @@ export function ResultsSummary({
   for (const f of report.files) {
     const d = f.detections;
     if (d.summary === "Clean") clean++;
+    if (d.summary === "Unknown") unknown++;
     if (d.upscaling) upscaled++;
     if (d.upsampling) upsampled++;
     if (d.transcoding) transcoded++;
@@ -53,6 +55,7 @@ export function ResultsSummary({
 
   const chips: { cls: string; label: string; n: number }[] = [
     { cls: "v-clean", label: "clean", n: clean },
+    { cls: "v-muted", label: "unknown", n: unknown },
     { cls: "v-upscaled", label: "upscaled", n: upscaled },
     { cls: "v-upsampled", label: "upsampled", n: upsampled },
     { cls: "v-transcoded", label: "transcoded", n: transcoded },
@@ -83,7 +86,7 @@ export function ResultsSummary({
         {chips
           .filter((c) => c.n > 0)
           .map((c) => (
-            <span className={`chip ${c.cls}`} key={c.cls}>
+            <span className={`chip ${c.cls}`} key={c.label}>
               {c.n} {c.label}
             </span>
           ))}

@@ -30,6 +30,10 @@ export function useAnalysis({ onToast, onFilesChanged }: UseAnalysisArgs) {
   // than from analyzing files. Only that case can hold paths whose files have
   // moved since — a fresh analysis just opened every one of them.
   const [loadedFromReport, setLoadedFromReport] = useState(false);
+  // Where that report was read from, so its file can be updated in place after
+  // the listing has been repointed at moved files. `null` for a listing that
+  // never came from a report — there is nothing to overwrite then.
+  const [reportPath, setReportPath] = useState<string | null>(null);
   // Spectrogram rendering works on files already listed, so the table stays up
   // while it runs; an analysis replaces the list, so it doesn't.
   const [keepResultsWhileBusy, setKeepResultsWhileBusy] = useState(false);
@@ -104,6 +108,7 @@ export function useAnalysis({ onToast, onFilesChanged }: UseAnalysisArgs) {
     setTargets([]);
     setDisplayOrder([]);
     setLoadedFromReport(false);
+    setReportPath(null);
     onFilesChanged(new Set());
   }, [onFilesChanged]);
 
@@ -127,6 +132,7 @@ export function useAnalysis({ onToast, onFilesChanged }: UseAnalysisArgs) {
         for (const t of paths) if (!nextTargets.includes(t)) nextTargets.push(t);
         applyReport(merged, nextTargets);
         setLoadedFromReport(false);
+        setReportPath(null);
         onToast(
           `Added ${added.length} ${added.length === 1 ? "file" : "files"} — ${merged.files.length} in the list.`,
         );
@@ -168,6 +174,7 @@ export function useAnalysis({ onToast, onFilesChanged }: UseAnalysisArgs) {
         // The same list doubles as the display order — see `applyReport`.
         applyReport(loaded, order, order);
         setLoadedFromReport(true);
+        setReportPath(path);
         onToast(
           `Loaded ${loaded.files.length} ${loaded.files.length === 1 ? "file" : "files"} from report.`,
         );
@@ -178,6 +185,30 @@ export function useAnalysis({ onToast, onFilesChanged }: UseAnalysisArgs) {
       }
     },
     [busy, startTask, applyReport, onToast],
+  );
+
+  /// Repoint the listing at files that moved.
+  ///
+  /// Only `path` changes — every measurement in the row was made on this exact
+  /// audio and is still true of it, so re-analyzing would be a waste and would
+  /// also throw away a report the user may have loaded precisely because
+  /// re-analyzing is expensive. `file_name` is left alone too: relocation
+  /// matches on it, so it cannot have changed.
+  const relocateFiles = useCallback(
+    (moves: { from: string; to: string }[]) => {
+      if (moves.length === 0) return;
+      const remap = new Map(moves.map((m) => [m.from, m.to]));
+      const move = (p: string) => remap.get(p) ?? p;
+
+      setReport((prev) =>
+        prev == null
+          ? prev
+          : { ...prev, files: prev.files.map((f) => ({ ...f, path: move(f.path) })) },
+      );
+      setTargets((prev) => prev.map(move));
+      setDisplayOrder((prev) => prev.map(move));
+    },
+    [],
   );
 
   const generateSpectrograms = useCallback(async () => {
@@ -262,6 +293,8 @@ export function useAnalysis({ onToast, onFilesChanged }: UseAnalysisArgs) {
     analyze,
     loadReport,
     loadedFromReport,
+    reportPath,
+    relocateFiles,
     generateSpectrograms,
     cancelTask,
     removeFile,

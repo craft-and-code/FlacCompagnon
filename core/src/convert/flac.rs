@@ -78,12 +78,136 @@ pub(super) fn encode(
     stream
         .write(&mut sink)
         .map_err(|e| ConvertError::Encode(name(), format!("{e:?}")))?;
-    std::fs::write(dest, sink.as_slice()).map_err(|e| ConvertError::Io(name(), e.to_string()))
+    let mut bytes = sink.as_slice().to_vec();
+    declare_fixed_block_size(&mut bytes)
+        .map_err(|e| ConvertError::Encode(name(), e.to_string()))?;
+    std::fs::write(dest, &bytes).map_err(|e| ConvertError::Io(name(), e.to_string()))
+}
+
+/// Make STREAMINFO's `min_blocksize` match `max_blocksize`.
+///
+/// # Why this is needed
+///
+/// `encode_with_fixed_block_size` does exactly what it says — every frame
+/// header carries the *fixed* blocking strategy — but the STREAMINFO it
+/// writes reports the smallest block that actually occurred, and the final
+/// block of a track is almost never full. A 10 900 224-sample file at a
+/// 4096-sample block size ends on 768 samples, so STREAMINFO went out saying
+/// `min 768 / max 4096`.
+///
+/// In the FLAC format, `min_blocksize == max_blocksize` is not a coincidence
+/// to be recomputed — it *is* the flag for a fixed-block stream. Writing them
+/// unequal declares a variable-block stream while every frame header says
+/// fixed, and the file contradicts itself. Tolerant decoders (ffmpeg, claxon)
+/// read the frame headers and never notice; stricter ones reject the file
+/// outright, and one of those is Symphonia — which this app itself uses for
+/// the transcoding detector's second decode. The symptom was a FLAC this app
+/// had just written, that this app could then not re-read.
+///
+/// Two bytes, at a fixed offset the format guarantees: STREAMINFO must be the
+/// first metadata block, so it starts at 8 (4 magic + 4 block header) and its
+/// two 16-bit block sizes are the first fields. Nothing is checksummed over
+/// them — STREAMINFO's own MD5 covers the decoded audio, not the header — so
+/// rewriting them in place is safe.
+fn declare_fixed_block_size(bytes: &mut [u8]) -> Result<(), &'static str> {
+    // Indexed through `get`/`get_mut` even though this buffer is ours: the
+    // encoder could fail in a way that returns a short buffer, and a panic
+    // here would take down a whole conversion batch.
+    if bytes.get(..4) != Some(b"fLaC") {
+        return Err("encoder produced a stream without a FLAC marker");
+    }
+    // The first metadata block must be STREAMINFO (block type 0) and 34 bytes.
+    if bytes.get(4).map(|b| b & 0x7f) != Some(0) {
+        return Err("encoder produced a stream whose first block is not STREAMINFO");
+    }
+    let Some(max) = bytes.get(10..12) else {
+        return Err("encoder produced a truncated STREAMINFO");
+    };
+    let max = [max[0], max[1]];
+    let Some(min) = bytes.get_mut(8..10) else {
+        return Err("encoder produced a truncated STREAMINFO");
+    };
+    min.copy_from_slice(&max);
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The bug that made a FLAC this app wrote unreadable by this app.
+    ///
+    /// Ground truth is the format specification, not the encoder: a stream
+    /// whose frames use the fixed blocking strategy must report
+    /// `min_blocksize == max_blocksize`. The length here is deliberately not
+    /// a multiple of the block size, which is the only case that triggers it
+    /// — the final short block is what `flacenc` reported as the minimum.
+    #[test]
+    fn streaminfo_declares_a_fixed_block_stream_even_with_a_short_final_block() {
+        let channels = 2usize;
+        let bits = 16u32;
+        // Two full 4096-sample blocks plus a deliberately partial third.
+        let frames = 4096 * 2 + 501;
+        let mut samples = Vec::with_capacity(frames * channels);
+        for t in 0..frames {
+            let phase = t as f32 / 44_100.0;
+            samples.push((phase * 440.0 * std::f32::consts::TAU).sin() * 0.5);
+            samples.push((phase * 220.0 * std::f32::consts::TAU).sin() * 0.5);
+        }
+        let expected_ints = f32_to_ints(&samples, bits);
+        let pcm = PcmAudio {
+            samples,
+            sample_rate: 44_100,
+            channels,
+        };
+        let dir = tempfile::tempdir().expect("tempdir");
+        let dest = dir.path().join("partial-tail.flac");
+        encode(&pcm, &dest, bits, FlacEffort::Balanced).expect("encode");
+
+        let bytes = std::fs::read(&dest).expect("read back");
+        assert_eq!(&bytes[..4], b"fLaC");
+        let min = u16::from_be_bytes([bytes[8], bytes[9]]);
+        let max = u16::from_be_bytes([bytes[10], bytes[11]]);
+        assert_eq!(
+            min, max,
+            "STREAMINFO declares a variable-block stream ({min}/{max}) while the \
+             frames use the fixed strategy — strict decoders reject this"
+        );
+
+        // And the patch must not have broken the audio: same independent
+        // decoder, same bit-exact expectation as the round-trip test.
+        let mut reader = claxon::FlacReader::open(&dest).expect("reopen");
+        let decoded: Vec<i32> = reader.samples().map(|s| s.expect("decode")).collect();
+        assert_eq!(decoded.len(), expected_ints.len());
+        assert!(
+            decoded == expected_ints,
+            "patching STREAMINFO changed the decoded audio"
+        );
+
+        // The symptom this is all named after: a file this app wrote, that
+        // the transcoding detector then could not decode a second time.
+        let pcm = crate::decode::decode_to_pcm(&dest).expect("the app must be able to re-read what it just wrote");
+        assert_eq!(pcm.sample_rate, 44_100);
+        assert_eq!(pcm.channels, channels);
+        assert_eq!(pcm.samples.len(), frames * channels);
+    }
+
+    /// The patch refuses anything that is not the layout it expects, rather
+    /// than rewriting two arbitrary bytes of it.
+    #[test]
+    fn the_streaminfo_patch_refuses_a_stream_it_does_not_recognise() {
+        assert!(declare_fixed_block_size(&mut []).is_err(), "empty");
+        assert!(declare_fixed_block_size(&mut b"not a flac file at all".to_vec()).is_err());
+        // Right marker, wrong first block type (4 = VORBIS_COMMENT).
+        let mut wrong = b"fLaC".to_vec();
+        wrong.push(4);
+        wrong.extend_from_slice(&[0; 40]);
+        assert!(declare_fixed_block_size(&mut wrong).is_err(), "wrong block");
+        // Right marker and block type, truncated before the block sizes.
+        let mut short = b"fLaC".to_vec();
+        short.extend_from_slice(&[0, 0, 0, 34, 1, 2]);
+        assert!(declare_fixed_block_size(&mut short).is_err(), "truncated");
+    }
 
     /// A synthetic tone in, decoded back with `claxon` — a different crate
     /// from the one that encoded it — and compared sample-for-sample. FLAC is

@@ -18,6 +18,9 @@ rustfft = "6"
 # Native FLAC parsing for STREAMINFO MD5 read + verification
 claxon = "0.4"
 md-5 = "0.10"
+# CRC32 for the whole-file fingerprint column; already in the tree as a
+# transitive dependency, so this pulls nothing new in.
+crc32fast = "1"
 # Serialization for passing results to the Tauri frontend, and for the
 # re-importable JSON report (report::build_json / parse_json).
 serde = { version = "1", features = ["derive"] }

@@ -56,7 +56,7 @@ pub struct ConvertSummary {
 /// one opaque row.
 ///
 /// Recursive, and it applies the same filtering [`convert_files`] would
-/// (extension-based, generated `spectres/` folders skipped), so what the panel
+/// (extension-based, generated spectrogram folders skipped), so what the panel
 /// lists and what the batch writes cannot disagree.
 ///
 /// Each file is returned with the `base` its output layout will be measured

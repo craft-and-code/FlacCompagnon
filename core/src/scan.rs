@@ -20,10 +20,16 @@ pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     "opus", "mp3", "aac", "dsf", "dff",
 ];
 
-/// Folder name used for generated spectrograms. Files inside one are skipped
+/// Folder names used for generated spectrograms. Files inside one are skipped
 /// so a second scan doesn't try to analyze the app's own PNG output — and, more
 /// to the point, so re-scanning a folder never grows the file list.
-const GENERATED_DIR: &str = "spectres";
+///
+/// Two names, because only the first is written any more: `spectres` was the
+/// original (French) name, and libraries scanned before the rename still hold
+/// those folders. Dropping it from this list would not corrupt anything, but
+/// it would silently change the behaviour of every folder a long-time user
+/// already has — the kind of regression nobody thinks to test for.
+const GENERATED_DIRS: [&str; 2] = ["spectrograms", "spectres"];
 
 /// Returns `true` if `path` has an extension FlacCompagnon knows how to decode.
 ///
@@ -49,7 +55,7 @@ pub fn is_supported_audio(path: &Path) -> bool {
 }
 
 /// List every supported audio file under `root`, sorted, skipping any file that
-/// lives inside a generated `spectres` folder.
+/// lives inside a generated spectrogram folder (see [`GENERATED_DIRS`]).
 pub fn list_audio_files(root: &Path, recursive: bool) -> Vec<PathBuf> {
     let depth = if recursive { usize::MAX } else { 1 };
     let mut paths: Vec<PathBuf> = walkdir::WalkDir::new(root)
@@ -61,7 +67,10 @@ pub fn list_audio_files(root: &Path, recursive: bool) -> Vec<PathBuf> {
         .filter_map(Result::ok)
         .map(|e| e.into_path())
         .filter(|p| p.is_file() && is_supported_audio(p))
-        .filter(|p| !p.components().any(|c| c.as_os_str() == GENERATED_DIR))
+        .filter(|p| {
+            !p.components()
+                .any(|c| GENERATED_DIRS.iter().any(|d| c.as_os_str() == *d))
+        })
         .collect();
     paths.sort();
     paths
@@ -121,21 +130,24 @@ mod tests {
     }
 
     /// Generated spectrograms live next to the audio; a rescan must not pick
-    /// up anything from there, at any depth.
+    /// up anything from there, at any depth — under either folder name, since
+    /// libraries scanned before the rename still hold `spectres/`.
     #[test]
-    fn generated_spectres_folders_are_skipped() {
+    fn generated_spectrogram_folders_are_skipped_under_both_names() {
         let dir = tempfile::tempdir().expect("tempdir");
         let root = dir.path();
         touch(root, "a.flac");
+        touch(root, "spectrograms/a.flac");
         touch(root, "spectres/a.flac");
         touch(root, "album/b.flac");
+        touch(root, "album/spectrograms/b.flac");
         touch(root, "album/spectres/b.flac");
 
         let found = list_audio_files(root, true);
         assert_eq!(found.len(), 2, "found: {found:?}");
         assert!(found.iter().all(|p| !p
             .components()
-            .any(|c| c.as_os_str() == GENERATED_DIR)));
+            .any(|c| GENERATED_DIRS.iter().any(|d| c.as_os_str() == *d))));
     }
 
     #[test]

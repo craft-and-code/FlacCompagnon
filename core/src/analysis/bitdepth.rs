@@ -1,10 +1,46 @@
 //! Effective bit-depth estimation.
 //!
-//! Many "24-bit" files are really 16-bit (or less) content padded with zero low
-//! bits — either because the master was 16-bit or because of a lazy conversion.
-//! By OR-ing every integer sample value together, the count of trailing zero
-//! bits (within the declared bit width) reveals how many low bits never carry
-//! information.
+//! Many "24-bit" files are really 16-bit content padded with zero low bits or
+//! exported with a tiny amount of dither. Exact padding is recovered from the
+//! bitwise OR of every sample. Dithered padding is recognized separately from
+//! the sample distribution around the 16-bit quantization grid.
+
+/// Maximum distance from the nearest 16-bit grid point in a 24-bit sample.
+/// Audacity's shaped dither on the regression file stays within ±10; ±16
+/// leaves headroom without accepting the 128-step spread of real 24-bit data.
+const DITHER_GRID_TOLERANCE: u32 = 16;
+/// A short or nearly silent signal cannot establish a quantization lattice.
+const DITHER_GRID_MIN_SAMPLES: u64 = 4_096;
+const DITHER_GRID_MIN_PEAK: u32 = 4_096;
+
+/// Streaming evidence for a 16-bit quantization grid inside 24-bit PCM.
+#[derive(Debug, Default)]
+pub struct Grid16Evidence {
+    samples: u64,
+    near_grid: u64,
+    peak: u32,
+}
+
+impl Grid16Evidence {
+    /// Add one integer sample in its declared native width.
+    pub fn push(&mut self, sample: i32) {
+        self.samples = self.samples.saturating_add(1);
+        self.peak = self.peak.max(sample.unsigned_abs());
+        let residue = sample.rem_euclid(256) as u32;
+        let distance = residue.min(256 - residue);
+        if distance <= DITHER_GRID_TOLERANCE {
+            self.near_grid = self.near_grid.saturating_add(1);
+        }
+    }
+
+    /// Whether a 24-bit stream follows a 16-bit grid hidden by low-level dither.
+    pub fn detected(&self, declared_bits: u32) -> bool {
+        declared_bits == 24
+            && self.samples >= DITHER_GRID_MIN_SAMPLES
+            && self.peak >= DITHER_GRID_MIN_PEAK
+            && self.near_grid == self.samples
+    }
+}
 
 /// Given the bitwise OR of every integer sample value and the container's
 /// declared bit width, return the effective (used) bit depth.
@@ -13,7 +49,8 @@
 /// sign-extension of negative two's-complement samples does not inflate the
 /// result. `effective = declared_bits - trailing_zero_bits`.
 ///
-/// * All-zero input (pure digital silence) is reported as 1 bit.
+/// * All-zero input returns the arithmetic minimum, 1. This is not evidence
+///   of a one-bit recording: callers must treat silence as unmeasurable.
 pub fn effective_bits(or_mask: u32, declared_bits: u32) -> u32 {
     let width = declared_bits.clamp(1, 32);
     let mask = if width >= 32 {
@@ -29,9 +66,9 @@ pub fn effective_bits(or_mask: u32, declared_bits: u32) -> u32 {
     width.saturating_sub(trailing).max(1)
 }
 
-/// Is a `declared`-bit file effectively 16-bit or less?
+/// Does non-silent integer content fit in 16 bits within a wider container?
 pub fn is_fake_hires(declared: u32, or_mask: u32) -> bool {
-    declared >= 24 && effective_bits(or_mask, declared) <= 16
+    (24..=32).contains(&declared) && or_mask != 0 && effective_bits(or_mask, declared) <= 16
 }
 
 #[cfg(test)]
@@ -74,7 +111,42 @@ mod tests {
     }
 
     #[test]
+    fn silence_is_not_evidence_of_fake_hires() {
+        assert!(!is_fake_hires(24, 0));
+        assert!(!is_fake_hires(32, 0));
+    }
+
+    #[test]
     fn silence_reports_one_bit() {
         assert_eq!(effective_bits(0, 24), 1);
+    }
+
+    #[test]
+    fn audacity_style_dither_still_reveals_the_16bit_grid() {
+        let mut evidence = Grid16Evidence::default();
+        for n in 0..DITHER_GRID_MIN_SAMPLES {
+            let base = (((n as i32 % 20_001) - 10_000) << 8).clamp(-8_388_608, 8_388_607);
+            let dither = (n as i32 % 21) - 10;
+            evidence.push(base + dither);
+        }
+        assert!(evidence.detected(24));
+    }
+
+    #[test]
+    fn genuine_24bit_residues_do_not_form_a_16bit_grid() {
+        let mut evidence = Grid16Evidence::default();
+        for n in 0..DITHER_GRID_MIN_SAMPLES {
+            evidence.push((n as i32 * 65_537) & 0x7f_ffff);
+        }
+        assert!(!evidence.detected(24));
+    }
+
+    #[test]
+    fn silence_with_low_level_noise_is_not_enough_evidence() {
+        let mut evidence = Grid16Evidence::default();
+        for n in 0..DITHER_GRID_MIN_SAMPLES {
+            evidence.push((n as i32 % 21) - 10);
+        }
+        assert!(!evidence.detected(24));
     }
 }

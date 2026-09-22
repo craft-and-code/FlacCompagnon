@@ -12,7 +12,7 @@
 use std::path::Path;
 
 use crate::decode;
-use crate::analysis::detections::{Detections, TranscodeState};
+use crate::analysis::detections::Detections;
 use crate::dsd as dsd_format;
 use crate::types::{FileAnalysis, ScanOptions};
 
@@ -125,7 +125,7 @@ fn verdict(upsampling: bool, detail: &str, summary: &str) -> Detections {
     Detections {
         upscaling: false,
         upsampling,
-        transcoding: TranscodeState::None,
+        transcoding: false,
         detail: detail.to_string(),
         summary: summary.to_string(),
     }
@@ -160,7 +160,7 @@ mod tests {
         ] {
             assert!(!v.upscaling);
             assert!(!v.upsampling);
-            assert_eq!(v.transcoding, TranscodeState::None);
+            assert!(!v.transcoding);
         }
     }
 }

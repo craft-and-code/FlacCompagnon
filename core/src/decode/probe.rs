@@ -11,10 +11,12 @@ use std::path::Path;
 
 use symphonia::core::audio::{AudioBufferRef, SampleBuffer};
 use symphonia::core::codecs::{CodecParameters, Decoder, DecoderOptions};
+use symphonia::core::conv::ConvertibleSample;
 use symphonia::core::formats::{FormatOptions, FormatReader};
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
+use symphonia::core::sample::Sample;
 
 use super::container::{codec_label, format_label, missing_decoder_reason};
 use crate::AnalysisError;
@@ -99,25 +101,25 @@ impl ProbedTrack {
     }
 }
 
-/// A reusable interleaved-`f32` scratch buffer for decoded packets.
+/// A reusable interleaved scratch buffer for decoded packets.
 ///
 /// Symphonia hands back a typed `AudioBufferRef` per packet; every caller
-/// wants the same flat `&[f32]`. Allocating one buffer per packet would churn
+/// needs a flat sample slice. Allocating one buffer per packet would churn
 /// the allocator once per ~4096 frames for the whole file, so the buffer is
 /// kept and only reallocated when a later packet needs a bigger one (block
 /// sizes can vary within a stream).
 #[derive(Default)]
-pub(super) struct InterleavedBuf {
-    buf: Option<SampleBuffer<f32>>,
+pub(super) struct InterleavedBuf<T: Sample = f32> {
+    buf: Option<SampleBuffer<T>>,
     frames: u64,
 }
 
-impl InterleavedBuf {
-    pub(super) fn fill(&mut self, decoded: AudioBufferRef<'_>) -> &[f32] {
+impl<T: Sample + ConvertibleSample> InterleavedBuf<T> {
+    pub(super) fn fill(&mut self, decoded: AudioBufferRef<'_>) -> &[T] {
         let needed = decoded.capacity() as u64;
         if self.buf.is_none() || needed > self.frames {
             let spec = *decoded.spec();
-            self.buf = Some(SampleBuffer::<f32>::new(needed, spec));
+            self.buf = Some(SampleBuffer::<T>::new(needed, spec));
             self.frames = needed;
         }
         // Set on the line above if it was missing, so this cannot be None.
