@@ -1,6 +1,7 @@
 .table-wrap {
   flex: 1;
   overflow: auto;
+  overflow-anchor: none; /* the window owns scroll geometry when rows change */
   overscroll-behavior: contain; /* don't propagate scroll / bounce to the window */
   border: 1px solid var(--border);
   /* No bottom border/radius: the footer (Footer.css) is grafted directly
@@ -20,6 +21,13 @@ table {
   border-collapse: collapse;
   width: 100%;
   font-size: 12.5px;
+}
+/* Separate borders make a row's measured height independent of whether its
+   neighbour is a real row or an offscreen spacer (collapsed half-borders do
+   not). This keeps scroll offsets exact while preserving the single rules. */
+.table-wrap > table {
+  border-collapse: separate;
+  border-spacing: 0;
 }
 thead th {
   position: sticky;
@@ -78,6 +86,14 @@ tbody tr:last-child td {
 }
 tbody tr:hover {
   background: var(--row-hover);
+}
+.table-wrap .table-spacer td {
+  padding: 0;
+  border: 0;
+  line-height: 0;
+}
+.table-wrap .table-spacer:hover {
+  background: none;
 }
 /* Table-wide: rows are dragged/selected by clicking, never by selecting
    text — `-webkit-user-select` is required in addition to the unprefixed

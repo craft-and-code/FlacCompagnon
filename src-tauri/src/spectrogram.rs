@@ -19,11 +19,12 @@ use std::process::{Command, Stdio};
 use flaccompagnon_core::BasicInfo;
 use serde::Deserialize;
 
-/// Output dimensions for a generated spectrogram.
+/// Spectrum canvas dimensions passed to ffmpeg. Its legend extends the final
+/// PNG beyond these dimensions, by an amount determined by ffmpeg.
 ///
-/// `Half` is Aède's default: 900×470, exactly half of the full frame in both
-/// directions. `Full` preserves FlacCompagnon's former 1800×940 output for
-/// detailed inspection or direct comparison with older images.
+/// `Half` is Aède's default: a 900×470 canvas, exactly half of the full canvas
+/// in both directions. `Full` preserves FlacCompagnon's former 1800×940 canvas
+/// for detailed inspection or direct comparison with older images.
 #[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum SpectrogramSize {

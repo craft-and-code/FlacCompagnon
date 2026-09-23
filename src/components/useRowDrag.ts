@@ -76,14 +76,15 @@ export function useRowDrag({ tableRef, orderedPaths, selectedPaths, onReorder }:
         if (p) rowByPath.set(p, row);
       }
 
-      let shown = paths;
-      let extra = 0;
-      if (paths.length > GHOST_STACK_CAP) {
-        const idx = paths.indexOf(primary);
-        const start = Math.max(0, Math.min(idx, paths.length - GHOST_STACK_CAP));
-        shown = paths.slice(start, start + GHOST_STACK_CAP);
-        extra = paths.length - GHOST_STACK_CAP;
+      // Offscreen selections still move, but have no DOM row to clone. Keep
+      // the grabbed row in the ghost and summarize all omitted selections.
+      let shown = paths.filter(path => rowByPath.has(path));
+      if (shown.length > GHOST_STACK_CAP) {
+        const idx = shown.indexOf(primary);
+        const start = Math.max(0, Math.min(idx, shown.length - GHOST_STACK_CAP));
+        shown = shown.slice(start, start + GHOST_STACK_CAP);
       }
+      const extra = paths.length - shown.length;
 
       const primaryRow = rowByPath.get(primary);
       const rect = primaryRow?.getBoundingClientRect();

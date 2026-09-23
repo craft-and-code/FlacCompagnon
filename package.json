@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "test:search": "node --test tests/search.test.mjs",
+    "test:table": "node --test tests/table-window.test.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },

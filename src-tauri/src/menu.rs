@@ -52,7 +52,7 @@ pub fn build(app: &tauri::App) -> tauri::Result<()> {
     let spectrograms_small = CheckMenuItem::with_id(
         handle,
         "spectrogram_size_small",
-        "Small Size (900 × 470)",
+        "Small Size",
         true,
         true,
         None::<&str>,
@@ -60,7 +60,7 @@ pub fn build(app: &tauri::App) -> tauri::Result<()> {
     let spectrograms_full = CheckMenuItem::with_id(
         handle,
         "spectrogram_size_full",
-        "Full Size (1800 × 940)",
+        "Large Size",
         true,
         false,
         None::<&str>,

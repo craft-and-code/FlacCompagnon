@@ -64,7 +64,7 @@ The **MD5** column only appears when the analysis actually includes FLAC files, 
 
 ### 4. Spectrogram generation
 
-Click **Generate spectrograms** to render a high-resolution spectrogram image for every track using **ffmpeg** installed on your system (resolved automatically at runtime — see prerequisites). For each folder that contains audio, a `spectrograms/` sub-folder is created next to the files, and one PNG is written per track. The image includes a labelled **frequency axis** (its top equals Nyquist = sample-rate ÷ 2) and a caption spelling out the **sample rate**, bit depth, channel count, and format — so the cutoff and the sampling are visible at a glance.
+Click **Generate spectrograms** to render a spectrogram image for every track using **ffmpeg** installed on your system (resolved automatically at runtime — see prerequisites). The default **Small Size** uses a 900 × 470 spectrum canvas; **Large Size** in the **Spectrograms** menu uses 1800 × 940. The PNG is larger than the canvas because ffmpeg adds a legend. The menu only saves the preferred size; generation starts when you click the button. For each folder that contains audio, a `spectrograms/` sub-folder is created next to the files, and one PNG is written per track. The image includes a labelled **frequency axis** (its top equals Nyquist = sample-rate ÷ 2) and a caption spelling out the **sample rate**, bit depth, channel count, and format — so the cutoff and the sampling are visible at a glance.
 
 ### 5. Extra integrity checks
 

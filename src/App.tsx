@@ -8,7 +8,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 
 import type { PlaylistFormat } from "./types";
 import * as api from "./api";
-import { commonDir, fileSearchText, matchesSearch } from "./format";
+import { commonDir, fileSearchFields, matchesSearch } from "./format";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { ConvertPanel } from "./components/ConvertPanel";
 import { Dropzone } from "./components/Dropzone";
@@ -17,6 +17,7 @@ import { DropGuard, Progress } from "./components/Progress";
 import { PlaylistFormatModal } from "./components/PlaylistFormatModal";
 import { ResultsSummary } from "./components/ResultsSummary";
 import { ResultsTable } from "./components/ResultsTable";
+import type { TableScrollHandle } from "./components/useTableWindow";
 import { TagPanel, type TagPanelHandle } from "./components/TagPanel";
 import { nextSort, sortFiles, type SortColumn, type SortState } from "./components/tableSort";
 import { TopBar } from "./components/TopBar";
@@ -49,6 +50,7 @@ import "./App.css";
 export function App() {
   const { toast, showToast } = useToast();
   const tagPanelRef = useRef<TagPanelHandle>(null);
+  const resultsTableRef = useRef<TableScrollHandle>(null);
   const [ffmpegAvailable, setFfmpegAvailable] = useState(false);
   const [playlistModalOpen, setPlaylistModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -100,20 +102,22 @@ export function App() {
   // filter exists, so hiding a row here can't drop it from a CSV/JSON/M3U
   // export. Playback is the one exception — see `displayedPaths` below.
   //
-  // Matches against everything the row actually shows (`fileSearchText`), not
-  // just the file name — so "24-bit", "transcoded" or "flac" filters the list
-  // too. `matchesSearch` does whole-word matching, not a plain substring
-  // search, so a closed word like "16-" (typed for "16-bit") can't match
-  // "160 MB" or "116 MB" just because they contain "16".
+  // Matches against the row data and the embedded tags already held by the
+  // shared cache, not just the file name — so "24-bit", "transcoded", an
+  // artist, album or catalogue number all filter the list. A multiword query
+  // must occur together within one value; words from unrelated tags must not
+  // combine into a false match.
   const hasSearchQuery = searchQuery.trim().length > 0;
   const visiblePaths = useMemo(() => {
     if (!hasSearchQuery) return null;
     const matches = new Set<string>();
     for (const f of analysis.orderedFiles) {
-      if (matchesSearch(fileSearchText(f), searchQuery)) matches.add(f.path);
+      if (matchesSearch(fileSearchFields(f, cache.tags.get(f.path)), searchQuery)) {
+        matches.add(f.path);
+      }
     }
     return matches;
-  }, [analysis.orderedFiles, hasSearchQuery, searchQuery]);
+  }, [analysis.orderedFiles, cache.tags, hasSearchQuery, searchQuery]);
 
   // Column sorting (ResultsTable's headers) — state lives here, not in
   // ResultsTable, for the same reason `displayedPaths` below exists: nothing
@@ -466,14 +470,8 @@ export function App() {
       metaKey: false,
       ctrlKey: false,
     });
-    // Keep the row on screen. Reaching into the DOM is the exception the
-    // frontend rules allow for real geometry work: scroll position is not
-    // state React renders, and `block: "nearest"` only moves the list when
-    // the row is actually out of view, so holding an arrow key scrolls
-    // steadily instead of recentring on every step.
-    document
-      .querySelector(`tr[data-path="${CSS.escape(path)}"]`)
-      ?.scrollIntoView({ block: "nearest" });
+    // Offscreen rows need not have a DOM node: the table knows their offsets.
+    resultsTableRef.current?.scrollToPath(path);
   });
 
   // Ctrl/Cmd+A selects every track; Ctrl/Cmd+Shift+A — there's no single
@@ -573,7 +571,6 @@ export function App() {
         hasReport={hasResults}
         canGenerateSpectrograms={analysis.targets.length > 0}
         ffmpegAvailable={ffmpegAvailable}
-        searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         selectedCount={selection.selectedPaths.length}
         onSelectAll={guardedSelectAll}
@@ -627,12 +624,14 @@ export function App() {
                   onToast={showToast}
                 />
                 <ResultsTable
+                  scrollRef={resultsTableRef}
+                  filterKey={searchQuery}
                   files={analysis.orderedFiles}
                   covers={cache.covers}
                   tags={cache.tags}
                   nowPlaying={playback.nowPlaying}
                   selectedPaths={selection.selectedPaths}
-                  visiblePaths={visiblePaths}
+                  displayedFiles={displayedFiles}
                   sort={sort}
                   onSortChange={onSortChange}
                   editingPath={editingPath}

@@ -75,5 +75,11 @@ jobs:
       - name: Build frontend (typecheck + bundle)
         run: npm run build
 
+      - name: Search regression tests
+        run: npm run test:search
+
+      - name: Table window regression tests
+        run: npm run test:table
+
       - name: Compile the whole workspace (core + Tauri app)
         run: cargo build --workspace

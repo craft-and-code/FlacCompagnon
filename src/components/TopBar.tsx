@@ -1,7 +1,7 @@
-// The action bar. Purely presentational: every button reports upwards, and
-// what's enabled is decided by the app state passed in.
+// The action bar. Buttons report upwards; only the search input's text is
+// local so it stays responsive while the parent filters a large table.
 
-import { useRef } from "react";
+import { startTransition, useRef, useState } from "react";
 import {
   ArrowLeftRight,
   CheckSquare,
@@ -29,10 +29,9 @@ export interface TopBarProps {
   ffmpegAvailable: boolean;
   /// Filters which rows the table *renders* — see ResultsTable's
   /// `visiblePaths`. Matches everything a row displays (format, bit depth,
-  /// detections, ...), not just the file name — see `fileSearchText`. Never
+  /// detections, tags, ...), not just the file name — see `fileSearchFields`. Never
   /// touches playback, selection, drag order or exports, which all keep
   /// working off the full list.
-  searchQuery: string;
   onSearchChange: (query: string) => void;
   /// Size of the current selection — the renumber button only makes sense
   /// (and only enables) once there are at least two tracks to order.
@@ -79,7 +78,6 @@ export function TopBar({
   hasReport,
   canGenerateSpectrograms,
   ffmpegAvailable,
-  searchQuery,
   onSearchChange,
   selectedCount,
   onSelectAll,
@@ -102,6 +100,14 @@ export function TopBar({
 }: TopBarProps) {
   const theme = useTheme();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [searchText, setSearchText] = useState("");
+
+  // The input can repaint before a large results table is filtered or restored.
+  // Its own text stays urgent; only the parent-owned filter is deferred.
+  const changeSearch = (value: string) => {
+    setSearchText(value);
+    startTransition(() => onSearchChange(value));
+  };
 
   return (
     <header className="topbar">
@@ -111,9 +117,9 @@ export function TopBar({
           ref={searchInputRef}
           type="text"
           placeholder="Filter…"
-          value={searchQuery}
+          value={searchText}
           disabled={!hasReport}
-          onChange={(ev) => onSearchChange(ev.target.value)}
+          onChange={(ev) => changeSearch(ev.target.value)}
         />
         {/* Only rendered once there's something to clear, and even then only
             revealed on hover (see .topbar-search:hover in TopBar.css) — a
@@ -121,14 +127,14 @@ export function TopBar({
             this isn't: it just resets the display filter. Refocusing the
             field afterwards (rather than leaving focus on the now-vanished
             button) means typing a new query doesn't need an extra click. */}
-        {searchQuery && (
+        {searchText && (
           <IconButton
             icon={<X size={12} strokeWidth={2} />}
             title="Clear filter"
             variant="close"
             className="topbar-search-clear"
             onClick={() => {
-              onSearchChange("");
+              changeSearch("");
               searchInputRef.current?.focus();
             }}
           />

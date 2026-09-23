@@ -16,6 +16,7 @@ import "./ResultRow.css";
 
 export interface ResultRowProps {
   file: FileAnalysis;
+  rowIndex: number;
   cover: CoverArt | null | undefined;
   /// This file's tags, for the optional tag-derived columns — `null` until
   /// loaded (or if it has none/failed to read), same contract as `cover`.
@@ -82,6 +83,7 @@ function rowClass(selected: boolean, dragging: boolean, dropEdge: "before" | "af
 
 export function ResultRow({
   file: f,
+  rowIndex,
   cover,
   tag,
   columns,
@@ -254,6 +256,7 @@ export function ResultRow({
     return (
       <tr
         data-path={f.path}
+        aria-rowindex={rowIndex}
         className={rowClass(selected, dragging, dropEdge)}
         onClick={onRowClick}
       >
@@ -272,6 +275,7 @@ export function ResultRow({
   return (
     <tr
       data-path={f.path}
+      aria-rowindex={rowIndex}
       className={rowClass(selected, dragging, dropEdge)}
       onClick={onRowClick}
     >

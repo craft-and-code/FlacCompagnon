@@ -5,7 +5,7 @@
 // Components render that markup now, and JSX escapes interpolated values
 // itself, so that whole class of mistake is gone along with the helper.
 
-import type { CoverArt, Detections, FileAnalysis, FlacMd5Status } from "./types";
+import type { CoverArt, Detections, FileAnalysis, FlacMd5Status, TagSet } from "./types";
 
 /// Audio extensions, stripped when suggesting a file name from a dropped
 /// file and used by [`isAudioPath`]. Mirrors `SUPPORTED_EXTENSIONS` in
@@ -266,15 +266,33 @@ function md5SearchWords(m: FlacMd5Status | null): string {
   }
 }
 
-/// Flattens everything a results-table row actually shows — file name,
-/// format, bit depth, sample rate, detections, clipping, MD5 status, and so
-/// on — into one lowercase string for the search filter (TopBar) to match
-/// against, so "24-bit" or "transcoded" finds files without needing the
-/// filename itself to mention them. Mirrors ResultRow/ResultCells' own
-/// formatting rather than sharing code with them (those compute a colour and
-/// a tooltip alongside the text, which the filter has no use for) — a new
-/// column there should get a line here too.
-export function fileSearchText(f: FileAnalysis): string {
+/// Keep tag values separate so a phrase cannot start in one tag and finish in
+/// another. The shared cache already reads them for the tag panel and columns.
+function tagSearchFields(tag: TagSet | null | undefined): string[] {
+  if (!tag) return [];
+  return [
+    tag.title,
+    tag.artist,
+    tag.album,
+    tag.album_artist,
+    tag.composer,
+    tag.year,
+    tag.track,
+    tag.track_total,
+    tag.disc,
+    tag.disc_total,
+    tag.genre,
+    tag.comment,
+    tag.compilation ? "compilation" : "",
+    tag.encoder,
+    tag.musicbrainz_release_id,
+    ...tag.extra.flat(),
+  ].filter((value): value is string => Boolean(value));
+}
+
+/// Searchable row values and embedded tags, kept as individual fields. A row
+/// is searchable by its analysis data while its tags load, then by both.
+export function fileSearchFields(f: FileAnalysis, tag?: TagSet | null): string[] {
   const parts = [
     f.file_name,
     f.format,
@@ -312,29 +330,25 @@ export function fileSearchText(f: FileAnalysis): string {
     f.file_crc32 ?? "",
     f.error ?? "",
   ];
-  return parts.filter(Boolean).join(" | ").toLowerCase();
+  return [...parts.filter(Boolean), ...tagSearchFields(tag)];
 }
 
-/// True when every "word" in `query` — a run of letters/digits, with
-/// anything else (spaces, hyphens, punctuation) treated as a separator — is
-/// found as a whole word in `haystack`, except the last one, which only
-/// needs to *start* a word if the query doesn't itself end on a separator
-/// (i.e. it's still being typed).
+/// Match the query as one phrase inside a single row or tag field. Separators
+/// may vary (a space in the query also finds a hyphen in a filename), and the
+/// last word may be a prefix while it is still being typed. Folding accents
+/// lets a plain-letter query find names with diacritics.
 ///
-/// The whole-word rule (rather than a plain substring search) is what stops
-/// "16-" — typed while aiming for "16-bit" — from matching "160 MB" or
-/// "116 MB": both contain "16" as a substring, but the trailing "-" closes
-/// the word, and `\b16\b` doesn't match a "16" immediately followed by
-/// another digit ("160") or preceded by one ("116"). Typing "16" without the
-/// trailing separator still matches both, since at that point it could still
-/// become "160" — the word isn't closed yet.
-export function matchesSearch(haystack: string, query: string): boolean {
-  const words = query.toLowerCase().match(/[a-z0-9]+/g);
+/// A closed "16-" therefore finds "16-bit" without matching "160 MB".
+export function matchesSearch(fields: readonly string[], query: string): boolean {
+  const fold = (value: string) => value.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase();
+  const foldedQuery = fold(query);
+  const words = foldedQuery.match(/[\p{L}\p{N}]+/gu);
   if (!words) return true;
-  const lastWordOpen = /[a-z0-9]$/.test(query);
-  const hay = haystack.toLowerCase();
-  return words.every((word, i) => {
-    const closed = i < words.length - 1 || !lastWordOpen;
-    return new RegExp(`\\b${word}${closed ? "\\b" : ""}`).test(hay);
-  });
+  const lastWordOpen = /[\p{L}\p{N}]$/u.test(foldedQuery);
+  const letterOrNumber = "[\\p{L}\\p{N}]";
+  const pattern = new RegExp(
+    `(?:^|[^\\p{L}\\p{N}])${words.join("[^\\p{L}\\p{N}]+")}${lastWordOpen ? "" : `(?!${letterOrNumber})`}`,
+    "u",
+  );
+  return fields.some((field) => pattern.test(fold(field)));
 }
