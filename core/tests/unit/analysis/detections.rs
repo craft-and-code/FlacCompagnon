@@ -40,6 +40,8 @@ fn summ(
             clipped: false,
         },
         fake_stereo: false,
+        phase_correlation: None,
+        phase_inverted: false,
         real_bit_depth: None,
         bit_depth_evidence: None,
         dr_db: None,

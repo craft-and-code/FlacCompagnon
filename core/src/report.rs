@@ -59,7 +59,7 @@ pub fn build_csv(report: &FolderReport) -> String {
     out.push_str(
         "file,format,codec,badge,bitrate_kbps,sample_rate,declared_bits,real_bit_depth,\
          duration_s,size_bytes,status,upscaling,upsampling,transcoding,lattice_score,cutoff_hz,\
-         cutoff_ratio,channels,fake_stereo,clipped,clip_events,peak_dbfs,true_peak_dbtp,dr_db,\
+         cutoff_ratio,channels,fake_stereo,phase_correlation,phase_inverted,clipped,clip_events,peak_dbfs,true_peak_dbtp,dr_db,\
          md5,bit_depth_method,stored_bits,modified_unix,file_md5,file_crc32\n",
     );
     for f in &report.files {
@@ -75,7 +75,7 @@ pub fn build_csv(report: &FolderReport) -> String {
             })
             .unwrap_or("");
         out.push_str(&format!(
-            "{},{},{},{},{},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{},{},{},{:.2},{:.2},{},{},{},{},{},{},{}\n",
+            "{},{},{},{},{},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.2},{:.2},{},{},{},{},{},{},{}\n",
             csv_escape(&f.file_name),
             f.format,
             f.codec.clone().unwrap_or_default(),
@@ -97,6 +97,8 @@ pub fn build_csv(report: &FolderReport) -> String {
             f.cutoff_ratio.map(|v| format!("{v:.3}")).unwrap_or_default(),
             f.channels,
             opt_bool(f.fake_stereo),
+            f.phase_correlation.map(|v| format!("{v:.3}")).unwrap_or_default(),
+            opt_bool(f.phase_inverted),
             f.clipping.clipped,
             f.clipping.clip_events,
             f.clipping.peak_dbfs,

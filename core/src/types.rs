@@ -138,6 +138,14 @@ pub struct FileAnalysis {
     pub lattice_score: Option<f32>,
     /// `true` when a >= 2 channel file is actually dual-mono.
     pub fake_stereo: Option<bool>,
+    /// L/R correlation (-1..1), measured on two-channel audio. Absent for
+    /// mono, multichannel or silent-channel files and older saved reports.
+    #[serde(default)]
+    pub phase_correlation: Option<f32>,
+    /// Strongly opposed channels suggest one has inverted polarity.
+    /// `None` means no two-channel phase analysis was available.
+    #[serde(default)]
+    pub phase_inverted: Option<bool>,
     /// Verified quality badge: `Some("Hi-Res")` for > 48 kHz or > 16-bit PCM,
     /// `Some("DSD64")` etc. for DSD — granted only when no detection
     /// invalidates the claim (no upscaling/upsampling/transcoding).

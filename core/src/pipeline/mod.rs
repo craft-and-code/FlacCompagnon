@@ -171,6 +171,10 @@ fn apply_outcome(
     if outcome.channels >= 2 {
         result.fake_stereo = Some(summary.fake_stereo);
     }
+    if outcome.channels == 2 {
+        result.phase_correlation = summary.phase_correlation;
+        result.phase_inverted = summary.phase_correlation.map(|_| summary.phase_inverted);
+    }
     let real_bits = match (outcome.declared_bits, summary.real_bit_depth) {
         (Some(_), Some(real)) => {
             result.real_bit_depth = Some(real);

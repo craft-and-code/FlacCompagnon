@@ -29,6 +29,8 @@ fn sample_file() -> FileAnalysis {
         bit_depth_evidence: None,
         lattice_score: None,
         fake_stereo: Some(false),
+        phase_correlation: Some(0.8),
+        phase_inverted: Some(false),
         badge: None,
         clipping: ClippingInfo {
             clipped_samples: 0,
@@ -76,6 +78,28 @@ fn csv_has_header_and_row() {
         lines[1].split(',').count(),
         "CSV header and row column counts must match"
     );
+}
+
+#[test]
+fn csv_exports_phase_measurements_in_their_own_columns() {
+    let mut file = sample_file();
+    file.phase_correlation = Some(-1.0);
+    file.phase_inverted = Some(true);
+    let csv = build_csv(&FolderReport {
+        root: "/music".into(),
+        files: vec![file],
+        has_flac: true,
+    });
+    let mut lines = csv.lines();
+    let header: Vec<_> = lines.next().expect("header").split(',').collect();
+    let row: Vec<_> = lines.next().expect("file row").split(',').collect();
+    for (column, expected) in [("phase_correlation", "-1.000"), ("phase_inverted", "true")] {
+        let at = header
+            .iter()
+            .position(|&name| name == column)
+            .expect("phase column");
+        assert_eq!(row[at], expected);
+    }
 }
 
 #[test]
@@ -140,6 +164,8 @@ fn the_json_carries_every_analysis_field() {
         "real_bit_depth",
         "lattice_score",
         "fake_stereo",
+        "phase_correlation",
+        "phase_inverted",
         "badge",
         "clipping",
         "dr_db",
@@ -158,6 +184,23 @@ fn the_json_carries_every_analysis_field() {
     assert!(json.contains("\"upscaling\""));
     assert!(json.contains("\"transcoding\""));
     assert!(json.contains("\"detail\""));
+}
+
+#[test]
+fn older_json_without_phase_fields_still_loads() {
+    let report = FolderReport {
+        root: "/music".into(),
+        files: vec![sample_file()],
+        has_flac: true,
+    };
+    let mut json: serde_json::Value = serde_json::from_str(&build_json(&report).unwrap()).unwrap();
+    let file = json["report"]["files"][0].as_object_mut().unwrap();
+    file.remove("phase_correlation");
+    file.remove("phase_inverted");
+    let old = serde_json::to_string(&json).unwrap();
+    let read = parse_json(&old).unwrap();
+    assert!(read.files[0].phase_correlation.is_none());
+    assert!(read.files[0].phase_inverted.is_none());
 }
 
 /// Files come out in the order they went in — the table's display order,

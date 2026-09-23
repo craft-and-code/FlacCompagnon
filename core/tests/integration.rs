@@ -126,6 +126,30 @@ fn full_band_noise_is_clean() {
         "cutoff {:?}, detail {}",
         r.cutoff_hz, r.detections.detail
     );
+    assert_eq!(r.phase_correlation, None);
+    assert_eq!(r.phase_inverted, None);
+    std::fs::remove_file(&path).ok();
+}
+
+/// A generated stereo WAV with R = -L is an independent ground-truth polarity
+/// inversion: its mono sum is exactly zero, regardless of the phase detector.
+#[test]
+fn inverted_stereo_channels_are_reported_as_a_phase_problem() {
+    let sr = 44_100;
+    let mut samples = Vec::with_capacity(sr as usize * 2);
+    for n in 0..sr {
+        let left =
+            (22_000.0 * (2.0 * std::f64::consts::PI * 317.0 * n as f64 / sr as f64).sin()) as i16;
+        samples.extend([left, -left]);
+    }
+    let path = tmp("inverted_stereo.wav");
+    write_wav_i16(&path, sr, 2, &samples);
+
+    let result = analyze_file(&path, &ScanOptions::default());
+    assert!(result.error.is_none(), "{:?}", result.error);
+    assert_eq!(result.fake_stereo, Some(false));
+    assert_eq!(result.phase_inverted, Some(true));
+    assert!(result.phase_correlation.is_some_and(|v| v < -0.999));
     std::fs::remove_file(&path).ok();
 }
 

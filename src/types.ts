@@ -63,6 +63,9 @@ export interface FileAnalysis {
   // `null` means the search did not run, which is not the same as a low score.
   lattice_score: number | null;
   fake_stereo: boolean | null;
+  // Older JSON reports omit these measurements.
+  phase_correlation?: number | null;
+  phase_inverted?: boolean | null;
   badge: string | null;
   clipping: ClippingInfo;
   dr_db: number | null;

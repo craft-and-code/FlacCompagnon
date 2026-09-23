@@ -67,6 +67,11 @@ pub(super) fn analyze(path: &Path, opts: &ScanOptions, result: &mut FileAnalysis
                 if info.channels >= 2 {
                     result.fake_stereo = Some(summary.fake_stereo);
                 }
+                if info.channels == 2 {
+                    result.phase_correlation = summary.phase_correlation;
+                    result.phase_inverted =
+                        summary.phase_correlation.map(|_| summary.phase_inverted);
+                }
                 flagged = dsd_format::pcm_source_check(
                     &summary.spectrum_db,
                     decoded_rate,

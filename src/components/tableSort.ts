@@ -11,7 +11,7 @@
 // means the natural/drag order, which is what the table opens in.
 
 import type { FileAnalysis } from "../types";
-import { detectionLabels } from "../format";
+import { detectionLabels, stereoLabel } from "../format";
 
 export type SortColumn =
   | "file"
@@ -41,13 +41,6 @@ export type SortDirection = "asc" | "desc";
 export interface SortState {
   column: SortColumn;
   direction: SortDirection;
-}
-
-/// Mirrors `StereoCell`'s displayed text.
-function stereoLabel(f: FileAnalysis): string {
-  if (f.fake_stereo == null) return f.channels <= 1 ? "mono" : "";
-  if (f.fake_stereo) return "dual-mono";
-  return f.channels > 2 ? "multi" : "stereo";
 }
 
 /// Not alphabetical on the state name (that would put "Error" before "Match"

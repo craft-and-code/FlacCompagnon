@@ -164,6 +164,27 @@ export function pictureTypeLabel(raw: string): string {
   return PICTURE_TYPE_LABELS[raw] ?? raw;
 }
 
+/// One shared stereo classification for the table, sorting and search.
+/// A -0.2 margin keeps independent channels whose measured correlation is
+/// merely near zero from receiving a warning; negative values held across a
+/// whole track are the mono-compatibility concern.
+const PHASE_RISK_CORRELATION = -0.2;
+
+export function stereoStatus(f: FileAnalysis): "mono" | "unknown" | "dual-mono" | "polarity" | "phase-risk" | "stereo" | "multi" {
+  if (f.channels === 1) return "mono";
+  if (f.fake_stereo == null) return "unknown";
+  if (f.fake_stereo) return "dual-mono";
+  if (f.channels > 2) return "multi";
+  if (f.phase_inverted) return "polarity";
+  if (f.phase_correlation != null && f.phase_correlation <= PHASE_RISK_CORRELATION) return "phase-risk";
+  return "stereo";
+}
+
+export function stereoLabel(f: FileAnalysis): string {
+  const status = stereoStatus(f);
+  return status === "unknown" ? "—" : status === "polarity" ? "polarity?" : status === "phase-risk" ? "phase risk" : status;
+}
+
 /// The deepest folder containing every one of `paths`. With a single folder of
 /// files this is that folder; across several folders it is their common
 /// ancestor. Recomputed as files are added.
@@ -304,15 +325,7 @@ export function fileSearchFields(f: FileAnalysis, tag?: TagSet | null): string[]
     fmtSize(f.size_bytes),
     fmtCutoff(f),
     `${f.channels}ch`,
-    f.fake_stereo == null
-      ? f.channels <= 1
-        ? "mono"
-        : ""
-      : f.fake_stereo
-        ? "dual-mono fake stereo"
-        : f.channels > 2
-          ? "multi"
-          : "stereo",
+    `${stereoLabel(f)}${f.fake_stereo ? " fake stereo" : ""}${f.phase_inverted ? " inverted polarity phase" : ""}`,
     f.clipping.clipped ? `${f.clipping.clip_events} clip events clipping` : "no clipping",
     Number.isFinite(f.clipping.true_peak_dbtp)
       ? `${f.clipping.true_peak_dbtp.toFixed(1)} dbtp true peak`

@@ -4,7 +4,7 @@
 // them.
 
 import type { ClippingInfo, Detections, FileAnalysis, FlacMd5Status } from "./../types";
-import { detectionLabels } from "../format";
+import { detectionLabels, stereoLabel, stereoStatus } from "../format";
 import "./ResultCells.css";
 
 export function DetectionsCell({ d }: { d: Detections }) {
@@ -178,14 +178,15 @@ export function RealBitsCell({ f }: { f: FileAnalysis }) {
 }
 
 export function StereoCell({ f }: { f: FileAnalysis }) {
-  if (f.fake_stereo == null) {
+  const status = stereoStatus(f);
+  if (status === "unknown" || status === "mono") {
     return (
       <td>
-        <span className="c-muted">{f.channels <= 1 ? "mono" : "—"}</span>
+        <span className="c-muted">{stereoLabel(f)}</span>
       </td>
     );
   }
-  if (f.fake_stereo) {
+  if (status === "dual-mono") {
     return (
       <td>
         <span
@@ -197,9 +198,22 @@ export function StereoCell({ f }: { f: FileAnalysis }) {
       </td>
     );
   }
+  if (status === "polarity" || status === "phase-risk") {
+    const correlation = f.phase_correlation?.toFixed(2) ?? "?";
+    const title = status === "polarity"
+      ? `L/R correlation ${correlation}: the channels are strongly opposed. One channel may have inverted polarity, and the mono mix may lose signal. A reference recording would be needed to establish the intended polarity.`
+      : `L/R correlation ${correlation} is negative. Some content may cancel in mono; this alone does not prove a polarity inversion.`;
+    return (
+      <td>
+        <span className={`${status === "polarity" ? "c-bad" : "c-warn"} has-tip`} title={title}>
+          {stereoLabel(f)}
+        </span>
+      </td>
+    );
+  }
   return (
     <td>
-      <span className="c-ok">{f.channels > 2 ? "multi" : "stereo"}</span>
+      <span className="c-ok">{stereoLabel(f)}</span>
     </td>
   );
 }

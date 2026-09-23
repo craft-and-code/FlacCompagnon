@@ -6,7 +6,7 @@
 //!
 //! * spectrum      -> Hann-windowed FFT of a mono downmix, averaged over windows
 //! * clipping      -> full-scale sample counting with run detection
-//! * fake stereo   -> energy of the L-R difference vs. the signal energy
+//! * stereo        -> L-R difference, L/R correlation and mono cancellation
 //! * real bitdepth -> exact unused bits and persistent lower-depth integer grids
 //!
 //! Nothing here depends on a specific file format; [`decode`](crate::decode)
@@ -75,6 +75,10 @@ pub struct AnalysisSummary {
     /// `true` when the left and right channels were identical (or near
     /// enough) for long enough to suggest a mono source duplicated to stereo.
     pub fake_stereo: bool,
+    /// Whole-stream correlation of the first two channels when both carry audio.
+    pub phase_correlation: Option<f32>,
+    /// True when the two channels are strongly opposed across the stream.
+    pub phase_inverted: bool,
     /// The bit depth actually used by the samples, when it could be
     /// determined from an integer PCM source (`None` for float sources).
     pub real_bit_depth: Option<u32>,
@@ -128,10 +132,11 @@ pub struct StreamAnalyzer {
     clip_state: clipping::ClipState,
     true_peak: TruePeak,
 
-    // --- fake stereo ---
+    // --- stereo relationship ---
     diff_energy: f64,
     l_energy: f64,
     r_energy: f64,
+    cross_energy: f64,
     identical_frames: u64,
     total_frames: u64,
 
@@ -179,6 +184,7 @@ impl StreamAnalyzer {
             diff_energy: 0.0,
             l_energy: 0.0,
             r_energy: 0.0,
+            cross_energy: 0.0,
             identical_frames: 0,
             total_frames: 0,
             bit_depth: bitdepth::BitDepthAnalyzer::new(channels.max(1)),
@@ -232,6 +238,7 @@ impl StreamAnalyzer {
             self.diff_energy += d * d;
             self.l_energy += l * l;
             self.r_energy += r * r;
+            self.cross_energy += l * r;
             if (l - r).abs() < 1e-9 {
                 self.identical_frames += 1;
             }
@@ -391,6 +398,7 @@ impl StreamAnalyzer {
         } else {
             false
         };
+        let phase = super::stereo::analyze_phase(self.l_energy, self.r_energy, self.cross_energy);
 
         let measured_depth = self.bit_depth.finish(declared_bits);
         let real_bit_depth = measured_depth.map(|(bits, _)| bits);
@@ -419,6 +427,8 @@ impl StreamAnalyzer {
             spectrum_db,
             clipping,
             fake_stereo,
+            phase_correlation: phase.correlation,
+            phase_inverted: phase.likely_inverted,
             real_bit_depth,
             bit_depth_evidence,
             dr_db,

@@ -31,6 +31,8 @@ fn hires_pcm(codec: Option<&str>) -> FileAnalysis {
         bit_depth_evidence: None,
         lattice_score: None,
         fake_stereo: Some(false),
+        phase_correlation: Some(0.8),
+        phase_inverted: Some(false),
         badge: None,
         clipping: ClippingInfo::unmeasured(),
         dr_db: Some(14.0),
