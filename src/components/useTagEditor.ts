@@ -36,7 +36,7 @@ export function emptyTagEdits(): TagEdits {
     genre: "Unset",
     comment: "Unset",
     compilation: null,
-    cover: "Unset",
+    pictures: [],
     extra: [],
   };
 }
@@ -49,10 +49,15 @@ export interface UseTagEditorArgs {
   onToast: (msg: string, kind?: "info" | "error") => void;
 }
 
+interface PictureDraft {
+  edit: CoverEdit;
+  preview: CoverArt | null;
+}
+
 export function useTagEditor({ paths, tagSets, onSaved, onToast }: UseTagEditorArgs) {
   const [edits, setEdits] = useState<Partial<Record<TagTextField, string>>>({});
   const [compilationEdit, setCompilationEdit] = useState<boolean | null>(null);
-  const [coverEdit, setCoverEdit] = useState<CoverEdit>("Unset");
+  const [pictureEdits, setPictureEdits] = useState<Record<string, PictureDraft>>({});
   // Sparse, keyed by the same raw format-specific tag name `TagSet.extra`
   // pairs use — the extended-tags pop-in's own Save merges its local draft
   // in here rather than writing to disk itself (see ExtendedTagsModal's file
@@ -70,7 +75,7 @@ export function useTagEditor({ paths, tagSets, onSaved, onToast }: UseTagEditorA
     lastSelection.current = selectionKey;
     setEdits({});
     setCompilationEdit(null);
-    setCoverEdit("Unset");
+    setPictureEdits({});
     setExtraEditsState({});
   }
 
@@ -93,7 +98,7 @@ export function useTagEditor({ paths, tagSets, onSaved, onToast }: UseTagEditorA
   const dirty =
     Object.keys(edits).length > 0 ||
     compilationEdit !== null ||
-    coverEdit !== "Unset" ||
+    Object.keys(pictureEdits).length > 0 ||
     Object.keys(extraEdits).length > 0;
 
   const setField = useCallback((field: TagTextField, value: string) => {
@@ -106,32 +111,31 @@ export function useTagEditor({ paths, tagSets, onSaved, onToast }: UseTagEditorA
     setEdits((prev) => ({ ...prev, ...patch }));
   }, []);
 
-  const stageCover = useCallback((cover: CoverArt) => {
-    setCoverEdit({
-      Set: {
-        mime: cover.mime,
-        data_base64: cover.data_base64,
-        picture_type: cover.picture_type,
+  const stageCover = useCallback((cover: CoverArt, pictureType: string) => {
+    setPictureEdits((prev) => ({
+      ...prev,
+      [pictureType]: {
+        edit: {
+          Set: {
+            mime: cover.mime,
+            data_base64: cover.data_base64,
+            picture_type: pictureType,
+          },
+        },
+        preview: { ...cover, picture_type: pictureType },
       },
-    });
+    }));
   }, []);
 
-  /// Removes the cover from every selected file — same "Clear" as any other
-  /// tag field, applied uniformly across the batch regardless of whether the
-  /// selection shares one cover (deleting doesn't have the "which exact image
-  /// gets overwritten" problem relabeling does).
-  const clearCover = useCallback(() => {
-    setCoverEdit("Clear");
-  }, []);
-
-  /// Relabels the cover currently shown without touching its bytes. Only
-  /// reachable when the whole selection shares one exact cover — `CoverEdit`
-  /// always re-applies the image to every file in the batch, so allowing this
-  /// on a mixed selection would silently overwrite covers, not just roles.
-  const setCoverRole = useCallback((cover: CoverArt, pictureType: string) => {
-    setCoverEdit({
-      Set: { mime: cover.mime, data_base64: cover.data_base64, picture_type: pictureType },
-    });
+  /// Delete only the selected role, preserving the other embedded pictures.
+  const clearCover = useCallback((pictureType: string) => {
+    setPictureEdits((prev) => ({
+      ...prev,
+      [pictureType]: {
+        edit: { Clear: { picture_type: pictureType } },
+        preview: null,
+      },
+    }));
   }, []);
 
   /// Merges the extended-tags pop-in's local draft into this buffer on its
@@ -145,7 +149,7 @@ export function useTagEditor({ paths, tagSets, onSaved, onToast }: UseTagEditorA
   const reset = useCallback(() => {
     setEdits({});
     setCompilationEdit(null);
-    setCoverEdit("Unset");
+    setPictureEdits({});
     setExtraEditsState({});
   }, []);
 
@@ -153,7 +157,7 @@ export function useTagEditor({ paths, tagSets, onSaved, onToast }: UseTagEditorA
     const out: TagEdits = {
       ...emptyTagEdits(),
       compilation: compilationEdit,
-      cover: coverEdit,
+      pictures: Object.values(pictureEdits).map((draft) => draft.edit),
       extra: Object.entries(extraEdits),
     };
     for (const field of TAG_TEXT_FIELDS) {
@@ -163,7 +167,7 @@ export function useTagEditor({ paths, tagSets, onSaved, onToast }: UseTagEditorA
       out[field] = trimmed === "" ? "Clear" : { Set: trimmed };
     }
     return out;
-  }, [edits, compilationEdit, coverEdit, extraEdits]);
+  }, [edits, compilationEdit, pictureEdits, extraEdits]);
 
   const save = useCallback(async () => {
     if (paths.length === 0 || !dirty || saving) return;
@@ -191,7 +195,7 @@ export function useTagEditor({ paths, tagSets, onSaved, onToast }: UseTagEditorA
   return {
     values,
     compilation,
-    coverEdit,
+    pictureEdits,
     extraEdits,
     dirty,
     saving,
@@ -200,7 +204,6 @@ export function useTagEditor({ paths, tagSets, onSaved, onToast }: UseTagEditorA
     setCompilation: setCompilationEdit,
     stageCover,
     clearCover,
-    setCoverRole,
     mergeExtraEdits,
     reset,
     save,

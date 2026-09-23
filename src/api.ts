@@ -101,12 +101,11 @@ export const readCoverImage = (path: string) =>
 
 // Writes a cover (already in hand as base64 — no re-read from any tag) out as
 // a plain file in `dir`, backing the tag panel's "extract cover(s)" button.
-// `index` (1-based) picks the name: 1 gets the classic "cover.<ext>", any
-// later index gets "cover-<n>.<ext>" — so extracting every distinct cover in
-// a multi-cover selection doesn't have the second call overwrite the first.
+// `pictureType` selects the base name ("cover", "back", etc.), and `index`
+// numbers additional images of that type so they do not overwrite each other.
 // Returns the path actually written.
-export const extractCoverArt = (dir: string, mime: string, dataBase64: string, index: number) =>
-  invoke<string>("extract_cover_art", { dir, mime, dataBase64, index });
+export const extractCoverArt = (dir: string, mime: string, dataBase64: string, pictureType: string, index: number) =>
+  invoke<string>("extract_cover_art", { dir, mime, dataBase64, pictureType, index });
 
 // The extended-tags pop-in's "+" picker: common tags this one representative
 // file's format can actually take, curated on the Rust side (lofty has no

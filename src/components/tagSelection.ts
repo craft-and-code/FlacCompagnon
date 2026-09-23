@@ -34,11 +34,12 @@ function sameCover(a: CoverArt, b: CoverArt): boolean {
 
 /// Every distinct cover across the selection, deduped by content rather than
 /// by file — so ten tracks of one album yield one cover, not ten.
-export function distinctCovers(tagSets: TagSet[]): CoverArt[] {
+export function distinctCovers(tagSets: TagSet[], pictureType: string): CoverArt[] {
   const out: CoverArt[] = [];
   for (const t of tagSets) {
-    const c = t.cover;
-    if (c && !out.some((d) => sameCover(d, c))) out.push(c);
+    for (const c of t.pictures) {
+      if (c.picture_type === pictureType && !out.some((d) => sameCover(d, c))) out.push(c);
+    }
   }
   return out;
 }

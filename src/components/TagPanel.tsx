@@ -12,7 +12,7 @@ import { X } from "lucide-react";
 
 import type { CoverArt as CoverArtData, LookupRelease, TagSet } from "../types";
 import * as api from "../api";
-import { commonDir } from "../format";
+import { PICTURE_TYPE_LABELS, commonDir, pictureTypeLabel } from "../format";
 import "./TagPanel.css";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CoverArt } from "./CoverArt";
@@ -84,10 +84,11 @@ export function TagPanel({
   const [lookupOpen, setLookupOpen] = useState(false);
   const [coverLoading, setCoverLoading] = useState(false);
   const [deleteCoverOpen, setDeleteCoverOpen] = useState(false);
+  const [pictureType, setPictureType] = useState("CoverFront");
 
   const editor = useTagEditor({ paths: selectedPaths, tagSets, onSaved, onToast });
 
-  const covers = useMemo(() => distinctCovers(tagSets), [tagSets]);
+  const covers = useMemo(() => distinctCovers(tagSets, pictureType), [tagSets, pictureType]);
   const extended = useMemo(() => extendedRows(tagSets), [tagSets]);
   // What the "Extended tags (N)" button's count shows — the base rows with
   // whatever's already staged in `editor.extraEdits` overlaid, so an add or
@@ -98,32 +99,19 @@ export function TagPanel({
   );
   const releaseId = useMemo(() => commonReleaseId(tagSets), [tagSets]);
 
-  // A staged cover (or deletion) replaces whatever the files currently have,
-  // so it's what the carousel must show — otherwise dropping an image, or
-  // deleting one, would appear to do nothing until after Save.
+  // The selected type shows its own staged image or deletion immediately;
+  // edits to other types stay in the buffer without changing this view.
   const shownCovers = useMemo(() => {
-    const staged = editor.coverEdit;
-    if (staged === "Unset") return covers;
-    if (staged === "Clear") return [];
-    return [
-      {
-        mime: staged.Set.mime,
-        data_base64: staged.Set.data_base64,
-        picture_type: staged.Set.picture_type,
-        // The staged image's real dimensions aren't known until it round-trips
-        // through the backend; the banner shows the byte size it does know.
-        width: 0,
-        height: 0,
-        size_bytes: Math.round((staged.Set.data_base64.length * 3) / 4),
-      } satisfies CoverArtData,
-    ];
-  }, [covers, editor.coverEdit]);
+    const staged = editor.pictureEdits[pictureType];
+    if (!staged) return covers;
+    return staged.preview ? [staged.preview] : [];
+  }, [covers, editor.pictureEdits, pictureType]);
 
   useImperativeHandle(
     ref,
     () => ({
       stageCover(cover: CoverArtData) {
-        editor.stageCover(cover);
+        editor.stageCover(cover, pictureType);
       },
       setCoverLoading(loading: boolean) {
         setCoverLoading(loading);
@@ -138,15 +126,9 @@ export function TagPanel({
     [editor],
   );
 
-  // Writes every distinct cover handed in as a plain file in the selection's
-  // common folder — "cover.<ext>" for the first, "cover-2.<ext>", "cover-3
-  // .<ext>", ... for the rest (see extractCoverArt). Previously this only
-  // ever extracted whichever cover the carousel happened to be showing, and
-  // always to the same "cover.<ext>" name — so a selection with several
-  // genuinely different covers needed one click per cover, and each one
-  // silently overwrote the last. One click now writes all of them. This is a
-  // read-only export, so it runs regardless of the `multiple` restriction
-  // that applies to relabeling.
+  // Export every distinct image of the selected type into the selection's
+  // common folder. The backend names front images "cover", back images
+  // "back", and numbers additional images of that type.
   const extractCovers = async (toExtract: CoverArtData[]) => {
     const dir = commonDir(selectedPaths);
     if (!dir || toExtract.length === 0) return;
@@ -154,7 +136,7 @@ export function TagPanel({
       const written: string[] = [];
       for (let i = 0; i < toExtract.length; i++) {
         const c = toExtract[i];
-        written.push(await api.extractCoverArt(dir, c.mime, c.data_base64, i + 1));
+        written.push(await api.extractCoverArt(dir, c.mime, c.data_base64, pictureType, i + 1));
       }
       onToast(
         written.length === 1
@@ -182,7 +164,7 @@ export function TagPanel({
       }
     }
     editor.setFields(patch);
-    if (release.cover) editor.stageCover(release.cover);
+    if (release.cover) editor.stageCover(release.cover, pictureType);
   };
 
   const taggable = tagSets.length > 0;
@@ -206,10 +188,15 @@ export function TagPanel({
 
       <CoverArt
         covers={shownCovers}
+        pictureType={pictureType}
+        pictureTypes={Object.keys(PICTURE_TYPE_LABELS)}
+        onTypeChange={(next) => {
+          setPictureType(next);
+          setLightbox(null);
+        }}
         dragOver={coverDragOver}
         loading={coverLoading}
         onOpenLightbox={(covers, index) => setLightbox({ covers, index })}
-        onRoleChange={editor.setCoverRole}
         onDelete={() => setDeleteCoverOpen(true)}
         onExtract={extractCovers}
       />
@@ -245,14 +232,14 @@ export function TagPanel({
 
       <ConfirmDialog
         open={deleteCoverOpen}
-        title="Delete cover"
-        message={`Remove the cover art from ${
+        title={`Delete ${pictureTypeLabel(pictureType)}`}
+        message={`Remove ${pictureTypeLabel(pictureType).toLowerCase()} images from ${
           selectedPaths.length === 1 ? "this track" : `these ${selectedPaths.length} tracks`
         }? This takes effect once you hit Save.`}
         confirmLabel="Delete"
         danger
         onConfirm={() => {
-          editor.clearCover();
+          editor.clearCover(pictureType);
           setDeleteCoverOpen(false);
         }}
         onCancel={() => setDeleteCoverOpen(false)}

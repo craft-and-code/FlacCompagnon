@@ -2,13 +2,11 @@
 // (cropped via `object-fit: cover` when the source isn't square itself — see
 // CoverArt.css's `.tag-cover-frame` comment for why fixed-and-square won out
 // over showing every cover at its own native ratio), with a banner
-// underneath carrying the dimensions/format/size and a role picker — Mac tag
+// underneath carrying the dimensions/format/size and a picture-type picker — Mac tag
 // editors like Meta caption artwork below it rather than above.
 //
-// A selection whose files don't share one cover shows chevrons to cycle
-// through the distinct ones, auto-advancing every 3s, and disables the role
-// picker: `CoverEdit` re-applies one image to the whole batch, so relabeling a
-// mixed selection would overwrite every file's artwork, not just its role.
+// A selection whose files don't share one image of the selected type shows
+// chevrons to cycle through the distinct ones, auto-advancing every 3s.
 
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, ImageDown, Music, Trash2, Upload } from "lucide-react";
@@ -28,11 +26,13 @@ const CAROUSEL_MS = 3000;
 /// because they are two halves of one instruction — the first names what the
 /// box takes and what dropping it does, the second confirms the release —
 /// and the conversion panel's drop zone words its own pair the same way.
-const IDLE_PROMPT = "Drop an image to set the cover on the selected tracks";
 const RELEASE_PROMPT = "Release to import";
 
 export interface CoverArtProps {
   covers: CoverArtData[];
+  pictureType: string;
+  pictureTypes: string[];
+  onTypeChange: (pictureType: string) => void;
   /// Highlighted while a file is being dragged over the box.
   dragOver: boolean;
   /// A dropped image is being read from disk — shows a spinner in place of
@@ -43,10 +43,9 @@ export interface CoverArtProps {
   /// CoverModal) rather than sharing this box's carousel state, since closing
   /// it shouldn't leave this box's mini-carousel wherever the lightbox ended.
   onOpenLightbox: (covers: CoverArtData[], index: number) => void;
-  onRoleChange: (cover: CoverArtData, pictureType: string) => void;
-  /// Removes the cover from every selected file.
+  /// Removes pictures of the selected type from every selected file.
   onDelete: () => void;
-  /// Extracts every distinct cover in `covers`, not just the one currently
+  /// Extracts every distinct picture in `covers`, not just the one currently
   /// shown — a selection whose files don't all share the exact same image
   /// needs all of them written, or clicking through the carousel and
   /// extracting each in turn would silently overwrite the last one with the
@@ -62,10 +61,12 @@ function infoLine(cover: CoverArtData, multiple: boolean): string {
 
 export function CoverArt({
   covers,
+  pictureType,
+  pictureTypes,
+  onTypeChange,
   dragOver,
   loading,
   onOpenLightbox,
-  onRoleChange,
   onDelete,
   onExtract,
 }: CoverArtProps) {
@@ -121,12 +122,6 @@ export function CoverArt({
     </>
   );
 
-  // A role outside the curated list (e.g. lofty's `Undefined(n)`) gets its own
-  // synthetic disabled option showing the raw value — rather than silently
-  // pre-selecting "Front cover" and letting a change event turn an
-  // obscure-but-real role into an actual front-cover overwrite.
-  const knownRole = cover ? cover.picture_type in PICTURE_TYPE_LABELS : false;
-
   // The overlay covers the frame edge to edge, but its veil is translucent —
   // artwork is meant to stay visible underneath, which is the point. The empty
   // box's own prompt is not: it would show through the release prompt, two
@@ -153,7 +148,10 @@ export function CoverArt({
         ) : (
           !overlay && (
             <span className="tag-cover-placeholder">
-              <DropHint icon={Music} label={IDLE_PROMPT} />
+              <DropHint
+                icon={Music}
+                label={`Drop an image to set the ${pictureTypeLabel(pictureType).toLowerCase()} on the selected tracks`}
+              />
             </span>
           )
         )}
@@ -168,50 +166,47 @@ export function CoverArt({
           </div>
         )}
       </div>
-      {cover && url && (
-        <div className="tag-cover-info">
+      <div className="tag-cover-info">
+        {cover && url ? (
           <MarqueeText className="tag-cover-info-text" text={infoLine(cover, multiple)} />
-          <div className="tag-cover-controls">
-            <IconButton
-              icon={<Upload size={14} strokeWidth={1.6} />}
-              title={
-                multiple
-                  ? `Extract all ${covers.length} covers next to the audio files`
-                  : "Extract this cover next to the audio file"
-              }
-              onClick={() => onExtract(covers)}
-            />
-            <IconButton
-              icon={<Trash2 size={14} strokeWidth={1.6} />}
-              title="Delete this cover"
-              variant="danger-persistent"
-              onClick={onDelete}
-            />
-            <select
-              className="tag-cover-role"
-              value={cover.picture_type}
-              disabled={multiple}
-              title={
-                multiple
-                  ? "All selected files must share the exact same cover to change its role"
-                  : "Change this cover's role"
-              }
-              onChange={(ev) => onRoleChange(cover, ev.target.value)}
-            >
-              {!knownRole && (
-                <option value={cover.picture_type} disabled>
-                  {pictureTypeLabel(cover.picture_type)}
-                </option>
-              )}
-              {Object.entries(PICTURE_TYPE_LABELS).map(([value, label]) => (
-                <option value={value} key={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
+        ) : (
+          <span className="tag-cover-info-text" />
+        )}
+        <div className="tag-cover-controls">
+          {cover && url && (
+            <>
+              <IconButton
+                icon={<Upload size={14} strokeWidth={1.6} />}
+                title={
+                  multiple
+                    ? `Extract all ${covers.length} ${pictureTypeLabel(pictureType)} images next to the audio files`
+                    : `Extract this ${pictureTypeLabel(pictureType)} image next to the audio file`
+                }
+                onClick={() => onExtract(covers)}
+              />
+              <IconButton
+                icon={<Trash2 size={14} strokeWidth={1.6} />}
+                title={`Delete ${pictureTypeLabel(pictureType)} images`}
+                variant="danger-persistent"
+                onClick={onDelete}
+              />
+            </>
+          )}
+          <select
+            className="tag-cover-role"
+            value={pictureType}
+            title="Select image type"
+            aria-label="Image type"
+            onChange={(ev) => onTypeChange(ev.target.value)}
+          >
+            {pictureTypes.map((value) => (
+              <option value={value} key={value}>
+                {PICTURE_TYPE_LABELS[value] ?? value}
+              </option>
+            ))}
+          </select>
         </div>
-      )}
+      </div>
     </div>
   );
 }

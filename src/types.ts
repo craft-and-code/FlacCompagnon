@@ -135,7 +135,7 @@ export interface TagSet {
   comment: string | null;
   compilation: boolean;
   extra: [string, string][];
-  cover: CoverArt | null;
+  pictures: CoverArt[];
   // MusicBrainz Release ID already in the file's tags (e.g. from Picard), if
   // any — lets "Search online" skip straight to that exact release.
   musicbrainz_release_id: string | null;
@@ -160,7 +160,7 @@ export interface RenameResult {
   file_name: string;
 }
 
-// Rust's `FieldEdit`/`CoverEdit` are three-way (leave alone / clear / set),
+// Rust's `FieldEdit` is three-way (leave alone / clear / set),
 // not a plain optional value — needed so a field the user never touched
 // doesn't clobber files in the selection that had a *different* value than
 // the one shown ("multiple values"). Default (externally tagged) serde
@@ -168,8 +168,7 @@ export interface RenameResult {
 // struct variant as `{ Set: ... }`.
 export type FieldEdit = "Unset" | "Clear" | { Set: string };
 export type CoverEdit =
-  | "Unset"
-  | "Clear"
+  | { Clear: { picture_type: string } }
   | { Set: { mime: string; data_base64: string; picture_type: string } };
 
 export interface TagEdits {
@@ -187,7 +186,7 @@ export interface TagEdits {
   comment: FieldEdit;
   // `null` leaves the compilation flag untouched.
   compilation: boolean | null;
-  cover: CoverEdit;
+  pictures: CoverEdit[];
   // Sparse add/edit/remove instructions for extended tags, keyed by the same
   // raw format-specific tag name `TagSet.extra` pairs use — see Rust's
   // `TagEdits::extra` doc comment.

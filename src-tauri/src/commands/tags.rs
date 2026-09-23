@@ -125,21 +125,19 @@ pub async fn read_cover_image(path: String) -> Result<core::tags::CoverArt, Stri
 
 /// Write a cover already in hand (as base64 — nothing is re-read from any tag)
 /// out as a plain file in `dir`, backing the tag panel's "extract cover(s)"
-/// button. `index` (1-based) picks the name: the first cover gets the classic
-/// "cover.<ext>" Mp3tag and foobar2000 use, any cover after it gets
-/// "cover-<n>.<ext>" — a selection whose files hold several genuinely
-/// different covers extracts all of them in one go (see the frontend's
-/// `extractCovers`), and without numbering, the second write would silently
-/// overwrite the first at the same fixed name. Overwrites anything already at
-/// the resulting path. Returns the path written.
+/// button. The first front image gets "cover.<ext>"; a back image gets
+/// "back.<ext>". Later images of the same type get a numbered suffix so a
+/// mixed selection can export them all in one click. Overwrites anything
+/// already at the resulting path. Returns the path written.
 #[tauri::command]
 pub async fn extract_cover_art(
     dir: String,
     mime: String,
     data_base64: String,
+    picture_type: String,
     index: u32,
 ) -> Result<String, String> {
-    let dest = PathBuf::from(dir).join(cover_file_name(&mime, index));
+    let dest = PathBuf::from(dir).join(cover_file_name(&mime, &picture_type, index));
     tauri::async_runtime::spawn_blocking(move || {
         core::tags::write_cover_file(&dest, &data_base64)
             .map(|_| dest.to_string_lossy().to_string())
@@ -149,15 +147,37 @@ pub async fn extract_cover_art(
     .map_err(|e| e.to_string())?
 }
 
-/// The file name `extract_cover_art` writes to: "cover.<ext>" for the first
-/// cover in a selection (index 1, or the degenerate 0), "cover-<n>.<ext>" for
-/// every one after it — see that command's doc comment for why.
-fn cover_file_name(mime: &str, index: u32) -> String {
+/// The file name `extract_cover_art` writes for the selected role, with a
+/// numbered suffix after the first image of that role.
+fn cover_file_name(mime: &str, picture_type: &str, index: u32) -> String {
     let ext = cover_extension(mime);
+    let name = match picture_type {
+        "CoverFront" => "cover",
+        "CoverBack" => "back",
+        "Icon" => "icon",
+        "OtherIcon" => "other-icon",
+        "Leaflet" => "leaflet",
+        "Media" => "media",
+        "LeadArtist" => "lead-artist",
+        "Artist" => "artist",
+        "Conductor" => "conductor",
+        "Band" => "band",
+        "Composer" => "composer",
+        "Lyricist" => "lyricist",
+        "RecordingLocation" => "recording-location",
+        "DuringRecording" => "during-recording",
+        "DuringPerformance" => "during-performance",
+        "ScreenCapture" => "screen-capture",
+        "BrightFish" => "bright-fish",
+        "Illustration" => "illustration",
+        "BandLogo" => "band-logo",
+        "PublisherLogo" => "publisher-logo",
+        _ => "other",
+    };
     if index <= 1 {
-        format!("cover.{ext}")
+        format!("{name}.{ext}")
     } else {
-        format!("cover-{index}.{ext}")
+        format!("{name}-{index}.{ext}")
     }
 }
 
@@ -213,20 +233,30 @@ mod tests {
 
     #[test]
     fn first_cover_keeps_the_classic_name() {
-        assert_eq!(cover_file_name("image/jpeg", 1), "cover.jpg");
+        assert_eq!(cover_file_name("image/jpeg", "CoverFront", 1), "cover.jpg");
         // 0 shouldn't occur (indices are 1-based), but degrading to the
         // classic name rather than a nonsensical "cover-0.jpg" is the safer
         // failure mode if it ever does.
-        assert_eq!(cover_file_name("image/jpeg", 0), "cover.jpg");
+        assert_eq!(cover_file_name("image/jpeg", "CoverFront", 0), "cover.jpg");
     }
 
     #[test]
     fn later_covers_get_a_numbered_name_so_they_do_not_collide() {
-        assert_eq!(cover_file_name("image/png", 2), "cover-2.png");
-        assert_eq!(cover_file_name("image/png", 5), "cover-5.png");
+        assert_eq!(cover_file_name("image/png", "CoverFront", 2), "cover-2.png");
+        assert_eq!(cover_file_name("image/png", "CoverFront", 5), "cover-5.png");
         assert_ne!(
-            cover_file_name("image/png", 1),
-            cover_file_name("image/png", 2)
+            cover_file_name("image/png", "CoverFront", 1),
+            cover_file_name("image/png", "CoverFront", 2)
+        );
+    }
+
+    #[test]
+    fn selected_role_changes_the_export_name() {
+        assert_eq!(cover_file_name("image/png", "CoverBack", 1), "back.png");
+        assert_eq!(cover_file_name("image/png", "CoverBack", 2), "back-2.png");
+        assert_eq!(
+            cover_file_name("image/jpeg", "../../../bad", 1),
+            "other.jpg"
         );
     }
 }

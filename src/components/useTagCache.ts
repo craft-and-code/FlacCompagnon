@@ -40,7 +40,10 @@ export function useTagCache() {
     });
     setCovers((prev) => {
       const next = new Map(prev);
-      for (const r of results) next.set(r.path, r.tags?.cover ?? null);
+      for (const r of results) {
+        const pictures = r.tags?.pictures ?? [];
+        next.set(r.path, pictures.find((p) => p.picture_type === "CoverFront") ?? pictures[0] ?? null);
+      }
       return next;
     });
   }, []);

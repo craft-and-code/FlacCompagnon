@@ -135,19 +135,15 @@
    flush against it. */
 .tag-cover-role {
   flex: none;
-  max-width: 74px;
+  max-width: 118px;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 10px;
+  font-size: 11px;
   padding: 1px 3px;
   border-radius: var(--radius-xs);
   border: 1px solid var(--border);
   background: var(--bg-elev);
   color: var(--text);
-}
-.tag-cover-role:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
 }
 /* No `aspect-ratio` of its own anymore — `.tag-cover-frame` is the fixed
    square now, so this just fills whatever frame it's dropped into. */

@@ -116,8 +116,8 @@ pub struct TagSet {
     pub compilation: bool,
     /// Every other textual tag item, keyed by its format-specific tag name.
     pub extra: Vec<(String, String)>,
-    /// Embedded cover art, when the file has one.
-    pub cover: Option<CoverArt>,
+    /// Every embedded picture, including pictures with different roles.
+    pub pictures: Vec<CoverArt>,
     /// The MusicBrainz Release ID, if this file already carries one (e.g.
     /// tagged previously by Picard, or by a ripper that writes it). Lets the
     /// "Search online" button skip straight to that exact release instead of
@@ -178,8 +178,8 @@ pub struct TagEdits {
     pub comment: FieldEdit,
     /// `None` leaves the compilation flag untouched.
     pub compilation: Option<bool>,
-    /// Edit instruction for the embedded cover art.
-    pub cover: CoverEdit,
+    /// Sparse picture edits, each targeting only its named role.
+    pub pictures: Vec<CoverEdit>,
     /// Sparse add/edit/remove instructions for extended tags, keyed by the
     /// same raw format-specific tag name [`TagSet::extra`] pairs use (e.g.
     /// `"BPM"` in a FLAC's Vorbis comments, `"TBPM"` in an MP3's ID3v2
@@ -267,7 +267,7 @@ pub fn read_tags(path: &Path) -> Result<TagSet, TagError> {
         }
     }
 
-    out.cover = cover::extract(tag);
+    out.pictures = cover::extract_all(tag);
 
     Ok(out)
 }
@@ -333,7 +333,7 @@ pub fn write_tags(path: &Path, edits: &TagEdits) -> Result<(), TagError> {
         }
     }
 
-    cover::apply_edit(&mut tag, &edits.cover, &path.display().to_string())?;
+    cover::apply_edits(&mut tag, &edits.pictures, &path.display().to_string())?;
 
     tag.save_to_path(path, WriteOptions::default())
         .map_err(|e| TagError::Write(path.display().to_string(), e.to_string()))
@@ -386,14 +386,15 @@ pub fn copy_tags(src: &Path, dest: &Path) -> Result<(), TagError> {
         // Only carried when true: writing `0` onto every non-compilation file
         // would add a tag the source never had.
         compilation: tags.compilation.then_some(true),
-        cover: match tags.cover {
-            Some(c) => CoverEdit::Set {
+        pictures: tags
+            .pictures
+            .into_iter()
+            .map(|c| CoverEdit::Set {
                 mime: c.mime,
                 data_base64: c.data_base64,
                 picture_type: c.picture_type,
-            },
-            None => CoverEdit::Unset,
-        },
+            })
+            .collect(),
         extra: tags
             .extra
             .into_iter()
@@ -446,7 +447,7 @@ mod tests {
             genre: FieldEdit::Set("Electronic".into()),
             comment: FieldEdit::Set("Test comment".into()),
             compilation: Some(true),
-            cover: CoverEdit::Unset,
+            pictures: Vec::new(),
             extra: Vec::new(),
         };
         write_tags(&path, &edits).expect("write_tags should succeed on a fresh WAV");
@@ -509,7 +510,10 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(read_tags(&path).unwrap().title.as_deref(), Some("Temporary"));
+        assert_eq!(
+            read_tags(&path).unwrap().title.as_deref(),
+            Some("Temporary")
+        );
 
         write_tags(
             &path,
@@ -541,7 +545,10 @@ mod tests {
         // Same read-clone-modify-save shape `write_tags` itself uses.
         let tagged = read_from_path(&path).unwrap();
         let tag_type = tagged.primary_tag_type();
-        let mut tag = tagged.primary_tag().cloned().unwrap_or_else(|| Tag::new(tag_type));
+        let mut tag = tagged
+            .primary_tag()
+            .cloned()
+            .unwrap_or_else(|| Tag::new(tag_type));
         tag.insert_text(ItemKey::MusicBrainzReleaseId, mbid.to_string());
         tag.save_to_path(&path, WriteOptions::default()).unwrap();
 
@@ -628,7 +635,11 @@ mod tests {
             },
         )
         .unwrap();
-        assert!(read_tags(&path).unwrap().extra.iter().any(|(k, _)| *k == key));
+        assert!(read_tags(&path)
+            .unwrap()
+            .extra
+            .iter()
+            .any(|(k, _)| *k == key));
 
         write_tags(
             &path,
@@ -638,7 +649,11 @@ mod tests {
             },
         )
         .unwrap();
-        assert!(!read_tags(&path).unwrap().extra.iter().any(|(k, _)| *k == key));
+        assert!(!read_tags(&path)
+            .unwrap()
+            .extra
+            .iter()
+            .any(|(k, _)| *k == key));
     }
 
     /// A key this file's tag type has no `ItemKey` mapping for must not fail
@@ -652,7 +667,10 @@ mod tests {
         let result = write_tags(
             &path,
             &TagEdits {
-                extra: vec![("NOT_A_REAL_TAG_KEY_XYZ".into(), FieldEdit::Set("value".into()))],
+                extra: vec![(
+                    "NOT_A_REAL_TAG_KEY_XYZ".into(),
+                    FieldEdit::Set("value".into()),
+                )],
                 ..Default::default()
             },
         );

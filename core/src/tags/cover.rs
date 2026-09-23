@@ -5,7 +5,7 @@
 //! everything about the image itself (mapping a role name to lofty's
 //! [`PictureType`], extracting the picture on read, replacing it on write).
 //!
-//! `extract` and `apply_edit` are the two entry points the parent module
+//! `extract_all` and `apply_edits` are the two entry points the parent module
 //! calls from [`super::read_tags`]/[`super::write_tags`]; everything else
 //! here is either a public type shared with the frontend or a private
 //! implementation detail.
@@ -40,19 +40,15 @@ pub struct CoverArt {
     pub data_base64: String,
 }
 
-/// Cover art edit instruction — same three-way shape as [`super::FieldEdit`],
-/// plus the image payload for `Set`. `picture_type` is the role to write it
-/// under (`"CoverFront"`, `"CoverBack"`, …, matching the strings
-/// `extract` surfaces via [`CoverArt::picture_type`]) — see
-/// `parse_picture_type` for how an unrecognized string is handled.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+/// An edit to one picture role. An empty edit list leaves every picture alone.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum CoverEdit {
-    /// Leave the cover alone.
-    #[default]
-    Unset,
-    /// Remove the cover entirely.
-    Clear,
-    /// Replace the cover with this image.
+    /// Remove pictures with this role only.
+    Clear {
+        /// Role of the pictures to remove.
+        picture_type: String,
+    },
+    /// Replace pictures with this role with one image.
     Set {
         /// MIME type of the replacement image.
         mime: String,
@@ -63,7 +59,7 @@ pub enum CoverEdit {
     },
 }
 
-/// Maps a picture-role name — one of the strings [`extract`] produces for
+/// Maps a picture-role name — one of the strings [`extract_all`] produces for
 /// [`CoverArt::picture_type`] (Rust's `Debug` output for lofty's
 /// [`PictureType`]) — back to the enum, for the tag panel's "change the
 /// cover's role" control. Anything unrecognized (including lofty's
@@ -132,7 +128,7 @@ pub fn cover_from_bytes(bytes: Vec<u8>, label: &str) -> Result<CoverArt, TagErro
     let size_bytes = bytes.len();
     let data_base64 = B64.encode(&bytes);
     // Reuses the same `PictureInformation` dimension-sniffing lofty already
-    // does for embedded covers in `extract`, rather than a second image
+    // does for embedded covers in `extract_all`, rather than a second image
     // decoder just for this.
     let picture = Picture::unchecked(bytes)
         .pic_type(PictureType::CoverFront)
@@ -153,8 +149,8 @@ pub fn cover_from_bytes(bytes: Vec<u8>, label: &str) -> Result<CoverArt, TagErro
 /// into a [`CoverArt`] ready to stage as a [`CoverEdit::Set`] — backs
 /// "drop an image to replace every selected file's cover".
 pub fn read_cover_file(path: &Path) -> Result<CoverArt, TagError> {
-    let bytes =
-        std::fs::read(path).map_err(|e| TagError::Cover(path.display().to_string(), e.to_string()))?;
+    let bytes = std::fs::read(path)
+        .map_err(|e| TagError::Cover(path.display().to_string(), e.to_string()))?;
     cover_from_bytes(bytes, &path.display().to_string())
 }
 
@@ -171,55 +167,59 @@ pub fn write_cover_file(dest: &Path, data_base64: &str) -> Result<(), TagError> 
         .map_err(|e| TagError::Cover(dest.display().to_string(), e.to_string()))
 }
 
-/// Extract the embedded cover from `tag` — the front-cover role if present,
-/// otherwise whatever picture comes first (so a file whose only picture is
-/// mistagged as something else still shows *something*, with its real role
-/// surfaced via `picture_type` rather than lied about). Called from
-/// [`super::read_tags`].
-pub(crate) fn extract(tag: &Tag) -> Option<CoverArt> {
-    let picture = tag
-        .get_picture_type(PictureType::CoverFront)
-        .or_else(|| tag.pictures().first())?;
-    let info = PictureInformation::from_picture(picture).unwrap_or_default();
-    Some(CoverArt {
-        mime: picture
-            .mime_type()
-            .map(|m| m.as_str().to_string())
-            .unwrap_or_default(),
-        width: info.width,
-        height: info.height,
-        size_bytes: picture.data().len(),
-        picture_type: format!("{:?}", picture.pic_type()),
-        data_base64: B64.encode(picture.data()),
-    })
+/// Read every embedded picture so the role selector can show each one.
+pub(crate) fn extract_all(tag: &Tag) -> Vec<CoverArt> {
+    tag.pictures()
+        .iter()
+        .map(|picture| {
+            let info = PictureInformation::from_picture(picture).unwrap_or_default();
+            CoverArt {
+                mime: picture
+                    .mime_type()
+                    .map(|m| m.as_str().to_string())
+                    .unwrap_or_default(),
+                width: info.width,
+                height: info.height,
+                size_bytes: picture.data().len(),
+                picture_type: format!("{:?}", picture.pic_type()),
+                data_base64: B64.encode(picture.data()),
+            }
+        })
+        .collect()
 }
 
-/// Apply a [`CoverEdit`] to `tag` in place. `label` identifies the file in a
+/// Apply sparse picture edits to `tag` in place. `label` identifies the file in a
 /// [`TagError::Cover`] (its display path). Called from [`super::write_tags`],
 /// just before the tag is saved.
-pub(crate) fn apply_edit(tag: &mut Tag, edit: &CoverEdit, label: &str) -> Result<(), TagError> {
-    match edit {
-        CoverEdit::Unset => {}
-        CoverEdit::Clear => {
-            for i in (0..tag.pictures().len()).rev() {
-                tag.remove_picture(i);
+pub(crate) fn apply_edits(tag: &mut Tag, edits: &[CoverEdit], label: &str) -> Result<(), TagError> {
+    let mut touched_roles = Vec::new();
+    for edit in edits {
+        let role = match edit {
+            CoverEdit::Clear { picture_type } | CoverEdit::Set { picture_type, .. } => {
+                parse_picture_type(picture_type)
             }
+        };
+        // A batch import stages one image per role; copying tags can include
+        // several images with the same role, which must all survive.
+        if !touched_roles.contains(&role) {
+            for i in (0..tag.pictures().len()).rev() {
+                if tag.pictures()[i].pic_type() == role {
+                    tag.remove_picture(i);
+                }
+            }
+            touched_roles.push(role);
         }
-        CoverEdit::Set {
-            mime,
-            data_base64,
-            picture_type,
-        } => {
+        if let CoverEdit::Set {
+            mime, data_base64, ..
+        } = edit
+        {
             let bytes = B64
                 .decode(data_base64)
                 .map_err(|e| TagError::Cover(label.to_string(), e.to_string()))?;
             let picture = Picture::unchecked(bytes)
-                .pic_type(parse_picture_type(picture_type))
+                .pic_type(role)
                 .mime_type(MimeType::from_str(mime))
                 .build();
-            for i in (0..tag.pictures().len()).rev() {
-                tag.remove_picture(i);
-            }
             tag.push_picture(picture);
         }
     }
@@ -228,7 +228,7 @@ pub(crate) fn apply_edit(tag: &mut Tag, edit: &CoverEdit, label: &str) -> Result
 
 #[cfg(test)]
 mod tests {
-    use super::super::{read_tags, write_tags, TagEdits};
+    use super::super::{copy_tags, read_tags, write_tags, TagEdits};
     use super::*;
 
     /// A byte-minimal PNG: real 8-byte signature and an `IHDR` chunk carrying
@@ -272,6 +272,14 @@ mod tests {
         path
     }
 
+    fn set_png(picture_type: &str, png: &[u8]) -> CoverEdit {
+        CoverEdit::Set {
+            mime: "image/png".to_string(),
+            data_base64: B64.encode(png),
+            picture_type: picture_type.to_string(),
+        }
+    }
+
     #[test]
     fn cover_art_round_trip() {
         let path = synth_wav();
@@ -279,18 +287,14 @@ mod tests {
         write_tags(
             &path,
             &TagEdits {
-                cover: CoverEdit::Set {
-                    mime: "image/png".to_string(),
-                    data_base64: B64.encode(&png),
-                    picture_type: "CoverFront".to_string(),
-                },
+                pictures: vec![set_png("CoverFront", &png)],
                 ..Default::default()
             },
         )
         .unwrap();
 
         let read = read_tags(&path).unwrap();
-        let cover = read.cover.expect("cover art should be present");
+        let cover = read.pictures.first().expect("cover art should be present");
         assert_eq!(cover.mime, "image/png");
         assert_eq!(cover.width, 1);
         assert_eq!(cover.height, 1);
@@ -301,40 +305,100 @@ mod tests {
         write_tags(
             &path,
             &TagEdits {
-                cover: CoverEdit::Clear,
+                pictures: vec![CoverEdit::Clear {
+                    picture_type: "CoverFront".into(),
+                }],
                 ..Default::default()
             },
         )
         .unwrap();
-        assert!(read_tags(&path).unwrap().cover.is_none());
+        assert!(read_tags(&path).unwrap().pictures.is_empty());
     }
 
-    /// The tag panel's "change the cover's role" control (relabel the
-    /// existing artwork as Back Cover, Artist, etc. without touching the
-    /// image bytes) round-trips through the same `CoverEdit::Set` path as a
-    /// brand-new image — only `picture_type` differs.
+    /// A back image must remain independently selectable after a front image
+    /// is written, and replacing or clearing one role must preserve the other.
     #[test]
-    fn cover_art_role_is_written_and_read_back() {
+    fn pictures_of_other_roles_survive_set_and_clear() {
         let path = synth_wav();
-        let png = tiny_png(1, 1);
+        let front = tiny_png(1, 1);
+        let back = tiny_png(2, 2);
         write_tags(
             &path,
             &TagEdits {
-                cover: CoverEdit::Set {
-                    mime: "image/png".to_string(),
-                    data_base64: B64.encode(&png),
-                    picture_type: "CoverBack".to_string(),
-                },
+                pictures: vec![set_png("CoverFront", &front), set_png("CoverBack", &back)],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let pictures = read_tags(&path).unwrap().pictures;
+        assert_eq!(pictures.len(), 2);
+        assert!(pictures
+            .iter()
+            .any(|p| p.picture_type == "CoverFront" && p.width == 1));
+        assert!(pictures
+            .iter()
+            .any(|p| p.picture_type == "CoverBack" && p.width == 2));
+
+        write_tags(
+            &path,
+            &TagEdits {
+                pictures: vec![set_png("CoverBack", &tiny_png(3, 3))],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let pictures = read_tags(&path).unwrap().pictures;
+        assert_eq!(pictures.len(), 2);
+        assert!(pictures
+            .iter()
+            .any(|p| p.picture_type == "CoverFront" && p.width == 1));
+        assert!(pictures
+            .iter()
+            .any(|p| p.picture_type == "CoverBack" && p.width == 3));
+
+        write_tags(
+            &path,
+            &TagEdits {
+                pictures: vec![CoverEdit::Clear {
+                    picture_type: "CoverBack".into(),
+                }],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let pictures = read_tags(&path).unwrap().pictures;
+        assert_eq!(pictures.len(), 1);
+        assert_eq!(pictures[0].picture_type, "CoverFront");
+    }
+
+    #[test]
+    fn copying_tags_keeps_every_picture_role() {
+        let source = synth_wav();
+        let destination = synth_wav();
+        write_tags(
+            &source,
+            &TagEdits {
+                pictures: vec![
+                    set_png("CoverFront", &tiny_png(1, 1)),
+                    set_png("CoverBack", &tiny_png(2, 2)),
+                    set_png("CoverBack", &tiny_png(3, 3)),
+                ],
                 ..Default::default()
             },
         )
         .unwrap();
 
-        let cover = read_tags(&path)
-            .unwrap()
-            .cover
-            .expect("cover art should be present");
-        assert_eq!(cover.picture_type, "CoverBack");
+        copy_tags(&source, &destination).unwrap();
+        let pictures = read_tags(&destination).unwrap().pictures;
+        assert_eq!(pictures.len(), 3);
+        assert!(pictures.iter().any(|p| p.picture_type == "CoverFront"));
+        assert_eq!(
+            pictures
+                .iter()
+                .filter(|p| p.picture_type == "CoverBack")
+                .count(),
+            2
+        );
     }
 
     #[test]
@@ -356,11 +420,7 @@ mod tests {
         write_tags(
             &path,
             &TagEdits {
-                cover: CoverEdit::Set {
-                    mime: "image/png".to_string(),
-                    data_base64: B64.encode(&png),
-                    picture_type: "SomethingLoftyDoesntKnow".to_string(),
-                },
+                pictures: vec![set_png("SomethingLoftyDoesntKnow", &png)],
                 ..Default::default()
             },
         )
@@ -368,7 +428,9 @@ mod tests {
 
         let cover = read_tags(&path)
             .unwrap()
-            .cover
+            .pictures
+            .into_iter()
+            .next()
             .expect("cover art should be present");
         assert_eq!(cover.picture_type, "Other");
     }
