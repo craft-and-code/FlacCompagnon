@@ -6,7 +6,7 @@
 <a href=#6 id=6 data-nosnippet>6</a>//! the *result* ([`crate::types`], [`detections::Detections`]), not the
 <a href=#7 id=7 data-nosnippet>7</a>//! measuring.
 <a href=#8 id=8 data-nosnippet>8</a>//!
-<a href=#9 id=9 data-nosnippet>9</a>//! These nine modules were top-level files next to `report.rs`, `playlist.rs`
+<a href=#9 id=9 data-nosnippet>9</a>//! These metric modules used to be top-level files next to `report.rs`, `playlist.rs`
 <a href=#10 id=10 data-nosnippet>10</a>//! and `scan.rs`, which made the crate root read as a flat pile where the
 <a href=#11 id=11 data-nosnippet>11</a>//! export helpers and the DSP sat at the same level. They are one subsystem
 <a href=#12 id=12 data-nosnippet>12</a>//! and they change together — a new detection touches the analyzer, a metric
@@ -18,10 +18,10 @@
 <a href=#18 id=18 data-nosnippet>18</a>//!
 <a href=#19 id=19 data-nosnippet>19</a>//! * [`analyzer`] runs that single streaming pass and owns the state it needs
 <a href=#20 id=20 data-nosnippet>20</a>//!   across packets. It is the only module here the decode paths talk to.
-<a href=#21 id=21 data-nosnippet>21</a>//! * The per-metric modules do one measurement each and hold no session
-<a href=#22 id=22 data-nosnippet>22</a>//!   state: [`spectrum`] (FFT, cut-off), [`bitdepth`] (effective depth),
+<a href=#21 id=21 data-nosnippet>21</a>//! * The per-metric modules do one measurement each: [`spectrum`] (FFT, cut-off),
+<a href=#22 id=22 data-nosnippet>22</a>//!   [`bitdepth`] (effective depth),
 <a href=#23 id=23 data-nosnippet>23</a>//!   [`stereo`] (dual-mono disguised as stereo), [`clipping`] (full-scale
-<a href=#24 id=24 data-nosnippet>24</a>//!   runs), [`truepeak`] (inter-sample peaks, dBTP).
+<a href=#24 id=24 data-nosnippet>24</a>//!   runs), [`truepeak`] (inter-sample peaks, dBTP), [`loudness`] (integrated LUFS).
 <a href=#25 id=25 data-nosnippet>25</a>//! * [`mdct`] and [`requant`] are the AAC-grid detection: the transform, then
 <a href=#26 id=26 data-nosnippet>26</a>//!   the search for coefficients that fall back onto the quantization lattice
 <a href=#27 id=27 data-nosnippet>27</a>//!   only an AAC encoder produces.
@@ -37,9 +37,11 @@
 <a href=#37 id=37 data-nosnippet>37</a><span class="kw">pub mod </span>bitdepth;
 <a href=#38 id=38 data-nosnippet>38</a><span class="kw">pub mod </span>clipping;
 <a href=#39 id=39 data-nosnippet>39</a><span class="kw">pub mod </span>detections;
-<a href=#40 id=40 data-nosnippet>40</a><span class="kw">pub mod </span>mdct;
-<a href=#41 id=41 data-nosnippet>41</a><span class="kw">pub mod </span>requant;
-<a href=#42 id=42 data-nosnippet>42</a><span class="kw">pub mod </span>spectrum;
-<a href=#43 id=43 data-nosnippet>43</a><span class="kw">pub mod </span>stereo;
-<a href=#44 id=44 data-nosnippet>44</a><span class="kw">pub mod </span>truepeak;
+<a href=#40 id=40 data-nosnippet>40</a><span class="kw">pub mod </span>discontinuities;
+<a href=#41 id=41 data-nosnippet>41</a><span class="kw">pub mod </span>loudness;
+<a href=#42 id=42 data-nosnippet>42</a><span class="kw">pub mod </span>mdct;
+<a href=#43 id=43 data-nosnippet>43</a><span class="kw">pub mod </span>requant;
+<a href=#44 id=44 data-nosnippet>44</a><span class="kw">pub mod </span>spectrum;
+<a href=#45 id=45 data-nosnippet>45</a><span class="kw">pub mod </span>stereo;
+<a href=#46 id=46 data-nosnippet>46</a><span class="kw">pub mod </span>truepeak;
 </code></pre></div></section></main></body></html>

@@ -52,7 +52,7 @@
 <a href=#52 id=52 data-nosnippet>52</a>        .take()
 <a href=#53 id=53 data-nosnippet>53</a>        .ok_or_else(|| AnalysisError::Decode(<span class="string">"ffmpeg produced no output pipe"</span>.into()))<span class="question-mark">?</span>;
 <a href=#54 id=54 data-nosnippet>54</a>
-<a href=#55 id=55 data-nosnippet>55</a>    <span class="kw">let </span><span class="kw-2">mut </span>analyzer = StreamAnalyzer::new(channels);
+<a href=#55 id=55 data-nosnippet>55</a>    <span class="kw">let </span><span class="kw-2">mut </span>analyzer = StreamAnalyzer::new(channels, decoded_rate);
 <a href=#56 id=56 data-nosnippet>56</a>    <span class="kw">let </span><span class="kw-2">mut </span>carry: Vec&lt;u8&gt; = Vec::new();
 <a href=#57 id=57 data-nosnippet>57</a>    <span class="kw">let </span><span class="kw-2">mut </span>buf = <span class="macro">vec!</span>[<span class="number">0u8</span>; PIPE_CHUNK];
 <a href=#58 id=58 data-nosnippet>58</a>    <span class="kw">let </span><span class="kw-2">mut </span>frame = <span class="macro">vec!</span>[<span class="number">0f32</span>; channels];

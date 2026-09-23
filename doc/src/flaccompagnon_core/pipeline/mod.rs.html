@@ -166,98 +166,108 @@
 <a href=#166 id=166 data-nosnippet>166</a>    </span>result.lattice_score = transcoded.as_ref().ok().map(|e| e.likelihood <span class="kw">as </span>f32);
 <a href=#167 id=167 data-nosnippet>167</a>    result.clipping = summary.clipping.clone();
 <a href=#168 id=168 data-nosnippet>168</a>    result.dr_db = summary.dr_db;
-<a href=#169 id=169 data-nosnippet>169</a>    result.bit_depth_evidence = summary.bit_depth_evidence;
-<a href=#170 id=170 data-nosnippet>170</a>
-<a href=#171 id=171 data-nosnippet>171</a>    <span class="kw">if </span>outcome.channels &gt;= <span class="number">2 </span>{
-<a href=#172 id=172 data-nosnippet>172</a>        result.fake_stereo = <span class="prelude-val">Some</span>(summary.fake_stereo);
-<a href=#173 id=173 data-nosnippet>173</a>    }
-<a href=#174 id=174 data-nosnippet>174</a>    <span class="kw">let </span>real_bits = <span class="kw">match </span>(outcome.declared_bits, summary.real_bit_depth) {
-<a href=#175 id=175 data-nosnippet>175</a>        (<span class="prelude-val">Some</span>(<span class="kw">_</span>), <span class="prelude-val">Some</span>(real)) =&gt; {
-<a href=#176 id=176 data-nosnippet>176</a>            result.real_bit_depth = <span class="prelude-val">Some</span>(real);
-<a href=#177 id=177 data-nosnippet>177</a>            <span class="prelude-val">Some</span>(real)
-<a href=#178 id=178 data-nosnippet>178</a>        }
-<a href=#179 id=179 data-nosnippet>179</a>        <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
-<a href=#180 id=180 data-nosnippet>180</a>    };
-<a href=#181 id=181 data-nosnippet>181</a>    <span class="comment">// `transcoded` is handed in — see the call site for why. An `Err` there
-<a href=#182 id=182 data-nosnippet>182</a>    // means "no answer" (unsupported rate, too short, undecodable), never
-<a href=#183 id=183 data-nosnippet>183</a>    // "clean": an un-run test must leave the flag down and say why, which is
-<a href=#184 id=184 data-nosnippet>184</a>    // what carrying the reason all the way here buys.
-<a href=#185 id=185 data-nosnippet>185</a>    </span>result.detections = detections::classify(
-<a href=#186 id=186 data-nosnippet>186</a>        <span class="kw-2">&amp;</span>summary,
-<a href=#187 id=187 data-nosnippet>187</a>        outcome.sample_rate,
-<a href=#188 id=188 data-nosnippet>188</a>        outcome.declared_bits,
-<a href=#189 id=189 data-nosnippet>189</a>        real_bits,
-<a href=#190 id=190 data-nosnippet>190</a>        transcoded,
-<a href=#191 id=191 data-nosnippet>191</a>    );
-<a href=#192 id=192 data-nosnippet>192</a>
-<a href=#193 id=193 data-nosnippet>193</a>    dsd_format::dsd_heritage_check(
-<a href=#194 id=194 data-nosnippet>194</a>        <span class="kw-2">&amp;</span>summary.spectrum_db,
-<a href=#195 id=195 data-nosnippet>195</a>        outcome.sample_rate,
-<a href=#196 id=196 data-nosnippet>196</a>        summary.fft_size(),
-<a href=#197 id=197 data-nosnippet>197</a>    )
-<a href=#198 id=198 data-nosnippet>198</a>}
-<a href=#199 id=199 data-nosnippet>199</a>
-<a href=#200 id=200 data-nosnippet>200</a><span class="doccomment">/// Compare the container the magic bytes say this is against what the
-<a href=#201 id=201 data-nosnippet>201</a>/// extension claims. `overwrite_format` is false on the DSD path, where
-<a href=#202 id=202 data-nosnippet>202</a>/// `format` already holds the more informative "DSD64" style label.
-<a href=#203 id=203 data-nosnippet>203</a>///
-<a href=#204 id=204 data-nosnippet>204</a>/// Only actually overwrites `result.format` when the extension turns out to
-<a href=#205 id=205 data-nosnippet>205</a>/// have lied about the container (`ext_mismatch`) or wasn't recognized at
-<a href=#206 id=206 data-nosnippet>206</a>/// all — otherwise `result.format` already carries `format_label`'s richer,
-<a href=#207 id=207 data-nosnippet>207</a>/// codec-aware value (e.g. "AAC/MP4" vs "ALAC/MP4", see its doc comment) and
-<a href=#208 id=208 data-nosnippet>208</a>/// `detected` here is only ever the bare container name ("MP4" either way),
-<a href=#209 id=209 data-nosnippet>209</a>/// which would silently downgrade a correct, more specific label back to a
-<a href=#210 id=210 data-nosnippet>210</a>/// less specific — but not wrong — one on every single file, mismatch or
-<a href=#211 id=211 data-nosnippet>211</a>/// not. This used to do exactly that unconditionally.
-<a href=#212 id=212 data-nosnippet>212</a></span><span class="kw">fn </span>flag_container_mismatch(path: <span class="kw-2">&amp;</span>Path, result: <span class="kw-2">&amp;mut </span>FileAnalysis, overwrite_format: bool) {
-<a href=#213 id=213 data-nosnippet>213</a>    <span class="kw">let </span><span class="prelude-val">Some</span>(detected) = decode::detect_container(path) <span class="kw">else </span>{
-<a href=#214 id=214 data-nosnippet>214</a>        <span class="kw">return</span>;
-<a href=#215 id=215 data-nosnippet>215</a>    };
-<a href=#216 id=216 data-nosnippet>216</a>    <span class="kw">let </span>expected = decode::ext_canonical(path);
-<a href=#217 id=217 data-nosnippet>217</a>    <span class="kw">if let </span><span class="prelude-val">Some</span>(expected) = expected {
-<a href=#218 id=218 data-nosnippet>218</a>        result.ext_mismatch = detected != expected;
-<a href=#219 id=219 data-nosnippet>219</a>    }
-<a href=#220 id=220 data-nosnippet>220</a>    <span class="kw">if </span>overwrite_format &amp;&amp; (expected.is_none() || result.ext_mismatch) {
-<a href=#221 id=221 data-nosnippet>221</a>        result.format = detected.to_string();
-<a href=#222 id=222 data-nosnippet>222</a>    }
-<a href=#223 id=223 data-nosnippet>223</a>}
-<a href=#224 id=224 data-nosnippet>224</a>
-<a href=#225 id=225 data-nosnippet>225</a><span class="doccomment">/// Codec labels (`FileAnalysis::codec`) that are inherently lossy — a badge
-<a href=#226 id=226 data-nosnippet>226</a>/// claiming Hi-Res quality must never survive one of these, no matter what
-<a href=#227 id=227 data-nosnippet>227</a>/// the container or extension implied. This is a backstop alongside the
-<a href=#228 id=228 data-nosnippet>228</a>/// three detections below, not a replacement for them: those look at the
-<a href=#229 id=229 data-nosnippet>229</a>/// decoded *audio* and catch a lossy source re-wrapped in a nominally
-<a href=#230 id=230 data-nosnippet>230</a>/// lossless codec (transcoding); this catches Symphonia's own codec
-<a href=#231 id=231 data-nosnippet>231</a>/// identification admitting outright that the codec itself is lossy — e.g.
-<a href=#232 id=232 data-nosnippet>232</a>/// an AAC stream sitting in an `.m4a` container that could equally hold
-<a href=#233 id=233 data-nosnippet>233</a>/// ALAC (see `codec`'s own doc comment).
-<a href=#234 id=234 data-nosnippet>234</a></span><span class="kw">const </span>LOSSY_CODECS: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>str] = <span class="kw-2">&amp;</span>[<span class="string">"AAC"</span>, <span class="string">"MP1"</span>, <span class="string">"MP2"</span>, <span class="string">"MP3"</span>, <span class="string">"Opus"</span>, <span class="string">"Vorbis"</span>];
-<a href=#235 id=235 data-nosnippet>235</a>
-<a href=#236 id=236 data-nosnippet>236</a><span class="doccomment">/// Verified Hi-Res badge: hi-res specs that no detection contradicts.
-<a href=#237 id=237 data-nosnippet>237</a></span><span class="kw">fn </span>hires_badge(result: <span class="kw-2">&amp;</span>FileAnalysis, dsd_heritage: <span class="prelude-ty">Option</span>&lt;f32&gt;) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
-<a href=#238 id=238 data-nosnippet>238</a>    <span class="kw">let </span>hires_specs = result.sample_rate &gt; <span class="number">48_000 </span>|| result.declared_bits.is_some_and(|b| b &gt; <span class="number">16</span>);
-<a href=#239 id=239 data-nosnippet>239</a>    <span class="kw">let </span>lossy_codec = result
-<a href=#240 id=240 data-nosnippet>240</a>        .codec
-<a href=#241 id=241 data-nosnippet>241</a>        .as_deref()
-<a href=#242 id=242 data-nosnippet>242</a>        .is_some_and(|c| LOSSY_CODECS.contains(<span class="kw-2">&amp;</span>c));
-<a href=#243 id=243 data-nosnippet>243</a>    <span class="kw">if </span>!hires_specs
-<a href=#244 id=244 data-nosnippet>244</a>        || lossy_codec
-<a href=#245 id=245 data-nosnippet>245</a>        || result.error.is_some()
-<a href=#246 id=246 data-nosnippet>246</a>        || result.detections.upscaling
-<a href=#247 id=247 data-nosnippet>247</a>        || result.detections.upsampling
-<a href=#248 id=248 data-nosnippet>248</a>        || result.detections.transcoding
-<a href=#249 id=249 data-nosnippet>249</a>    {
-<a href=#250 id=250 data-nosnippet>250</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
-<a href=#251 id=251 data-nosnippet>251</a>    }
-<a href=#252 id=252 data-nosnippet>252</a>    <span class="prelude-val">Some</span>(<span class="kw">if </span>dsd_heritage.is_some() {
-<a href=#253 id=253 data-nosnippet>253</a>        <span class="comment">// Hi-res PCM carrying the sigma-delta noise signature of a DSD master.
-<a href=#254 id=254 data-nosnippet>254</a>        </span><span class="string">"Hi-Res (DSD source)"</span>.to_string()
-<a href=#255 id=255 data-nosnippet>255</a>    } <span class="kw">else </span>{
-<a href=#256 id=256 data-nosnippet>256</a>        <span class="string">"Hi-Res"</span>.to_string()
-<a href=#257 id=257 data-nosnippet>257</a>    })
-<a href=#258 id=258 data-nosnippet>258</a>}
-<a href=#259 id=259 data-nosnippet>259</a>
-<a href=#260 id=260 data-nosnippet>260</a><span class="attr">#[cfg(test)]
-<a href=#261 id=261 data-nosnippet>261</a>#[path = <span class="string">"../../tests/unit/pipeline/mod.rs"</span>]
-<a href=#262 id=262 data-nosnippet>262</a></span><span class="kw">mod </span>tests;
+<a href=#169 id=169 data-nosnippet>169</a>    result.integrated_lufs = summary.integrated_lufs;
+<a href=#170 id=170 data-nosnippet>170</a>    result.loudness_range_lu = summary.loudness_range_lu;
+<a href=#171 id=171 data-nosnippet>171</a>    <span class="comment">// Bounded event lists are cheap to copy; classification still borrows
+<a href=#172 id=172 data-nosnippet>172</a>    // the complete summary below.
+<a href=#173 id=173 data-nosnippet>173</a>    </span>result.discontinuities = summary.discontinuities.clone();
+<a href=#174 id=174 data-nosnippet>174</a>    result.stereo_balance = summary.stereo_balance;
+<a href=#175 id=175 data-nosnippet>175</a>    result.bit_depth_evidence = summary.bit_depth_evidence;
+<a href=#176 id=176 data-nosnippet>176</a>
+<a href=#177 id=177 data-nosnippet>177</a>    <span class="kw">if </span>outcome.channels &gt;= <span class="number">2 </span>{
+<a href=#178 id=178 data-nosnippet>178</a>        result.fake_stereo = <span class="prelude-val">Some</span>(summary.fake_stereo);
+<a href=#179 id=179 data-nosnippet>179</a>    }
+<a href=#180 id=180 data-nosnippet>180</a>    <span class="kw">if </span>outcome.channels == <span class="number">2 </span>{
+<a href=#181 id=181 data-nosnippet>181</a>        result.phase_correlation = summary.phase_correlation;
+<a href=#182 id=182 data-nosnippet>182</a>        result.phase_inverted = summary.phase_correlation.map(|<span class="kw">_</span>| summary.phase_inverted);
+<a href=#183 id=183 data-nosnippet>183</a>    }
+<a href=#184 id=184 data-nosnippet>184</a>    <span class="kw">let </span>real_bits = <span class="kw">match </span>(outcome.declared_bits, summary.real_bit_depth) {
+<a href=#185 id=185 data-nosnippet>185</a>        (<span class="prelude-val">Some</span>(<span class="kw">_</span>), <span class="prelude-val">Some</span>(real)) =&gt; {
+<a href=#186 id=186 data-nosnippet>186</a>            result.real_bit_depth = <span class="prelude-val">Some</span>(real);
+<a href=#187 id=187 data-nosnippet>187</a>            <span class="prelude-val">Some</span>(real)
+<a href=#188 id=188 data-nosnippet>188</a>        }
+<a href=#189 id=189 data-nosnippet>189</a>        <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
+<a href=#190 id=190 data-nosnippet>190</a>    };
+<a href=#191 id=191 data-nosnippet>191</a>    <span class="comment">// `transcoded` is handed in — see the call site for why. An `Err` there
+<a href=#192 id=192 data-nosnippet>192</a>    // means "no answer" (unsupported rate, too short, undecodable), never
+<a href=#193 id=193 data-nosnippet>193</a>    // "clean": an un-run test must leave the flag down and say why, which is
+<a href=#194 id=194 data-nosnippet>194</a>    // what carrying the reason all the way here buys.
+<a href=#195 id=195 data-nosnippet>195</a>    </span>result.detections = detections::classify(
+<a href=#196 id=196 data-nosnippet>196</a>        <span class="kw-2">&amp;</span>summary,
+<a href=#197 id=197 data-nosnippet>197</a>        outcome.sample_rate,
+<a href=#198 id=198 data-nosnippet>198</a>        outcome.declared_bits,
+<a href=#199 id=199 data-nosnippet>199</a>        real_bits,
+<a href=#200 id=200 data-nosnippet>200</a>        transcoded,
+<a href=#201 id=201 data-nosnippet>201</a>    );
+<a href=#202 id=202 data-nosnippet>202</a>
+<a href=#203 id=203 data-nosnippet>203</a>    dsd_format::dsd_heritage_check(
+<a href=#204 id=204 data-nosnippet>204</a>        <span class="kw-2">&amp;</span>summary.spectrum_db,
+<a href=#205 id=205 data-nosnippet>205</a>        outcome.sample_rate,
+<a href=#206 id=206 data-nosnippet>206</a>        summary.fft_size(),
+<a href=#207 id=207 data-nosnippet>207</a>    )
+<a href=#208 id=208 data-nosnippet>208</a>}
+<a href=#209 id=209 data-nosnippet>209</a>
+<a href=#210 id=210 data-nosnippet>210</a><span class="doccomment">/// Compare the container the magic bytes say this is against what the
+<a href=#211 id=211 data-nosnippet>211</a>/// extension claims. `overwrite_format` is false on the DSD path, where
+<a href=#212 id=212 data-nosnippet>212</a>/// `format` already holds the more informative "DSD64" style label.
+<a href=#213 id=213 data-nosnippet>213</a>///
+<a href=#214 id=214 data-nosnippet>214</a>/// Only actually overwrites `result.format` when the extension turns out to
+<a href=#215 id=215 data-nosnippet>215</a>/// have lied about the container (`ext_mismatch`) or wasn't recognized at
+<a href=#216 id=216 data-nosnippet>216</a>/// all — otherwise `result.format` already carries `format_label`'s richer,
+<a href=#217 id=217 data-nosnippet>217</a>/// codec-aware value (e.g. "AAC/MP4" vs "ALAC/MP4", see its doc comment) and
+<a href=#218 id=218 data-nosnippet>218</a>/// `detected` here is only ever the bare container name ("MP4" either way),
+<a href=#219 id=219 data-nosnippet>219</a>/// which would silently downgrade a correct, more specific label back to a
+<a href=#220 id=220 data-nosnippet>220</a>/// less specific — but not wrong — one on every single file, mismatch or
+<a href=#221 id=221 data-nosnippet>221</a>/// not. This used to do exactly that unconditionally.
+<a href=#222 id=222 data-nosnippet>222</a></span><span class="kw">fn </span>flag_container_mismatch(path: <span class="kw-2">&amp;</span>Path, result: <span class="kw-2">&amp;mut </span>FileAnalysis, overwrite_format: bool) {
+<a href=#223 id=223 data-nosnippet>223</a>    <span class="kw">let </span><span class="prelude-val">Some</span>(detected) = decode::detect_container(path) <span class="kw">else </span>{
+<a href=#224 id=224 data-nosnippet>224</a>        <span class="kw">return</span>;
+<a href=#225 id=225 data-nosnippet>225</a>    };
+<a href=#226 id=226 data-nosnippet>226</a>    <span class="kw">let </span>expected = decode::ext_canonical(path);
+<a href=#227 id=227 data-nosnippet>227</a>    <span class="kw">if let </span><span class="prelude-val">Some</span>(expected) = expected {
+<a href=#228 id=228 data-nosnippet>228</a>        result.ext_mismatch = detected != expected;
+<a href=#229 id=229 data-nosnippet>229</a>    }
+<a href=#230 id=230 data-nosnippet>230</a>    <span class="kw">if </span>overwrite_format &amp;&amp; (expected.is_none() || result.ext_mismatch) {
+<a href=#231 id=231 data-nosnippet>231</a>        result.format = detected.to_string();
+<a href=#232 id=232 data-nosnippet>232</a>    }
+<a href=#233 id=233 data-nosnippet>233</a>}
+<a href=#234 id=234 data-nosnippet>234</a>
+<a href=#235 id=235 data-nosnippet>235</a><span class="doccomment">/// Codec labels (`FileAnalysis::codec`) that are inherently lossy — a badge
+<a href=#236 id=236 data-nosnippet>236</a>/// claiming Hi-Res quality must never survive one of these, no matter what
+<a href=#237 id=237 data-nosnippet>237</a>/// the container or extension implied. This is a backstop alongside the
+<a href=#238 id=238 data-nosnippet>238</a>/// three detections below, not a replacement for them: those look at the
+<a href=#239 id=239 data-nosnippet>239</a>/// decoded *audio* and catch a lossy source re-wrapped in a nominally
+<a href=#240 id=240 data-nosnippet>240</a>/// lossless codec (transcoding); this catches Symphonia's own codec
+<a href=#241 id=241 data-nosnippet>241</a>/// identification admitting outright that the codec itself is lossy — e.g.
+<a href=#242 id=242 data-nosnippet>242</a>/// an AAC stream sitting in an `.m4a` container that could equally hold
+<a href=#243 id=243 data-nosnippet>243</a>/// ALAC (see `codec`'s own doc comment).
+<a href=#244 id=244 data-nosnippet>244</a></span><span class="kw">const </span>LOSSY_CODECS: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>str] = <span class="kw-2">&amp;</span>[<span class="string">"AAC"</span>, <span class="string">"MP1"</span>, <span class="string">"MP2"</span>, <span class="string">"MP3"</span>, <span class="string">"Opus"</span>, <span class="string">"Vorbis"</span>];
+<a href=#245 id=245 data-nosnippet>245</a>
+<a href=#246 id=246 data-nosnippet>246</a><span class="doccomment">/// Verified Hi-Res badge: hi-res specs that no detection contradicts.
+<a href=#247 id=247 data-nosnippet>247</a></span><span class="kw">fn </span>hires_badge(result: <span class="kw-2">&amp;</span>FileAnalysis, dsd_heritage: <span class="prelude-ty">Option</span>&lt;f32&gt;) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
+<a href=#248 id=248 data-nosnippet>248</a>    <span class="kw">let </span>hires_specs = result.sample_rate &gt; <span class="number">48_000 </span>|| result.declared_bits.is_some_and(|b| b &gt; <span class="number">16</span>);
+<a href=#249 id=249 data-nosnippet>249</a>    <span class="kw">let </span>lossy_codec = result
+<a href=#250 id=250 data-nosnippet>250</a>        .codec
+<a href=#251 id=251 data-nosnippet>251</a>        .as_deref()
+<a href=#252 id=252 data-nosnippet>252</a>        .is_some_and(|c| LOSSY_CODECS.contains(<span class="kw-2">&amp;</span>c));
+<a href=#253 id=253 data-nosnippet>253</a>    <span class="kw">if </span>!hires_specs
+<a href=#254 id=254 data-nosnippet>254</a>        || lossy_codec
+<a href=#255 id=255 data-nosnippet>255</a>        || result.error.is_some()
+<a href=#256 id=256 data-nosnippet>256</a>        || result.detections.upscaling
+<a href=#257 id=257 data-nosnippet>257</a>        || result.detections.upsampling
+<a href=#258 id=258 data-nosnippet>258</a>        || result.detections.transcoding
+<a href=#259 id=259 data-nosnippet>259</a>    {
+<a href=#260 id=260 data-nosnippet>260</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
+<a href=#261 id=261 data-nosnippet>261</a>    }
+<a href=#262 id=262 data-nosnippet>262</a>    <span class="prelude-val">Some</span>(<span class="kw">if </span>dsd_heritage.is_some() {
+<a href=#263 id=263 data-nosnippet>263</a>        <span class="comment">// Hi-res PCM carrying the sigma-delta noise signature of a DSD master.
+<a href=#264 id=264 data-nosnippet>264</a>        </span><span class="string">"Hi-Res (DSD source)"</span>.to_string()
+<a href=#265 id=265 data-nosnippet>265</a>    } <span class="kw">else </span>{
+<a href=#266 id=266 data-nosnippet>266</a>        <span class="string">"Hi-Res"</span>.to_string()
+<a href=#267 id=267 data-nosnippet>267</a>    })
+<a href=#268 id=268 data-nosnippet>268</a>}
+<a href=#269 id=269 data-nosnippet>269</a>
+<a href=#270 id=270 data-nosnippet>270</a><span class="attr">#[cfg(test)]
+<a href=#271 id=271 data-nosnippet>271</a>#[path = <span class="string">"../../tests/unit/pipeline/mod.rs"</span>]
+<a href=#272 id=272 data-nosnippet>272</a></span><span class="kw">mod </span>tests;
 </code></pre></div></section></main></body></html>

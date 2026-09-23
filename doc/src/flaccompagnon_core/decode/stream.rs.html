@@ -42,7 +42,7 @@
 <a href=#42 id=42 data-nosnippet>42</a>        .filter(|b| (<span class="number">1</span>..=<span class="number">32</span>).contains(b))
 <a href=#43 id=43 data-nosnippet>43</a>        .map(|b| <span class="number">32 </span>- b);
 <a href=#44 id=44 data-nosnippet>44</a>
-<a href=#45 id=45 data-nosnippet>45</a>    <span class="kw">let </span><span class="kw-2">mut </span>analyzer = StreamAnalyzer::new(channels);
+<a href=#45 id=45 data-nosnippet>45</a>    <span class="kw">let </span><span class="kw-2">mut </span>analyzer = StreamAnalyzer::new(channels, sample_rate);
 <a href=#46 id=46 data-nosnippet>46</a>    <span class="kw">let </span><span class="kw-2">mut </span>buf = InterleavedBuf::&lt;f32&gt;::default();
 <a href=#47 id=47 data-nosnippet>47</a>    <span class="kw">let </span><span class="kw-2">mut </span>int_buf = InterleavedBuf::&lt;i32&gt;::default();
 <a href=#48 id=48 data-nosnippet>48</a>    <span class="kw">let </span><span class="kw-2">mut </span>int_packet: Vec&lt;i32&gt; = Vec::new();

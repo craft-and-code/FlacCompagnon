@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["is_fake"]};
+window.SIDEBAR_ITEMS = {"enum":["StereoBalance"],"fn":["analyze_balance","analyze_phase","is_fake"],"struct":["PhaseAnalysis"]};
