@@ -1,9 +1,46 @@
-//! Stereo relationship: dual-mono and opposing channel polarity.
+//! Stereo relationship: dual-mono, opposing polarity and channel balance.
 //!
 //! A file can claim to be stereo while both channels carry an identical signal.
 //! Two independent conditions flag it:
 //! 1. Every frame had L == R (bit-exact dual mono), or
 //! 2. The L-R difference energy is >= 60 dB below the total channel energy.
+
+use serde::{Deserialize, Serialize};
+
+/// Full-stream, unweighted RMS balance. Silent channels are explicit states
+/// because an infinite dB difference cannot be represented in JSON.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "state")]
+pub enum StereoBalance {
+    /// Both channels contain signal; zero means equal RMS, not identical audio.
+    Measured {
+        /// Right minus left RMS level in dB: positive means right is louder.
+        right_minus_left_db: f32,
+    },
+    /// Every left-channel sample is zero, with signal on the right.
+    LeftSilent,
+    /// Every right-channel sample is zero, with signal on the left.
+    RightSilent,
+}
+
+/// Compare channel energy over the same frames. Since RMS = sqrt(E / N),
+/// the level difference is 20 log10(RMS_R / RMS_L) = 10 log10(E_R / E_L).
+/// Separate logarithms avoid overflow for very unequal energies. This is a
+/// descriptive measurement: artistic panning can legitimately be asymmetric.
+/// Both channels silent, or invalid energies, yield no measurement.
+pub fn analyze_balance(l_energy: f64, r_energy: f64) -> Option<StereoBalance> {
+    if !l_energy.is_finite() || !r_energy.is_finite() || l_energy < 0.0 || r_energy < 0.0 {
+        return None;
+    }
+    match (l_energy > 0.0, r_energy > 0.0) {
+        (false, false) => None,
+        (false, true) => Some(StereoBalance::LeftSilent),
+        (true, false) => Some(StereoBalance::RightSilent),
+        (true, true) => Some(StereoBalance::Measured {
+            right_minus_left_db: (10.0 * (r_energy.log10() - l_energy.log10())) as f32,
+        }),
+    }
+}
 
 /// Threshold (in dB) below which the L-R difference is considered negligible.
 const DIFF_FLOOR_DB: f64 = -60.0;

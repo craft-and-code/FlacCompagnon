@@ -146,6 +146,10 @@ pub struct FileAnalysis {
     /// `None` means no two-channel phase analysis was available.
     #[serde(default)]
     pub phase_inverted: Option<bool>,
+    /// Full-stream, unweighted L/R RMS balance for stereo audio. Absent for
+    /// silence, unsupported layouts, invalid samples and older saved reports.
+    #[serde(default)]
+    pub stereo_balance: Option<crate::analysis::stereo::StereoBalance>,
     /// Verified quality badge: `Some("Hi-Res")` for > 48 kHz or > 16-bit PCM,
     /// `Some("DSD64")` etc. for DSD — granted only when no detection
     /// invalidates the claim (no upscaling/upsampling/transcoding).

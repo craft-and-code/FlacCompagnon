@@ -29,6 +29,7 @@ export type SortColumn =
   | "cutoff"
   | "channels"
   | "stereo"
+  | "balance"
   | "clipping"
   | "truePeak"
   | "fileMd5"
@@ -110,6 +111,15 @@ function sortValue(f: FileAnalysis, col: SortColumn): string | number | null {
       return f.channels;
     case "stereo":
       return stereoLabel(f);
+    case "balance": {
+      const balance = f.stereo_balance;
+      if (!balance) return null;
+      // Sort from left-heavy to right-heavy; keep silent-channel endpoints
+      // finite so comparing two identical endpoints cannot produce NaN.
+      if (balance.state === "LeftSilent") return Number.MAX_VALUE;
+      if (balance.state === "RightSilent") return -Number.MAX_VALUE;
+      return Number.isFinite(balance.right_minus_left_db) ? balance.right_minus_left_db : null;
+    }
     case "clipping":
       return f.clipping.clipped ? f.clipping.clip_events : 0;
     case "truePeak":

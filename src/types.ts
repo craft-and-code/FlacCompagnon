@@ -32,6 +32,11 @@ export type FlacMd5Status =
   | { state: "Mismatch" }
   | { state: "Error"; detail: string };
 
+export type StereoBalance =
+  | { state: "Measured"; right_minus_left_db: number }
+  | { state: "LeftSilent" }
+  | { state: "RightSilent" };
+
 export interface FileAnalysis {
   path: string;
   file_name: string;
@@ -66,6 +71,7 @@ export interface FileAnalysis {
   // Older JSON reports omit these measurements.
   phase_correlation?: number | null;
   phase_inverted?: boolean | null;
+  stereo_balance?: StereoBalance | null;
   badge: string | null;
   clipping: ClippingInfo;
   dr_db: number | null;

@@ -4,7 +4,7 @@
 // them.
 
 import type { ClippingInfo, Detections, FileAnalysis, FlacMd5Status } from "./../types";
-import { detectionLabels, stereoLabel, stereoStatus } from "../format";
+import { detectionLabels, stereoBalanceLabel, stereoLabel, stereoStatus } from "../format";
 import "./ResultCells.css";
 
 export function DetectionsCell({ d }: { d: Detections }) {
@@ -41,18 +41,20 @@ export function DynamicRangeCell({ dr }: { dr: number | null }) {
   );
 }
 
-export function LoudnessCell({ value, mode }: { value: number | null | undefined; mode: "integrated" | "range" }) {
+export function LoudnessCell({ value, mode, duration }: { value: number | null | undefined; mode: "integrated" | "range"; duration?: number }) {
   const isRange = mode === "range";
   if (value == null || !Number.isFinite(value)) {
     const reason = isRange ? "3 s" : "400 ms";
-    return <td className="c-muted has-tip" title={`No ${isRange ? "LRA" : "LUFS"} reading is available for silence, audio shorter than ${reason}, unsupported sample rates or channel layouts, and older saved reports.`}>—</td>;
+    return <td className="c-muted has-tip" title={`No ${isRange ? "LRA" : "LUFS"} reading is available for silence, audio shorter than ${reason}, invalid samples, unsupported sample rates or channel layouts, and older saved reports.`}>—</td>;
   }
+  // EBU Tech 3341 (2023), section 2.4: mark LRA as unstable before 60 s.
+  const unstable = isRange && duration != null && duration < 60;
   const title = isRange
     ? "Loudness range (EBU Tech 3342): variation between the 10th and 95th percentiles of short-term loudness. A larger value means more level variation, not necessarily better quality."
     : "Integrated loudness measured across the whole track using ITU-R BS.1770-5 / EBU R 128 K-weighting and gates. This is a level measurement, not a quality verdict or a target for every release.";
   return (
-    <td className="has-tip" title={title}>
-      {value.toFixed(1)} {isRange ? "LU" : "LUFS"}
+    <td className="has-tip" title={title + (unstable ? " Under 60 s: this LRA may not be stable; track boundaries can noticeably affect the result." : "")}>
+      {unstable ? "≈" : ""}{value.toFixed(1)} {isRange ? "LU" : "LUFS"}
     </td>
   );
 }
@@ -191,6 +193,17 @@ export function RealBitsCell({ f }: { f: FileAnalysis }) {
     );
   }
   return <td className="c-ok">{f.real_bit_depth}-bit</td>;
+}
+
+export function StereoBalanceCell({ f }: { f: FileAnalysis }) {
+  const balance = f.stereo_balance;
+  const label = stereoBalanceLabel(balance);
+  const title = label === "—"
+    ? "No L/R balance reading: both channels are silent, the layout is not stereo, samples are invalid, or this is an older report."
+    : balance?.state === "Measured"
+      ? "Whole-track unweighted RMS difference. L/R identifies the louder channel. Equal RMS does not imply identical channels. Panning and DC offset can affect this measurement; an imbalance alone does not establish a defect."
+      : `${balance?.state === "LeftSilent" ? "Left" : "Right"} channel is digitally silent throughout the track; the other channel contains signal.`;
+  return <td className={`${label === "—" ? "c-muted " : ""}has-tip`} title={title}>{label}</td>;
 }
 
 export function StereoCell({ f }: { f: FileAnalysis }) {

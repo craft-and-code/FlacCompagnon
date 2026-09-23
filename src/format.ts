@@ -185,6 +185,17 @@ export function stereoLabel(f: FileAnalysis): string {
   return status === "unknown" ? "—" : status === "polarity" ? "polarity?" : status === "phase-risk" ? "phase risk" : status;
 }
 
+/// Shared display and search wording; 0.0 dB reflects display precision only.
+export function stereoBalanceLabel(balance: FileAnalysis["stereo_balance"]): string {
+  if (!balance) return "—";
+  if (balance.state === "LeftSilent") return "L silent";
+  if (balance.state === "RightSilent") return "R silent";
+  const difference = balance.right_minus_left_db;
+  if (!Number.isFinite(difference)) return "—";
+  const magnitude = Math.abs(difference).toFixed(1);
+  return magnitude === "0.0" ? "0.0 dB" : `${difference < 0 ? "L" : "R"} +${magnitude} dB`;
+}
+
 /// The deepest folder containing every one of `paths`. With a single folder of
 /// files this is that folder; across several folders it is their common
 /// ancestor. Recomputed as files are added.
@@ -326,6 +337,7 @@ export function fileSearchFields(f: FileAnalysis, tag?: TagSet | null): string[]
     fmtCutoff(f),
     `${f.channels}ch`,
     `${stereoLabel(f)}${f.fake_stereo ? " fake stereo" : ""}${f.phase_inverted ? " inverted polarity phase" : ""}`,
+    f.stereo_balance ? `${stereoBalanceLabel(f.stereo_balance)} balance` : "",
     f.clipping.clipped ? `${f.clipping.clip_events} clip events clipping` : "no clipping",
     Number.isFinite(f.clipping.true_peak_dbtp)
       ? `${f.clipping.true_peak_dbtp.toFixed(1)} dbtp true peak`

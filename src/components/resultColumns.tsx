@@ -35,6 +35,7 @@ import {
   QualityBadgeCell,
   RealBitsCell,
   StereoCell,
+  StereoBalanceCell,
   TruePeakCell,
 } from "./ResultCells";
 
@@ -53,6 +54,7 @@ export type ColumnKey =
   | "cutoff"
   | "channels"
   | "stereo"
+  | "balance"
   | "clipping"
   | "truePeak"
   | "fileMd5"
@@ -214,6 +216,13 @@ export const ALL_COLUMNS: ColumnDef[] = [
     render: (f) => <StereoCell f={f} />,
   },
   {
+    key: "balance",
+    label: "Balance",
+    sort: "balance",
+    defaultVisible: true,
+    render: (f) => <StereoBalanceCell f={f} />,
+  },
+  {
     key: "clipping",
     label: "Clipping",
     sort: "clipping",
@@ -239,7 +248,7 @@ export const ALL_COLUMNS: ColumnDef[] = [
     label: "LRA",
     sort: "lra",
     defaultVisible: true,
-    render: (f) => <LoudnessCell value={f.loudness_range_lu} mode="range" />,
+    render: (f) => <LoudnessCell value={f.loudness_range_lu} mode="range" duration={f.duration_secs} />,
   },
   {
     key: "dynamics",

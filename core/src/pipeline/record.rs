@@ -55,6 +55,7 @@ pub(super) fn skeleton(path: &Path) -> FileAnalysis {
         fake_stereo: None,
         phase_correlation: None,
         phase_inverted: None,
+        stereo_balance: None,
         badge: None,
         clipping: ClippingInfo::unmeasured(),
         dr_db: None,

@@ -80,6 +80,8 @@ pub struct AnalysisSummary {
     pub phase_correlation: Option<f32>,
     /// True when the two channels are strongly opposed across the stream.
     pub phase_inverted: bool,
+    /// Unweighted RMS balance, available only for two-channel streams.
+    pub stereo_balance: Option<super::stereo::StereoBalance>,
     /// The bit depth actually used by the samples, when it could be
     /// determined from an integer PCM source (`None` for float sources).
     pub real_bit_depth: Option<u32>,
@@ -444,6 +446,11 @@ impl StreamAnalyzer {
             fake_stereo,
             phase_correlation: phase.correlation,
             phase_inverted: phase.likely_inverted,
+            stereo_balance: if self.channels == 2 {
+                super::stereo::analyze_balance(self.l_energy, self.r_energy)
+            } else {
+                None
+            },
             real_bit_depth,
             bit_depth_evidence,
             dr_db,

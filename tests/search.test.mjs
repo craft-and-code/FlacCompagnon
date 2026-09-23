@@ -46,6 +46,14 @@ test("integrated loudness is searchable, while older reports remain usable", () 
   assert.equal(matchesSearch(fileSearchFields(sampleFile), "lufs"), false);
 });
 
+test("balance is searchable by direction, amount and silent channel", () => {
+  const fields = fileSearchFields({ ...sampleFile, stereo_balance: { state: "Measured", right_minus_left_db: -6.0206 } });
+  assert.equal(matchesSearch(fields, "L +6.0 dB"), true);
+  assert.equal(matchesSearch(fields, "balance"), true);
+  assert.equal(matchesSearch(fileSearchFields({ ...sampleFile, stereo_balance: { state: "RightSilent" } }), "R silent"), true);
+  assert.equal(matchesSearch(fileSearchFields(sampleFile), "balance"), false);
+});
+
 test("loudness range is searchable by its LU value", () => {
   const fields = fileSearchFields({ ...sampleFile, loudness_range_lu: 10.0 });
   assert.equal(matchesSearch(fields, "10.0 lu"), true);

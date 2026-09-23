@@ -33,6 +33,7 @@ fn hires_pcm(codec: Option<&str>) -> FileAnalysis {
         fake_stereo: Some(false),
         phase_correlation: Some(0.8),
         phase_inverted: Some(false),
+        stereo_balance: None,
         badge: None,
         clipping: ClippingInfo::unmeasured(),
         dr_db: Some(14.0),

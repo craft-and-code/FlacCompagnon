@@ -113,6 +113,7 @@ pub struct LoudnessMeter {
     short_window_power: f64,
     short_powers: Vec<f64>,
     short_valid: bool,
+    valid: bool,
 }
 
 impl LoudnessMeter {
@@ -124,10 +125,11 @@ impl LoudnessMeter {
         if !(1..=2).contains(&channels) || !(8_000..=768_000).contains(&sample_rate) {
             return None;
         }
-        // ITU-R BS.1770-5 Annex 1: 400 ms gates with 75% overlap, rounded to
-        // whole samples. At common rates both lengths are exact integers.
+        // ITU-R BS.1770-5 Annex 1: 400 ms gates with 75% overlap. Round the
+        // hop down to whole samples to preserve EBU Tech 3342's >=10 Hz LRA
+        // update rate even at 11025 Hz. At common rates both lengths are exact.
         let block_frames = (sample_rate as f64 * 0.4).round() as usize;
-        let step_frames = (sample_rate as f64 * 0.1).round() as u64;
+        let step_frames = (sample_rate / 10) as u64;
         Some(Self {
             filters: (0..channels)
                 .map(|_| ChannelFilter::new(sample_rate))
@@ -143,12 +145,18 @@ impl LoudnessMeter {
             short_window_power: 0.0,
             short_powers: Vec::new(),
             short_valid: true,
+            valid: true,
         })
     }
 
     /// Push a complete decoded frame, with one normalized sample per channel.
     pub fn push_frame(&mut self, samples: &[f32]) {
-        if samples.len() != self.filters.len() {
+        // Never publish the valid prefix of a malformed stream as its
+        // whole-file loudness. NaN also poisons all later filter history.
+        if samples.len() != self.filters.len() || samples.iter().any(|s| !s.is_finite()) {
+            self.valid = false;
+        }
+        if !self.valid {
             return;
         }
         let power: f64 = self
@@ -194,6 +202,9 @@ impl LoudnessMeter {
     /// Return the absolute- and relative-gated programme loudness in LUFS.
     /// Silence and files shorter than one 400 ms gate have no reading.
     pub fn integrated_lufs(&self) -> Option<f32> {
+        if !self.valid {
+            return None;
+        }
         let absolute_power = 10f64.powf((ABSOLUTE_GATE_LUFS - LOUDNESS_OFFSET) / 10.0);
         let (sum, count) = self
             .block_powers
@@ -223,7 +234,7 @@ impl LoudnessMeter {
     /// standard's file measurement extends the stream by 1.5 s of silence to
     /// centre the last 3 s analysis window on the end of the actual audio.
     pub fn loudness_range_lu(mut self) -> Option<f32> {
-        if !self.short_valid || self.frames < self.short_ring.len() as u64 {
+        if !self.valid || !self.short_valid || self.frames < self.short_ring.len() as u64 {
             return None;
         }
         let silence = vec![0.0; self.filters.len()];

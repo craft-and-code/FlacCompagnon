@@ -6,6 +6,39 @@ use std::path::PathBuf;
 use flaccompagnon_core::{analyze_file, ScanOptions};
 use rustfft::{num_complex::Complex, FftPlanner};
 
+#[test]
+fn stereo_wav_balance_survives_decoding_with_correct_channel_direction() {
+    use flaccompagnon_core::analysis::stereo::StereoBalance;
+    let dir = tempfile::tempdir().unwrap();
+    for (channels, left_gain, right_gain, expected) in [
+        (2, 2, 1, Some(StereoBalance::Measured { right_minus_left_db: -6.0206 })),
+        (2, 1, 2, Some(StereoBalance::Measured { right_minus_left_db: 6.0206 })),
+        (2, 1, 0, Some(StereoBalance::RightSilent)),
+        (2, 0, 1, Some(StereoBalance::LeftSilent)),
+        (2, 0, 0, None),
+        (1, 1, 1, None),
+        (3, 1, 2, None),
+    ] {
+        let path = dir.path().join(format!("balance-{channels}-{left_gain}-{right_gain}.wav"));
+        let mut samples = Vec::new();
+        for n in 0..8_000 {
+            let sample = (8_000.0 * (2.0 * std::f64::consts::PI * 317.0 * n as f64 / 8_000.0).sin()) as i16;
+            for channel in 0..channels {
+                samples.push(sample * if channel == 0 { left_gain } else { right_gain });
+            }
+        }
+        write_wav_i16(&path, 8_000, channels, &samples);
+        let result = analyze_file(&path, &ScanOptions::default());
+        assert!(result.error.is_none(), "{:?}", result.error);
+        match (result.stereo_balance, expected) {
+            (Some(StereoBalance::Measured { right_minus_left_db: actual }), Some(StereoBalance::Measured { right_minus_left_db: expected })) => {
+                assert!((actual - expected).abs() < 0.001);
+            }
+            (actual, expected) => assert_eq!(actual, expected),
+        }
+    }
+}
+
 /// Synthesize genuinely band-limited noise: build a spectrum that is random
 /// below `cutoff_hz` and exactly zero above it, then inverse-FFT. This produces
 /// a hard spectral ceiling (a real dead zone) with no leakage, unlike a sum of

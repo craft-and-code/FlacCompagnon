@@ -31,6 +31,7 @@ fn sample_file() -> FileAnalysis {
         fake_stereo: Some(false),
         phase_correlation: Some(0.8),
         phase_inverted: Some(false),
+        stereo_balance: None,
         badge: None,
         clipping: ClippingInfo {
             clipped_samples: 0,
@@ -49,6 +50,43 @@ fn sample_file() -> FileAnalysis {
         file_crc32: Some("0a1b2c3d".into()),
         error: None,
     }
+}
+
+#[test]
+fn balance_exports_preserve_direction_and_silence_without_infinite_numbers() {
+    use crate::analysis::stereo::StereoBalance;
+    for (balance, db, silent) in [
+        (Some(StereoBalance::Measured { right_minus_left_db: -6.0206 }), "-6.02", ""),
+        (Some(StereoBalance::Measured { right_minus_left_db: 6.0206 }), "6.02", ""),
+        (Some(StereoBalance::LeftSilent), "", "left"),
+        (Some(StereoBalance::RightSilent), "", "right"),
+        (None, "", ""),
+    ] {
+        let mut file = sample_file();
+        file.stereo_balance = balance;
+        let report = FolderReport { root: "/music".into(), files: vec![file], has_flac: true };
+        let csv = build_csv(&report);
+        let lines: Vec<_> = csv.lines().collect();
+        let header: Vec<_> = lines[0].split(',').collect();
+        let row: Vec<_> = lines[1].split(',').collect();
+        assert_eq!(header.len(), row.len());
+        for (column, expected) in [("balance_right_minus_left_db", db), ("balance_silent_channel", silent)] {
+            let index = header.iter().position(|&name| name == column).unwrap();
+            assert_eq!(row[index], expected);
+        }
+        let json = build_json(&report).unwrap();
+        let read = parse_json(&json).unwrap();
+        assert_eq!(read.files[0].stereo_balance, balance);
+    }
+}
+
+#[test]
+fn older_json_without_balance_still_loads() {
+    let report = FolderReport { root: "/music".into(), files: vec![sample_file()], has_flac: true };
+    let mut json: serde_json::Value = serde_json::from_str(&build_json(&report).unwrap()).unwrap();
+    json["report"]["files"][0].as_object_mut().unwrap().remove("stereo_balance");
+    let read = parse_json(&serde_json::to_string(&json).unwrap()).unwrap();
+    assert_eq!(read.files[0].stereo_balance, None);
 }
 
 #[test]
@@ -184,6 +222,7 @@ fn the_json_carries_every_analysis_field() {
         "fake_stereo",
         "phase_correlation",
         "phase_inverted",
+        "stereo_balance",
         "badge",
         "clipping",
         "dr_db",
