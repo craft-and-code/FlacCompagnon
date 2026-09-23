@@ -5,7 +5,7 @@
 //! and every level exists because the detector does not know something the
 //! encoder did:
 //!
-//! | Unknown | Response |
+//! | Parameter to infer | Search strategy |
 //! |---|---|
 //! | where the encoder's frames began | try all 1024 sample alignments |
 //! | which window shape each frame used | try all four, keep the best |

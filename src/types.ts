@@ -10,7 +10,8 @@ export interface Detections {
   // by the codec-lattice detectors, which either find the lattice or don't.
   transcoding: boolean;
   detail: string;
-  // "Clean", "Flagged", or "Unknown" when the analysis is incomplete.
+  // "Clean" (no finding), "Flagged", or "Not analyzed" for an empty record.
+  // Unavailable checks are explained in detail rather than a third verdict.
   summary: string;
 }
 
@@ -56,6 +57,8 @@ export interface FileAnalysis {
   cutoff_hz: number | null;
   cutoff_ratio: number | null;
   real_bit_depth: number | null;
+  // Exact occupied bits can include low-level noise around an inferred grid.
+  bit_depth_evidence?: { stored_bits: number; method: "Stored" | "NarrowGrid" } | null;
   // The transcoding evidence, 0..1 — see Rust's `FileAnalysis::lattice_score`.
   // `null` means the search did not run, which is not the same as a low score.
   lattice_score: number | null;

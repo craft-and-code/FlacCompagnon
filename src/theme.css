@@ -29,7 +29,6 @@
   --upscaled: #b7790c;
   --upsampled: #c56a1a;
   --transcoded: #dc2626;
-  --unknown: #616a7d;
   --shadow: rgba(20, 30, 50, 0.14);
   --row-hover: #e4eaf5;
   /* How dark a drop target goes while something is being dragged over it —
@@ -62,7 +61,6 @@
     --upscaled: #f0b849;
     --upsampled: #e08b3b;
     --transcoded: #ef5b6a;
-    --unknown: #8b93a7;
     --shadow: rgba(0, 0, 0, 0.5);
     --row-hover: #2d3342;
     color-scheme: dark;
@@ -91,7 +89,6 @@
   --upscaled: #f0b849;
   --upsampled: #e08b3b;
   --transcoded: #ef5b6a;
-  --unknown: #8b93a7;
   --shadow: rgba(0, 0, 0, 0.5);
   --row-hover: #2d3342;
   color-scheme: dark;

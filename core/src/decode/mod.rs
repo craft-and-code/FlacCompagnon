@@ -67,3 +67,20 @@ pub struct DecodeOutcome {
     /// The analyzer, fed with every decoded sample and ready to be finished.
     pub analyzer: StreamAnalyzer,
 }
+
+/// A padding verdict requires actual samples and must not describe a prefix
+/// as the whole file when the container declares that samples are missing.
+pub(super) fn validate_decoded_frames(
+    frames: u64,
+    declared_frames: Option<u64>,
+) -> Result<(), crate::AnalysisError> {
+    if frames == 0 {
+        return Err(crate::AnalysisError::Decode("no audio data decoded".into()));
+    }
+    if declared_frames.is_some_and(|declared| frames < declared) {
+        return Err(crate::AnalysisError::Decode(
+            "incomplete audio stream".into(),
+        ));
+    }
+    Ok(())
+}

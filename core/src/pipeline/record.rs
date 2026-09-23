@@ -46,10 +46,11 @@ pub(super) fn skeleton(path: &Path) -> FileAnalysis {
         size_bytes,
         bitrate_kbps: None, // filled in once `duration_secs` is known — see `analyze_file`
         modified_unix,
-        detections: Detections::unknown(),
+        detections: Detections::not_analyzed(),
         cutoff_hz: None,
         cutoff_ratio: None,
         real_bit_depth: None,
+        bit_depth_evidence: None,
         lattice_score: None,
         fake_stereo: None,
         badge: None,
@@ -81,7 +82,6 @@ pub(super) fn bitrate_kbps(size_bytes: u64, duration_secs: f64) -> Option<u32> {
         None
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -125,7 +125,11 @@ mod tests {
         // 1 MB over 8 seconds = 1000 kbps exactly.
         assert_eq!(bitrate_kbps(1_000_000, 8.0), Some(1000));
         assert_eq!(bitrate_kbps(1_000_000, 0.0), None, "zero duration");
-        assert_eq!(bitrate_kbps(0, 300.0), Some(0), "an empty file has no bitrate, not no answer");
+        assert_eq!(
+            bitrate_kbps(0, 300.0),
+            Some(0),
+            "an empty file has no bitrate, not no answer"
+        );
         assert_eq!(bitrate_kbps(1_000_000, f64::NAN), None, "NaN duration");
     }
 }

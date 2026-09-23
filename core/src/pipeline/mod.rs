@@ -166,6 +166,7 @@ fn apply_outcome(
     result.lattice_score = transcoded.as_ref().ok().map(|e| e.likelihood as f32);
     result.clipping = summary.clipping.clone();
     result.dr_db = summary.dr_db;
+    result.bit_depth_evidence = summary.bit_depth_evidence;
 
     if outcome.channels >= 2 {
         result.fake_stereo = Some(summary.fake_stereo);
@@ -242,8 +243,6 @@ fn hires_badge(result: &FileAnalysis, dsd_heritage: Option<f32>) -> Option<Strin
     if !hires_specs
         || lossy_codec
         || result.error.is_some()
-        || result.detections.summary != "Clean"
-        || result.real_bit_depth.is_none()
         || result.detections.upscaling
         || result.detections.upsampling
         || result.detections.transcoding
@@ -290,6 +289,7 @@ mod tests {
             cutoff_hz: None,
             cutoff_ratio: None,
             real_bit_depth: Some(24),
+            bit_depth_evidence: None,
             lattice_score: None,
             fake_stereo: Some(false),
             badge: None,
@@ -310,16 +310,6 @@ mod tests {
     fn hires_badge_refuses_a_known_lossy_codec() {
         assert_eq!(hires_badge(&hires_pcm(Some("AAC")), None), None);
         assert_eq!(hires_badge(&hires_pcm(Some("MP3")), None), None);
-    }
-
-    #[test]
-    fn unknown_or_unmeasurable_resolution_never_earns_a_hires_badge() {
-        let mut file = hires_pcm(None);
-        file.detections.summary = "Unknown".into();
-        assert_eq!(hires_badge(&file, None), None);
-        file.detections.summary = "Clean".into();
-        file.real_bit_depth = None;
-        assert_eq!(hires_badge(&file, None), None);
     }
 
     /// Same specs, lossless (or unresolved — FLAC/DSD always report `codec:

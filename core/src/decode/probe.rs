@@ -9,7 +9,7 @@
 use std::fs::File;
 use std::path::Path;
 
-use symphonia::core::audio::{AudioBufferRef, SampleBuffer};
+use symphonia::core::audio::{AudioBufferRef, SampleBuffer, SignalSpec};
 use symphonia::core::codecs::{CodecParameters, Decoder, DecoderOptions};
 use symphonia::core::conv::ConvertibleSample;
 use symphonia::core::formats::{FormatOptions, FormatReader};
@@ -75,14 +75,14 @@ impl ProbedTrack {
     pub(super) fn sample_rate(&self) -> Result<u32, AnalysisError> {
         self.params
             .sample_rate
-            .ok_or_else(|| AnalysisError::Decode("unknown sample rate".into()))
+            .ok_or_else(|| AnalysisError::Decode("missing sample rate".into()))
     }
 
     pub(super) fn channels(&self) -> Result<usize, AnalysisError> {
         self.params
             .channels
             .map(|c| c.count())
-            .ok_or_else(|| AnalysisError::Decode("unknown channel layout".into()))
+            .ok_or_else(|| AnalysisError::Decode("missing channel layout".into()))
     }
 
     pub(super) fn make_decoder(&self) -> Result<Box<dyn Decoder>, AnalysisError> {
@@ -112,15 +112,17 @@ impl ProbedTrack {
 pub(super) struct InterleavedBuf<T: Sample = f32> {
     buf: Option<SampleBuffer<T>>,
     frames: u64,
+    spec: Option<SignalSpec>,
 }
 
 impl<T: Sample + ConvertibleSample> InterleavedBuf<T> {
     pub(super) fn fill(&mut self, decoded: AudioBufferRef<'_>) -> &[T] {
         let needed = decoded.capacity() as u64;
-        if self.buf.is_none() || needed > self.frames {
-            let spec = *decoded.spec();
+        let spec = *decoded.spec();
+        if self.buf.is_none() || needed > self.frames || self.spec != Some(spec) {
             self.buf = Some(SampleBuffer::<T>::new(needed, spec));
             self.frames = needed;
+            self.spec = Some(spec);
         }
         // Set on the line above if it was missing, so this cannot be None.
         let buf = self.buf.as_mut().expect("buffer just ensured present");

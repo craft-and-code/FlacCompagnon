@@ -118,6 +118,9 @@ pub struct FileAnalysis {
 
     /// Estimated *effective* bit depth (integer sources only).
     pub real_bit_depth: Option<u32>,
+    /// Supporting integer precision measurement; absent in older saved reports.
+    #[serde(default)]
+    pub bit_depth_evidence: Option<crate::analysis::bitdepth::BitDepthEvidence>,
     /// How strongly the audio sits on a lossy codec's quantization lattice,
     /// in `0..1` — the criterion `L` of [`crate::transcode`], maximised over
     /// every alignment, frame, window shape and stereo mode tried, and over

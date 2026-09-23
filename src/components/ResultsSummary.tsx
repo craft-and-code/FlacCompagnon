@@ -6,6 +6,7 @@ import { Folder } from "lucide-react";
 
 import type { FolderReport } from "../types";
 import * as api from "../api";
+import { detectionLabels } from "../format";
 import { IconButton } from "./IconButton";
 import "./ResultsSummary.css";
 
@@ -35,7 +36,7 @@ export function ResultsSummary({
   onToast,
 }: ResultsSummaryProps) {
   let clean = 0;
-  let unknown = 0;
+  let errors = 0;
   let upscaled = 0;
   let upsampled = 0;
   let transcoded = 0;
@@ -44,18 +45,21 @@ export function ResultsSummary({
 
   for (const f of report.files) {
     const d = f.detections;
-    if (d.summary === "Clean") clean++;
-    if (d.summary === "Unknown") unknown++;
-    if (d.upscaling) upscaled++;
-    if (d.upsampling) upsampled++;
-    if (d.transcoding) transcoded++;
+    if (f.error) {
+      errors++;
+    } else {
+      if (detectionLabels(d).includes("Clean")) clean++;
+      if (d.upscaling) upscaled++;
+      if (d.upsampling) upsampled++;
+      if (d.transcoding) transcoded++;
+    }
     if (f.flac_md5?.state === "Mismatch") md5Bad++;
     if (f.flac_md5?.state === "NoSignature") md5Missing++;
   }
 
   const chips: { cls: string; label: string; n: number }[] = [
     { cls: "v-clean", label: "clean", n: clean },
-    { cls: "v-muted", label: "unknown", n: unknown },
+    { cls: "v-bad", label: "errors", n: errors },
     { cls: "v-upscaled", label: "upscaled", n: upscaled },
     { cls: "v-upsampled", label: "upsampled", n: upsampled },
     { cls: "v-transcoded", label: "transcoded", n: transcoded },

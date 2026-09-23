@@ -11,8 +11,8 @@
 
 use std::path::Path;
 
-use crate::decode;
 use crate::analysis::detections::Detections;
+use crate::decode;
 use crate::dsd as dsd_format;
 use crate::types::{FileAnalysis, ScanOptions};
 
@@ -48,7 +48,6 @@ pub(super) fn analyze(path: &Path, opts: &ScanOptions, result: &mut FileAnalysis
         result.detections = verdict(
             false,
             "DST-compressed DFF: header verified; content analysis is not supported for DST streams.",
-            "Unknown",
         );
     } else if let Some(ffmpeg) = &opts.ffmpeg {
         let decoded_rate = (info.sample_rate / DSD_TO_PCM_DIVISOR).max(1);
@@ -56,7 +55,7 @@ pub(super) fn analyze(path: &Path, opts: &ScanOptions, result: &mut FileAnalysis
             Ok(outcome) => {
                 analyzed = true;
                 // The DFF header carries a byte size, not a sample count, so
-                // its duration is often unknown until the audio is decoded.
+                // its duration is often unavailable until the audio is decoded.
                 if result.duration_secs == 0.0 {
                     result.duration_secs = outcome.duration_secs;
                 }
@@ -74,11 +73,10 @@ pub(super) fn analyze(path: &Path, opts: &ScanOptions, result: &mut FileAnalysis
                     summary.fft_size(),
                 );
                 result.detections = match flagged {
-                    Some(hit) => verdict(true, &pcm_source_detail(hit), "Flagged"),
+                    Some(hit) => verdict(true, &pcm_source_detail(hit)),
                     None => verdict(
                         false,
                         "Content blends into the sigma-delta noise shaping with no PCM brick wall — consistent with native DSD.",
-                        "Clean",
                     ),
                 };
             }
@@ -88,7 +86,6 @@ pub(super) fn analyze(path: &Path, opts: &ScanOptions, result: &mut FileAnalysis
         result.detections = verdict(
             false,
             "DSD header verified. Install ffmpeg to enable the content authenticity check.",
-            "Unknown",
         );
     }
 
@@ -121,14 +118,8 @@ fn pcm_source_detail(hit: dsd_format::PcmSourceCheck) -> String {
 /// A DSD verdict. Only `upsampling` can ever fire on this path: the other two
 /// detections need a PCM bit depth and an MDCT grid, neither of which a 1-bit
 /// stream has — so hardcoding them false here is a statement, not a shortcut.
-fn verdict(upsampling: bool, detail: &str, summary: &str) -> Detections {
-    Detections {
-        upscaling: false,
-        upsampling,
-        transcoding: false,
-        detail: detail.to_string(),
-        summary: summary.to_string(),
-    }
+fn verdict(upsampling: bool, detail: &str) -> Detections {
+    Detections::from_findings(false, upsampling, false, detail.to_string())
 }
 
 #[cfg(test)]
@@ -151,16 +142,14 @@ mod tests {
         assert!(dvd.contains("48 kHz"), "{dvd}");
     }
 
-    /// The three non-flagged verdicts must never claim a detection fired.
+    /// Header-only checks retain their explanation without a third verdict.
     #[test]
     fn informational_verdicts_flag_nothing() {
-        for v in [
-            verdict(false, "header only", "Unknown"),
-            verdict(false, "native", "Clean"),
-        ] {
+        for v in [verdict(false, "header only"), verdict(false, "native")] {
             assert!(!v.upscaling);
             assert!(!v.upsampling);
             assert!(!v.transcoding);
+            assert_eq!(v.summary, "Clean");
         }
     }
 }

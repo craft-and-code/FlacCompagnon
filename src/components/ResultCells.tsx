@@ -9,7 +9,7 @@ import "./ResultCells.css";
 
 export function DetectionsCell({ d }: { d: Detections }) {
   const tags = detectionLabels(d).map((label) => ({
-    cls: label === "Unknown" ? "c-muted" : `t-${label.toLowerCase()}`,
+    cls: label === "—" ? "c-muted" : `t-${label.toLowerCase()}`,
     label,
   }));
 
@@ -152,30 +152,29 @@ export function ClippingCell({ c }: { c: ClippingInfo }) {
   );
 }
 
-/// Occupied integer bits describe the stored samples, not the source master.
-/// Padding is flagged; a full-width result is neutral because noise counts too.
+/// Grid estimates are marked explicitly; occupied bits include noise as well as audio.
 export function RealBitsCell({ f }: { f: FileAnalysis }) {
-  if (f.real_bit_depth == null) {
-    const reason = f.error == null && f.cutoff_hz != null && f.clipping.peak === 0
-      ? "Digital silence: all decoded samples are zero. Effective bit depth cannot be determined; this is not a 1-bit recording."
-      : "Integer bit depth could not be measured. No original resolution is verified.";
-    return <td className="c-muted has-tip" title={reason}>—</td>;
+  if (f.real_bit_depth == null) return <td className="c-muted">—</td>;
+  if (f.bit_depth_evidence?.method === "NarrowGrid") {
+    return (
+      <td className="c-bad has-tip" title={`Estimated ${f.real_bit_depth}-bit depth from quantization grids measured separately on every channel, with low-level residuals. Stored samples occupy ${f.bit_depth_evidence.stored_bits} bits; this estimate does not establish the recording history.`}>
+        ≈{f.real_bit_depth}-bit
+      </td>
+    );
   }
   if (f.declared_bits != null && f.real_bit_depth < f.declared_bits) {
     return (
       <td
         className="c-bad has-tip"
-        title={`The decoded samples follow a ${f.real_bit_depth}-bit grid within the declared ${f.declared_bits}-bit container. This can be exact zero-padding or a lower-bit-depth source masked by low-level dither; hover the Detection cell for the measured case.`}
+        title={f.clipping.peak === 0
+          ? "Digital silence: all samples are zero. Reported as 1 bit by convention."
+          : `Samples fit exactly in ${f.real_bit_depth} of the declared ${f.declared_bits} bits: the remaining low bits are always zero.`}
       >
         {f.real_bit_depth}-bit
       </td>
     );
   }
-  return (
-    <td className="has-tip" title="Occupied bits in the decoded integer samples. Dither, noise or processing can occupy these bits without increasing the original recording resolution.">
-      {f.real_bit_depth}-bit
-    </td>
-  );
+  return <td className="c-ok">{f.real_bit_depth}-bit</td>;
 }
 
 export function StereoCell({ f }: { f: FileAnalysis }) {

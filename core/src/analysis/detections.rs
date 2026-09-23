@@ -1,7 +1,7 @@
 //! Authenticity detections: three independent tests, each a plain yes/no.
 //!
-//! * **Upscaling**   — integer samples whose low bits are always zero. This
-//!   proves unused precision, not the recording history.
+//! * **Upscaling**   — a low-resolution signal (≤16-bit) stored at a higher bit
+//!   depth. Detected from the effective vs. declared bit depth.
 //! * **Upsampling**  — a low-rate signal placed in a higher-sample-rate
 //!   container, inferred from limited bandwidth. This is a heuristic, not
 //!   proof that the sample rate was changed.
@@ -25,13 +25,15 @@
 //! It is gone, along with the brick-wall and MDCT dead-zone rules that fed
 //! it. Transcoding is now decided solely by the re-quantization detectors,
 //! which provide statistical evidence of quantization, not a proof of origin.
-//! An incomplete search must remain unknown rather than clearing the file.
+//! Missing checks are explained in detail; Clean means no finding, not that
+//! every check was available or that the recording history was verified.
 //! The cut-off frequency is still measured and still shown in its own
 //! column — it is useful information — but it no longer accuses anyone.
 
 use serde::{Deserialize, Serialize};
 
 use super::analyzer::AnalysisSummary;
+use super::bitdepth::BitDepthMethod;
 use crate::transcode::LatticeResult;
 
 /// The three independent detections plus a human summary.
@@ -46,21 +48,42 @@ pub struct Detections {
     pub transcoding: bool,
     /// One-line explanation of the flagged issues (or why the file looks clean).
     pub detail: String,
-    /// Quick status word: "Clean", "Flagged", or "Unknown" when the
-    /// checks could not complete or the content is silent, with no issue found.
+    /// "Clean" for no findings, "Flagged" for any finding, or "Not analyzed"
+    /// for a placeholder. Missing checks remain explicit in `detail`.
     pub summary: String,
 }
 
 impl Detections {
+    /// Build a binary summary from findings, independently of check availability.
+    pub fn from_findings(
+        upscaling: bool,
+        upsampling: bool,
+        transcoding: bool,
+        detail: String,
+    ) -> Self {
+        Self {
+            upscaling,
+            upsampling,
+            transcoding,
+            detail,
+            summary: if upscaling || upsampling || transcoding {
+                "Flagged"
+            } else {
+                "Clean"
+            }
+            .into(),
+        }
+    }
+
     /// A neutral placeholder for a file that hasn't been (or couldn't be)
-    /// analyzed yet — no detections flagged, summary set to Unknown.
-    pub fn unknown() -> Self {
+    /// analyzed yet. A read failure is displayed separately as a file error.
+    pub fn not_analyzed() -> Self {
         Detections {
             upscaling: false,
             upsampling: false,
             transcoding: false,
             detail: "Not yet analyzed.".to_string(),
-            summary: "Unknown".to_string(),
+            summary: "Not analyzed".to_string(),
         }
     }
 }
@@ -119,15 +142,6 @@ pub fn classify(
     real_bit_depth: Option<u32>,
     transcode: LatticeResult,
 ) -> Detections {
-    // Zero samples carry no evidence of their recording resolution. The
-    // former one-bit display was just the minimum of the bit-count formula,
-    // not a measurement that could justify either Upscaled or Clean.
-    if real_bit_depth.is_none() && summary.clipping.peak == 0.0 {
-        return Detections {
-            detail: "Digital silence: all decoded samples are zero. Effective bit depth and source authenticity cannot be determined.".into(),
-            ..Detections::unknown()
-        };
-    }
     let mdct_dead = mdct_signature(summary);
     let mdct_cutoff_hz = summary
         .mdct_cutoff_ratio
@@ -136,11 +150,11 @@ pub fn classify(
     let mdct_khz = mdct_cutoff_hz / 1000.0;
     let stft_khz = summary.cutoff_hz / 1000.0;
 
-    // 1. Upscaling — lower-resolution content in a wider container. Exact
-    //    zero padding and a tightly dithered 16-bit grid are both measured.
+    // 1. Upscaling: exact unused bits, or a persistent lower-depth grid with
+    //    a bounded residual. The latter is identified as an estimate in detail.
     let upscaling = matches!(
         (declared_bits, real_bit_depth),
-        (Some(d), Some(r)) if (1..=32).contains(&d) && r > 0 && r < d
+        (Some(d), Some(r)) if r < d
     );
 
     // 2. Upsampling candidate. In a hi-res container (> 48 kHz), a
@@ -158,17 +172,16 @@ pub fn classify(
     // Build the human explanation.
     let mut reasons: Vec<String> = Vec::new();
     if upscaling {
-        reasons.push(if summary.bit_depth_dithered {
-            format!(
-                "Upscaling: {}-bit samples follow a 16-bit quantization grid with low-level dither",
-                declared_bits.unwrap_or(0)
-            )
-        } else {
-            format!(
-                "Upscaling: samples fit exactly in {} bits within a {}-bit container (zero low bits)",
-                real_bit_depth.unwrap_or(0),
-                declared_bits.unwrap_or(0)
-            )
+        let real = real_bit_depth.unwrap_or(0);
+        let declared = declared_bits.unwrap_or(0);
+        reasons.push(match summary.bit_depth_evidence {
+            Some(e) if e.method == BitDepthMethod::NarrowGrid => format!(
+                "Upscaling: estimated {real}-bit depth in {declared}-bit PCM from per-channel quantization grids with low-level residuals; stored samples occupy {} bits", e.stored_bits
+            ),
+            _ if summary.clipping.peak == 0.0 => format!(
+                "Upscaling: digital silence in {declared}-bit PCM (all samples are zero; reported as 1 bit by convention)"
+            ),
+            _ => format!("Upscaling: samples fit exactly in {real} bits within {declared}-bit PCM (zero low bits)"),
         });
     }
     if upsampling {
@@ -185,14 +198,8 @@ pub fn classify(
         ));
     }
 
-    let flagged = upscaling || upsampling || transcoding;
-    let summary_word = if flagged {
-        "Flagged"
-    } else if transcode.is_err() || real_bit_depth.is_none() {
-        "Unknown"
-    } else {
-        "Clean"
-    };
+    let mut detections =
+        Detections::from_findings(upscaling, upsampling, transcoding, String::new());
 
     // Always say what the lattice search found, flagged or not. A bare
     // "Clean" hides the difference between "measured, and nothing there" and
@@ -213,25 +220,13 @@ pub fn classify(
         (Err(skip), true) => format!(" Lattice search did not complete: {skip}."),
     };
 
-    let mut detail = if reasons.is_empty() {
-        format!("{summary_word} — measured bandwidth to ~{stft_khz:.1} kHz.{lattice}")
+    detections.detail = if reasons.is_empty() {
+        format!("{} — no anomaly detected by the completed checks; measured bandwidth to ~{stft_khz:.1} kHz.{lattice}", detections.summary)
     } else {
         format!("{}{lattice}", reasons.join(" · "))
     };
 
-    if real_bit_depth.is_none() {
-        detail.push_str(" Integer bit-depth check unavailable; source resolution is not verified.");
-    } else if !upscaling {
-        detail.push_str(" No zero-padding found; dither or processing can hide a lower-bit-depth source. Used bits do not establish the original resolution.");
-    }
-
-    Detections {
-        upscaling,
-        upsampling,
-        transcoding,
-        detail,
-        summary: summary_word.to_string(),
-    }
+    detections
 }
 
 #[cfg(test)]
@@ -279,7 +274,7 @@ mod tests {
             },
             fake_stereo: false,
             real_bit_depth: None,
-            bit_depth_dithered: false,
+            bit_depth_evidence: None,
             dr_db: None,
             mdct_cutoff_ratio: mcr,
             mdct_dead_db: mdb,
@@ -407,11 +402,10 @@ mod tests {
         );
     }
 
-    /// An `Err` is a third answer, not a synonym for clean, and `detail` has to
-    /// say which one it is. A user reading "Clean" on a file the detector
-    /// never ran on is being told something the app does not know.
+    /// A skipped codec check must retain its reason without changing the
+    /// binary findings summary or inventing a successful lattice measurement.
     #[test]
-    fn an_untested_file_says_so_rather_than_reading_as_clean() {
+    fn skipped_codec_checks_keep_a_binary_summary_and_their_explanation() {
         // Too short / undecodable: the detector returned no answer at a rate
         // it *does* support.
         let d = classify(
@@ -422,7 +416,7 @@ mod tests {
             Err(LatticeSkip::TooShort),
         );
         assert!(!d.transcoding);
-        assert_eq!(d.summary, "Unknown");
+        assert_eq!(d.summary, "Clean");
         assert!(d.detail.contains("did not complete"), "{}", d.detail);
         // And it names the cause, so the row is reportable as-is.
         assert!(d.detail.contains("too short"), "{}", d.detail);
@@ -438,6 +432,7 @@ mod tests {
             )),
         );
         assert!(bad.detail.contains("no decoder"), "{}", bad.detail);
+        assert_eq!(bad.summary, "Clean");
 
         // Above 48 kHz the test does not apply at all, and says that instead.
         let hi = classify(
@@ -448,6 +443,7 @@ mod tests {
             Err(LatticeSkip::UnsupportedRate(96_000)),
         );
         assert!(hi.detail.contains("not applicable"), "{}", hi.detail);
+        assert_eq!(hi.summary, "Clean");
 
         // And when it did run and found nothing, the score is shown.
         let ok = classify(
@@ -461,47 +457,9 @@ mod tests {
     }
 
     #[test]
-    fn digital_silence_is_unknown_even_when_the_lattice_test_is_negative() {
-        let mut silent = summ(0.0, 44_100, 0.0, -120.0, None);
-        silent.clipping.peak = 0.0;
-        for declared in [16, 24, 32] {
-            let d = classify(&silent, 44_100, Some(declared), None, evidence(false));
-            assert_eq!(d.summary, "Unknown");
-            assert!(!d.upscaling && !d.upsampling && !d.transcoding);
-            assert!(d.detail.contains("Digital silence"));
-        }
-    }
-
-    #[test]
-    fn missing_bit_measurement_is_not_a_clean_resolution_verdict() {
-        let d = classify(
-            &summ(21_000.0, 44_100, 5.0, -60.0, None),
-            44_100,
-            Some(32),
-            None,
-            evidence(false),
-        );
-        assert_eq!(d.summary, "Unknown");
-        assert!(d.detail.contains("Integer bit-depth check unavailable"));
-    }
-
-    #[test]
-    fn occupied_low_bits_do_not_certify_the_original_resolution() {
-        let d = classify(
-            &summ(21_000.0, 44_100, 5.0, -60.0, None),
-            44_100,
-            Some(24),
-            Some(24),
-            evidence(false),
-        );
-        assert!(!d.upscaling);
-        assert!(d.detail.contains("dither or processing"));
-    }
-
-    #[test]
     fn the_placeholder_flags_nothing() {
-        let d = Detections::unknown();
+        let d = Detections::not_analyzed();
         assert!(!d.upscaling && !d.upsampling && !d.transcoding);
-        assert_eq!(d.summary, "Unknown");
+        assert_eq!(d.summary, "Not analyzed");
     }
 }

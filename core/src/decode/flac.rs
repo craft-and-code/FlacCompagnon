@@ -4,15 +4,15 @@
 //! Fused because both need every sample of the file: doing them separately
 //! would decode the whole track twice for no gain. claxon is used here rather
 //! than Symphonia because it hands back the raw decoded integers, which is
-//! what the MD5 must be computed over — a float round-trip would not be
-//! bit-exact for the hash even though it is exact for the analysis.
+//! what the MD5 and bit-depth measurement must use. Spectral analysis can
+//! use normalized floats without discarding the raw integer evidence.
 
 use std::path::Path;
 
 use md5::{Digest, Md5};
 
-use super::DecodeOutcome;
 use super::FlacMd5Status;
+use super::{validate_decoded_frames, DecodeOutcome};
 use crate::analysis::analyzer::StreamAnalyzer;
 use crate::AnalysisError;
 
@@ -63,25 +63,23 @@ pub fn decode_flac_to_pcm(path: &Path) -> Result<crate::decode::PcmAudio, Analys
 
     let mut blocks = reader.blocks();
     let mut buffer: Vec<i32> = Vec::new();
+    let mut frame_count = 0;
     loop {
         let block = match blocks.read_next_or_eof(buffer) {
             Ok(Some(b)) => b,
             Ok(None) => break,
             Err(e) => return Err(AnalysisError::Decode(format!("flac decode error: {e}"))),
         };
+        validate_block_channels(&block, channels)?;
         for t in 0..block.duration() as usize {
             for c in 0..channels {
-                // `channel()` panics on an out-of-range index, so the channel
-                // count is taken from STREAMINFO and validated above rather
-                // than from the block.
-                samples.push(block.channel(c as u32)[t] as f32 * scale);
+                samples.push(block_sample(&block, c, t)? as f32 * scale);
             }
         }
+        frame_count += u64::from(block.duration());
         buffer = block.into_buffer();
     }
-    if samples.is_empty() {
-        return Err(AnalysisError::Decode("no audio data decoded".into()));
-    }
+    validate_decoded_frames(frame_count, info.samples)?;
     Ok(crate::decode::PcmAudio {
         samples,
         sample_rate,
@@ -139,6 +137,7 @@ pub fn decode_and_analyze_flac(
             Ok(None) => break,
             Err(e) => return Err(AnalysisError::Decode(format!("flac decode error: {e}"))),
         };
+        validate_block_channels(&block, channels)?;
         let n = block.duration() as usize;
         if hasher.is_some() {
             byte_row.clear();
@@ -146,7 +145,7 @@ pub fn decode_and_analyze_flac(
         }
         for t in 0..n {
             for c in 0..channels {
-                let s = block.channel(c as u32)[t];
+                let s = block_sample(&block, c, t)?;
                 frame_i32[c] = s;
                 frame_f32[c] = s as f32 * scale;
                 if hasher.is_some() {
@@ -162,6 +161,7 @@ pub fn decode_and_analyze_flac(
         }
         buffer = block.into_buffer();
     }
+    validate_decoded_frames(frame_count, total_frames_hint)?;
 
     let md5_status = if !has_signature {
         FlacMd5Status::NoSignature
@@ -195,8 +195,126 @@ pub fn decode_and_analyze_flac(
     ))
 }
 
+fn validate_block_channels(
+    block: &claxon::frame::Block,
+    channels: usize,
+) -> Result<(), AnalysisError> {
+    if block.channels() as usize != channels {
+        return Err(AnalysisError::Decode(
+            "FLAC channel count changed during decoding".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn block_sample(
+    block: &claxon::frame::Block,
+    channel: usize,
+    frame: usize,
+) -> Result<i32, AnalysisError> {
+    // `channel()` can panic, so validate against this block, not STREAMINFO.
+    if channel >= block.channels() as usize {
+        return Err(AnalysisError::Decode("invalid FLAC channel index".into()));
+    }
+    block
+        .channel(channel as u32)
+        .get(frame)
+        .copied()
+        .ok_or_else(|| AnalysisError::Decode("incomplete FLAC block".into()))
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use flacenc::component::BitRepr;
+    use flacenc::error::Verify;
+
+    fn encoded_flac(samples: &[i32], channels: usize, bits: usize) -> Vec<u8> {
+        let mut config = flacenc::config::Encoder::default();
+        config.multithread = false;
+        let config = config.into_verified().expect("valid encoder settings");
+        let source = flacenc::source::MemSource::from_samples(samples, channels, bits, 96_000);
+        let stream = flacenc::encode_with_fixed_block_size(&config, source, config.block_size)
+            .expect("reference FLAC encoding");
+        let mut sink = flacenc::bitsink::ByteSink::new();
+        stream.write(&mut sink).expect("serialize reference FLAC");
+        sink.as_slice().to_vec()
+    }
+
+    #[test]
+    fn independent_flac_encoder_preserves_zero_padding_and_low_bits() {
+        let dir = tempfile::tempdir().expect("temporary directory");
+        let path = dir.path().join("integer.flac");
+        for (samples, expected) in [
+            ([123 << 8, -125 << 8, 0, 127 << 8].repeat(16), 16),
+            (
+                [0x40_0001, -0x40_0001, 0x20_0001, -0x20_0001].repeat(16),
+                24,
+            ),
+            (vec![0; 64], 1),
+        ] {
+            std::fs::write(&path, encoded_flac(&samples, 2, 24)).expect("write FLAC");
+            let (decoded, md5) = decode_and_analyze_flac(&path, true).expect("decode FLAC");
+            assert_eq!(md5, FlacMd5Status::Match);
+            assert_eq!(
+                decoded
+                    .analyzer
+                    .finish(decoded.sample_rate, decoded.declared_bits)
+                    .real_bit_depth,
+                Some(expected)
+            );
+        }
+    }
+
+    #[test]
+    fn missing_flac_frames_are_rejected_even_without_md5_verification() {
+        let dir = tempfile::tempdir().expect("temporary directory");
+        let path = dir.path().join("missing-tail.flac");
+        let mut bytes = encoded_flac(&[123 << 8; 128], 1, 24);
+        // RFC 9639 STREAMINFO: the low 36 bits of this eight-byte field
+        // contain the total sample count. The file now lacks 128 frames.
+        let packed = u64::from_be_bytes(bytes[18..26].try_into().expect("STREAMINFO field"));
+        let count_mask = (1u64 << 36) - 1;
+        bytes[18..26].copy_from_slice(&((packed & !count_mask) | 256).to_be_bytes());
+        std::fs::write(&path, bytes).expect("write truncated declaration");
+        assert!(decode_and_analyze_flac(&path, false).is_err());
+        assert!(decode_flac_to_pcm(&path).is_err());
+    }
+
+    #[test]
+    fn inconsistent_flac_channels_return_an_error_instead_of_panicking() {
+        let dir = tempfile::tempdir().expect("temporary directory");
+        let path = dir.path().join("wrong-channels.flac");
+        let mut bytes = encoded_flac(&[123 << 8; 128], 1, 24);
+        // STREAMINFO says stereo while the frame remains mono.
+        bytes[20] |= 0b10;
+        std::fs::write(&path, bytes).expect("write contradictory header");
+        assert!(decode_and_analyze_flac(&path, false).is_err());
+        assert!(decode_flac_to_pcm(&path).is_err());
+    }
+
+    #[test]
+    fn metadata_only_flac_is_rejected() {
+        let dir = tempfile::tempdir().expect("temporary directory");
+        let path = dir.path().join("empty.flac");
+        let mut bytes = encoded_flac(&[0; 128], 1, 24);
+        let mut offset = 4;
+        loop {
+            let last = bytes[offset] & 0x80 != 0;
+            let length =
+                u32::from_be_bytes([0, bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]])
+                    as usize;
+            offset += 4 + length;
+            if last {
+                break;
+            }
+        }
+        bytes.truncate(offset);
+        std::fs::write(&path, bytes).expect("write metadata-only fixture");
+        assert!(decode_and_analyze_flac(&path, false).is_err());
+        assert!(decode_flac_to_pcm(&path).is_err());
+    }
+
     /// The fused FLAC path feeds the analyzer with `s * (1 / 2^(bits-1))` as
     /// f32. This must be a *lossless* round-trip for every integer the format
     /// can produce at ≤ 24 bits — otherwise analysis results could drift from

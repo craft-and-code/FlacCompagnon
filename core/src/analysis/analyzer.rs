@@ -7,7 +7,7 @@
 //! * spectrum      -> Hann-windowed FFT of a mono downmix, averaged over windows
 //! * clipping      -> full-scale sample counting with run detection
 //! * fake stereo   -> energy of the L-R difference vs. the signal energy
-//! * real bitdepth -> bitwise OR of every integer sample value
+//! * real bitdepth -> exact unused bits and persistent lower-depth integer grids
 //!
 //! Nothing here depends on a specific file format; [`decode`](crate::decode)
 //! adapts each codec to the [`StreamAnalyzer::push_frame`] interface.
@@ -76,11 +76,10 @@ pub struct AnalysisSummary {
     /// enough) for long enough to suggest a mono source duplicated to stereo.
     pub fake_stereo: bool,
     /// The bit depth actually used by the samples, when it could be
-    /// determined from integer PCM (`None` for float sources or digital silence).
+    /// determined from an integer PCM source (`None` for float sources).
     pub real_bit_depth: Option<u32>,
-    /// `true` when a 24-bit stream follows a 16-bit grid hidden by low-level
-    /// dither rather than having exactly zero low bits.
-    pub bit_depth_dithered: bool,
+    /// Exact occupied depth and whether the effective depth is a grid estimate.
+    pub bit_depth_evidence: Option<bitdepth::BitDepthEvidence>,
 
     /// Dynamic-range estimate in dB: peak level vs the RMS of the loudest 20%
     /// of ~3 s blocks (crest factor of the loud passages, DR-meter style).
@@ -137,9 +136,7 @@ pub struct StreamAnalyzer {
     total_frames: u64,
 
     // --- bit depth ---
-    int_or_mask: u32,
-    saw_integer: bool,
-    grid16: bitdepth::Grid16Evidence,
+    bit_depth: bitdepth::BitDepthAnalyzer,
 
     // --- MDCT (AAC-SIN) ---
     mdct: &'static Mdct,
@@ -184,9 +181,7 @@ impl StreamAnalyzer {
             r_energy: 0.0,
             identical_frames: 0,
             total_frames: 0,
-            int_or_mask: 0,
-            saw_integer: false,
-            grid16: bitdepth::Grid16Evidence::default(),
+            bit_depth: bitdepth::BitDepthAnalyzer::new(channels.max(1)),
             mdct: Mdct::shared(),
             mdct_prev: Vec::with_capacity(AAC_N),
             mdct_fill: Vec::with_capacity(AAC_N),
@@ -242,15 +237,7 @@ impl StreamAnalyzer {
             }
         }
 
-        // Integer OR mask for bit-depth estimation. Raw two's-complement value;
-        // sign extension is handled later by masking to the declared width.
-        if let Some(ints) = int_samples {
-            self.saw_integer = true;
-            for &v in ints {
-                self.int_or_mask |= v as u32;
-                self.grid16.push(v);
-            }
-        }
+        self.bit_depth.push_frame(int_samples);
 
         // Mono downmix into the FFT buffer.
         let mut mono = 0.0f32;
@@ -405,19 +392,9 @@ impl StreamAnalyzer {
             false
         };
 
-        let exact_bit_depth = match (self.saw_integer, declared_bits) {
-            (true, Some(declared)) if self.int_or_mask != 0 && (1..=32).contains(&declared) => {
-                Some(bitdepth::effective_bits(self.int_or_mask, declared))
-            }
-            _ => None,
-        };
-        let bit_depth_dithered = declared_bits
-            .is_some_and(|bits| exact_bit_depth == Some(bits) && self.grid16.detected(bits));
-        let real_bit_depth = if bit_depth_dithered {
-            Some(16)
-        } else {
-            exact_bit_depth
-        };
+        let measured_depth = self.bit_depth.finish(declared_bits);
+        let real_bit_depth = measured_depth.map(|(bits, _)| bits);
+        let bit_depth_evidence = measured_depth.map(|(_, evidence)| evidence);
 
         let (mdct_cutoff_ratio, mdct_dead_db, mdct_dead_fraction) = if self.mdct_frames > 0 {
             let frac = self.mdct_dead_frames as f32 / self.mdct_frames as f32;
@@ -443,7 +420,7 @@ impl StreamAnalyzer {
             clipping,
             fake_stereo,
             real_bit_depth,
-            bit_depth_dithered,
+            bit_depth_evidence,
             dr_db,
             mdct_cutoff_ratio,
             mdct_dead_db,

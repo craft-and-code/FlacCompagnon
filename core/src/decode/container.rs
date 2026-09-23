@@ -99,7 +99,7 @@ pub fn ext_canonical(path: &Path) -> Option<&'static str> {
 ///
 /// Deliberately not the same mapping as [`ext_canonical`]: this one is shown
 /// to the user, and falls back to the uppercased extension for anything
-/// unknown, while `ext_canonical` returns a strict canonical name used to
+/// unrecognized, while `ext_canonical` returns a strict canonical name used to
 /// compare against the detected container.
 ///
 /// `codec` only changes anything for `.m4a`/`.mp4`/`.alac`: an MP4 container

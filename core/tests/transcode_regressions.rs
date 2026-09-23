@@ -77,9 +77,13 @@ fn an_actual_mp3_encoder_still_leaves_detectable_evidence() {
 }
 
 fn write_pcm(path: &std::path::Path, signal: &[f64]) {
+    write_pcm_at_rate(path, signal, 44_100);
+}
+
+fn write_pcm_at_rate(path: &std::path::Path, signal: &[f64], sample_rate: u32) {
     let spec = hound::WavSpec {
         channels: 1,
-        sample_rate: 44_100,
+        sample_rate,
         bits_per_sample: 24,
         sample_format: hound::SampleFormat::Int,
     };
@@ -93,14 +97,36 @@ fn write_pcm(path: &std::path::Path, signal: &[f64]) {
 }
 
 #[test]
-fn an_incomplete_codec_search_is_unknown_in_the_final_report() {
+fn an_incomplete_codec_search_keeps_its_reason_without_a_third_verdict() {
     let dir = tempfile::tempdir().unwrap();
     let source = dir.path().join("short.wav");
     // Enough for all MP3 frames, but not the AAC population.
     write_pcm(&source, &noise(8 * 1024, 0x2545_F491));
     let result = flaccompagnon_core::analyze_file(&source, &Default::default());
     assert!(result.error.is_none(), "{:?}", result.error);
-    assert_eq!(result.detections.summary, "Unknown");
+    assert_eq!(result.detections.summary, "Clean");
     assert!(result.lattice_score.is_none());
     assert!(result.detections.detail.contains("too short"));
+}
+
+#[test]
+fn native_high_rate_pcm_stays_clean_when_codec_checks_do_not_apply() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("native-high-rate.wav");
+    // Native, full-band 24-bit integer PCM: no padding or bandwidth signature.
+    let signal = noise(16 * 1024, 0x2545_F491);
+    for rate in [88_200, 96_000, 192_000] {
+        write_pcm_at_rate(&source, &signal, rate);
+        let result = flaccompagnon_core::analyze_file(&source, &Default::default());
+        assert!(result.error.is_none(), "{:?}", result.error);
+        assert_eq!(result.real_bit_depth, Some(24));
+        assert_eq!(result.detections.summary, "Clean", "rate {rate}");
+        assert!(
+            !result.detections.upscaling
+                && !result.detections.upsampling
+                && !result.detections.transcoding
+        );
+        assert!(result.lattice_score.is_none());
+        assert!(result.detections.detail.contains("not applicable"));
+    }
 }

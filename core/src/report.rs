@@ -60,7 +60,7 @@ pub fn build_csv(report: &FolderReport) -> String {
         "file,format,codec,badge,bitrate_kbps,sample_rate,declared_bits,real_bit_depth,\
          duration_s,size_bytes,status,upscaling,upsampling,transcoding,lattice_score,cutoff_hz,\
          cutoff_ratio,channels,fake_stereo,clipped,clip_events,peak_dbfs,true_peak_dbtp,dr_db,\
-         md5,modified_unix,file_md5,file_crc32\n",
+         md5,bit_depth_method,stored_bits,modified_unix,file_md5,file_crc32\n",
     );
     for f in &report.files {
         let md5 = f
@@ -75,7 +75,7 @@ pub fn build_csv(report: &FolderReport) -> String {
             })
             .unwrap_or("");
         out.push_str(&format!(
-            "{},{},{},{},{},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{},{},{},{:.2},{:.2},{},{},{},{},{}\n",
+            "{},{},{},{},{},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{},{},{},{:.2},{:.2},{},{},{},{},{},{},{}\n",
             csv_escape(&f.file_name),
             f.format,
             f.codec.clone().unwrap_or_default(),
@@ -103,6 +103,11 @@ pub fn build_csv(report: &FolderReport) -> String {
             f.clipping.true_peak_dbtp,
             f.dr_db.map(|v| format!("{v:.1}")).unwrap_or_default(),
             md5,
+            f.bit_depth_evidence.map(|e| match e.method {
+                crate::analysis::bitdepth::BitDepthMethod::Stored => "Stored",
+                crate::analysis::bitdepth::BitDepthMethod::NarrowGrid => "NarrowGrid",
+            }).unwrap_or(""),
+            opt(f.bit_depth_evidence.map(|e| e.stored_bits)),
             opt(f.modified_unix),
             f.file_md5.clone().unwrap_or_default(),
             f.file_crc32.clone().unwrap_or_default(),
@@ -140,8 +145,8 @@ pub fn build_json(report: &FolderReport) -> serde_json::Result<String> {
 
 /// Write the JSON report to `dest`.
 pub fn write_json(dest: &Path, report: &FolderReport) -> std::io::Result<()> {
-    let text = build_json(report)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    let text =
+        build_json(report).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
     let mut file = std::fs::File::create(dest)?;
     file.write_all(text.as_bytes())
 }
@@ -165,9 +170,8 @@ pub fn write_json(dest: &Path, report: &FolderReport) -> std::io::Result<()> {
 /// assert!(report::parse_json(r#"{"hello":"world"}"#).is_err());
 /// ```
 pub fn parse_json(text: &str) -> Result<FolderReport, String> {
-    let wrapped: JsonReport = serde_json::from_str(text).map_err(|e| {
-        format!("This doesn't look like a FlacCompagnon JSON report ({e}).")
-    })?;
+    let wrapped: JsonReport = serde_json::from_str(text)
+        .map_err(|e| format!("This doesn't look like a FlacCompagnon JSON report ({e})."))?;
     if wrapped.format != JSON_FORMAT_MARKER {
         return Err("This JSON file wasn't exported by FlacCompagnon.".to_string());
     }
@@ -175,6 +179,16 @@ pub fn parse_json(text: &str) -> Result<FolderReport, String> {
         return Err(
             "This report was saved by a newer version of FlacCompagnon — please update the app."
                 .to_string(),
+        );
+    }
+    if wrapped.report.files.iter().any(|file| {
+        !matches!(
+            file.detections.summary.as_str(),
+            "Clean" | "Flagged" | "Not analyzed"
+        )
+    }) {
+        return Err(
+            "This report uses an unsupported detection status. Reanalyze the audio files.".into(),
         );
     }
     Ok(wrapped.report)
@@ -226,6 +240,7 @@ mod tests {
             cutoff_hz: Some(21000.0),
             cutoff_ratio: Some(0.95),
             real_bit_depth: Some(16),
+            bit_depth_evidence: None,
             lattice_score: None,
             fake_stereo: Some(false),
             badge: None,
@@ -277,6 +292,37 @@ mod tests {
         );
     }
 
+    #[test]
+    fn csv_keeps_estimated_depth_distinct_from_occupied_bits() {
+        use crate::analysis::bitdepth::{BitDepthEvidence, BitDepthMethod};
+        let mut file = sample_file();
+        file.declared_bits = Some(24);
+        file.real_bit_depth = Some(16);
+        file.bit_depth_evidence = Some(BitDepthEvidence {
+            stored_bits: 24,
+            method: BitDepthMethod::NarrowGrid,
+        });
+        let csv = build_csv(&FolderReport {
+            root: "/music".into(),
+            files: vec![file],
+            has_flac: true,
+        });
+        let mut lines = csv.lines();
+        let header: Vec<_> = lines.next().expect("header").split(',').collect();
+        let row: Vec<_> = lines.next().expect("file row").split(',').collect();
+        for (column, expected) in [
+            ("real_bit_depth", "16"),
+            ("stored_bits", "24"),
+            ("bit_depth_method", "NarrowGrid"),
+        ] {
+            let at = header
+                .iter()
+                .position(|&name| name == column)
+                .expect("evidence column");
+            assert_eq!(row[at], expected);
+        }
+    }
+
     /// The JSON is the archival format, so it must carry every field
     /// regardless of what the table was showing. Written as an explicit list
     /// rather than a count, so adding a field to `FileAnalysis` without
@@ -290,11 +336,31 @@ mod tests {
         };
         let json = build_json(&report).expect("serialize");
         for key in [
-            "path", "file_name", "format", "codec", "ext_mismatch", "sample_rate",
-            "channels", "declared_bits", "duration_secs", "size_bytes", "bitrate_kbps",
-            "modified_unix", "detections", "cutoff_hz", "cutoff_ratio", "real_bit_depth",
-            "lattice_score", "fake_stereo", "badge", "clipping", "dr_db", "flac_md5",
-            "file_md5", "file_crc32", "error",
+            "path",
+            "file_name",
+            "format",
+            "codec",
+            "ext_mismatch",
+            "sample_rate",
+            "channels",
+            "declared_bits",
+            "duration_secs",
+            "size_bytes",
+            "bitrate_kbps",
+            "modified_unix",
+            "detections",
+            "cutoff_hz",
+            "cutoff_ratio",
+            "real_bit_depth",
+            "lattice_score",
+            "fake_stereo",
+            "badge",
+            "clipping",
+            "dr_db",
+            "flac_md5",
+            "file_md5",
+            "file_crc32",
+            "error",
         ] {
             assert!(
                 json.contains(&format!("\"{key}\"")),
@@ -394,12 +460,27 @@ mod tests {
             has_flac: true,
         };
         let csv = build_csv(&report);
-        let header: Vec<&str> = csv.lines().next().expect("header line").split(',').collect();
+        let header: Vec<&str> = csv
+            .lines()
+            .next()
+            .expect("header line")
+            .split(',')
+            .collect();
         assert_eq!(header.get(1), Some(&"format"));
         assert_eq!(header.get(2), Some(&"codec"));
-        let bitrate_idx = header.iter().position(|&h| h == "bitrate_kbps").expect("bitrate_kbps");
-        let rate_idx = header.iter().position(|&h| h == "sample_rate").expect("sample_rate");
-        assert_eq!(bitrate_idx + 1, rate_idx, "bitrate_kbps must sit right before sample_rate");
+        let bitrate_idx = header
+            .iter()
+            .position(|&h| h == "bitrate_kbps")
+            .expect("bitrate_kbps");
+        let rate_idx = header
+            .iter()
+            .position(|&h| h == "sample_rate")
+            .expect("sample_rate");
+        assert_eq!(
+            bitrate_idx + 1,
+            rate_idx,
+            "bitrate_kbps must sit right before sample_rate"
+        );
     }
 
     #[test]
@@ -419,6 +500,20 @@ mod tests {
         assert_eq!(parsed.files[0].clipping.true_peak_dbtp, -0.7);
         assert_eq!(parsed.files[0].flac_md5, Some(FlacMd5Status::Match));
         assert_eq!(parsed.files[0].size_bytes, 32_345_678);
+    }
+
+    #[test]
+    fn unsupported_report_status_requires_reanalysis() {
+        let mut file = sample_file();
+        file.detections.summary = "Retired status".into();
+        let report = FolderReport {
+            root: "/music".into(),
+            files: vec![file],
+            has_flac: true,
+        };
+        let error = parse_json(&build_json(&report).expect("save fixture"))
+            .expect_err("obsolete results must not be reintroduced");
+        assert!(error.contains("Reanalyze"));
     }
 
     /// A report exported before `size_bytes` existed must still load — the

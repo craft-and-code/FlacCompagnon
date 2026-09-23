@@ -246,7 +246,7 @@ export function detectionLabels(d: Detections): string[] {
   if (d.upscaling) tags.push("Upscaled");
   if (d.upsampling) tags.push("Upsampled");
   if (d.transcoding) tags.push("Transcoded");
-  if (tags.length === 0) tags.push(d.summary === "Clean" ? "Clean" : "Unknown");
+  if (tags.length === 0) tags.push(d.summary === "Clean" ? "Clean" : "—");
   return tags;
 }
 
