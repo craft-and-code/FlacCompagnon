@@ -222,10 +222,9 @@ component.
 - **The frontend's size rule applies here too: ~200 lines target, 300 the hard
   ceiling.** Same test — if you cannot describe a file's job in one sentence
   without "and", split it.
-- **The count is code, not tests.** A `#[cfg(test)] mod tests` at the bottom
-  doesn't push a file over: this file also asks for thorough tests next to the
-  code they cover, and the two rules must not fight. Thorough tests are never
-  the reason to split a module.
+- **The count is production code.** Tests live in separate files under each
+  crate's `tests/unit/` directory, so they never determine whether a source
+  module needs splitting.
 - **Exemption, and how to claim it.** A file that is *one* algorithm or *one*
   subsystem may exceed the ceiling when splitting it would only scatter an
   argument that reads best top-to-bottom (a DSP method with its derivation, a
@@ -270,8 +269,12 @@ component.
 - Every parser needs a malformed-input test. "It rejects garbage without
   panicking" is a behaviour, and it is the one that breaks first on real files.
 - A bug fixed is a test added, named after the symptom.
-- Tests live in a `#[cfg(test)] mod tests` at the bottom of the file they cover,
-  except cross-module ground-truth suites, which go in `core/tests/`.
+- Keep test bodies out of `src/` files. Put a module's unit tests in the
+  matching path under `core/tests/unit/` or `src-tauri/tests/unit/`, included
+  with a `#[cfg(test)]` and `#[path = "..."] mod tests;` declaration in the
+  source module. This keeps access to private code without mixing tests into
+  production files. Cross-module ground-truth suites remain directly under
+  `core/tests/`; frontend tests live in the root `tests/` directory.
 
 ## Testing and verification
 
@@ -284,10 +287,9 @@ cargo test           # Rust workspace
 cargo clippy         # Rust lints
 ```
 
-**The AI assistant's sandbox has no Rust toolchain and no npm registry
-access.** Rust changes and any change needing a fresh dependency can only be
-reviewed by reading, not compiled — say so explicitly rather than implying a
-change was verified, and ask the maintainer to run the commands above.
+If a command cannot run in the current environment, say which verification is
+missing and ask the maintainer to run it. Do not claim a change was verified
+by a command that did not run.
 
 ## Comments
 
