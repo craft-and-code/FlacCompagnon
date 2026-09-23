@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `core/src/scan.rs`."><title>scan.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-1ed95124.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="flaccompagnon_core" data-themes="" data-resource-suffix="" data-rustdoc-version="1.98.1 (48a229cea 2026-09-01)" data-channel="1.98.1" data-search-js="search-9944d736.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-41dd4d93.js"></script><script defer src="../../static.files/src-script-813739b1.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-417ebf0a.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">flaccompagnon_core/</div>scan.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Finding the files worth analyzing, and analyzing a whole folder of them.
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `core/src/scan.rs`."><title>scan.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-1ed95124.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="flaccompagnon_core" data-themes="" data-resource-suffix="" data-rustdoc-version="1.98.1 (48a229cea 2026-09-01)" data-channel="1.98.1" data-search-js="search-9944d736.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-41dd4d93.js"></script><script defer src="../../static.files/src-script-813739b1.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-417ebf0a.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">flaccompagnon_core/</div>scan.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-2"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Finding the files worth analyzing, and analyzing a whole folder of them.
 <a href=#2 id=2 data-nosnippet>2</a>
 <a href=#3 id=3 data-nosnippet>3</a></span><span class="kw">use </span>std::path::{Path, PathBuf};
 <a href=#4 id=4 data-nosnippet>4</a>
@@ -90,98 +90,6 @@
 <a href=#90 id=90 data-nosnippet>90</a>}
 <a href=#91 id=91 data-nosnippet>91</a>
 <a href=#92 id=92 data-nosnippet>92</a><span class="attr">#[cfg(test)]
-<a href=#93 id=93 data-nosnippet>93</a></span><span class="kw">mod </span>tests {
-<a href=#94 id=94 data-nosnippet>94</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
-<a href=#95 id=95 data-nosnippet>95</a>    <span class="kw">use </span>std::fs;
-<a href=#96 id=96 data-nosnippet>96</a>
-<a href=#97 id=97 data-nosnippet>97</a>    <span class="kw">fn </span>touch(dir: <span class="kw-2">&amp;</span>Path, rel: <span class="kw-2">&amp;</span>str) {
-<a href=#98 id=98 data-nosnippet>98</a>        <span class="kw">let </span>p = dir.join(rel);
-<a href=#99 id=99 data-nosnippet>99</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(parent) = p.parent() {
-<a href=#100 id=100 data-nosnippet>100</a>            fs::create_dir_all(parent).expect(<span class="string">"mkdir"</span>);
-<a href=#101 id=101 data-nosnippet>101</a>        }
-<a href=#102 id=102 data-nosnippet>102</a>        fs::write(<span class="kw-2">&amp;</span>p, <span class="string">b""</span>).expect(<span class="string">"write"</span>);
-<a href=#103 id=103 data-nosnippet>103</a>    }
-<a href=#104 id=104 data-nosnippet>104</a>
-<a href=#105 id=105 data-nosnippet>105</a>    <span class="attr">#[test]
-<a href=#106 id=106 data-nosnippet>106</a>    </span><span class="kw">fn </span>every_supported_extension_is_recognized() {
-<a href=#107 id=107 data-nosnippet>107</a>        <span class="kw">for </span>ext <span class="kw">in </span>SUPPORTED_EXTENSIONS {
-<a href=#108 id=108 data-nosnippet>108</a>            <span class="kw">let </span>name = <span class="macro">format!</span>(<span class="string">"track.{ext}"</span>);
-<a href=#109 id=109 data-nosnippet>109</a>            <span class="macro">assert!</span>(is_supported_audio(Path::new(<span class="kw-2">&amp;</span>name)), <span class="string">"{ext}"</span>);
-<a href=#110 id=110 data-nosnippet>110</a>            <span class="comment">// Uppercase too: file systems are case-insensitive in practice.
-<a href=#111 id=111 data-nosnippet>111</a>            </span><span class="kw">let </span>upper = <span class="macro">format!</span>(<span class="string">"track.{}"</span>, ext.to_uppercase());
-<a href=#112 id=112 data-nosnippet>112</a>            <span class="macro">assert!</span>(is_supported_audio(Path::new(<span class="kw-2">&amp;</span>upper)), <span class="string">"{upper}"</span>);
-<a href=#113 id=113 data-nosnippet>113</a>        }
-<a href=#114 id=114 data-nosnippet>114</a>        <span class="macro">assert!</span>(!is_supported_audio(Path::new(<span class="string">"cover.jpg"</span>)));
-<a href=#115 id=115 data-nosnippet>115</a>        <span class="macro">assert!</span>(!is_supported_audio(Path::new(<span class="string">"notes.txt"</span>)));
-<a href=#116 id=116 data-nosnippet>116</a>        <span class="macro">assert!</span>(!is_supported_audio(Path::new(<span class="string">"README"</span>)));
-<a href=#117 id=117 data-nosnippet>117</a>        <span class="comment">// An extension that merely *contains* a supported one is not one.
-<a href=#118 id=118 data-nosnippet>118</a>        </span><span class="macro">assert!</span>(!is_supported_audio(Path::new(<span class="string">"track.flacx"</span>)));
-<a href=#119 id=119 data-nosnippet>119</a>    }
-<a href=#120 id=120 data-nosnippet>120</a>
-<a href=#121 id=121 data-nosnippet>121</a>    <span class="doccomment">/// The symptom: a `.opus` file dropped on the app vanished without a
-<a href=#122 id=122 data-nosnippet>122</a>    /// word, while the *same* Opus audio named `.ogg` was accepted (and then
-<a href=#123 id=123 data-nosnippet>123</a>    /// failed at decode with a real message). Whether a file is worth trying
-<a href=#124 id=124 data-nosnippet>124</a>    /// must not depend on which of two names its container was given.
-<a href=#125 id=125 data-nosnippet>125</a>    </span><span class="attr">#[test]
-<a href=#126 id=126 data-nosnippet>126</a>    </span><span class="kw">fn </span>opus_is_accepted_under_both_its_container_names() {
-<a href=#127 id=127 data-nosnippet>127</a>        <span class="kw">for </span>name <span class="kw">in </span>[<span class="string">"track.opus"</span>, <span class="string">"track.ogg"</span>, <span class="string">"track.oga"</span>, <span class="string">"TRACK.OPUS"</span>] {
-<a href=#128 id=128 data-nosnippet>128</a>            <span class="macro">assert!</span>(is_supported_audio(Path::new(name)), <span class="string">"{name}"</span>);
-<a href=#129 id=129 data-nosnippet>129</a>        }
-<a href=#130 id=130 data-nosnippet>130</a>    }
-<a href=#131 id=131 data-nosnippet>131</a>
-<a href=#132 id=132 data-nosnippet>132</a>    <span class="doccomment">/// Generated spectrograms live next to the audio; a rescan must not pick
-<a href=#133 id=133 data-nosnippet>133</a>    /// up anything from there, at any depth — under either folder name, since
-<a href=#134 id=134 data-nosnippet>134</a>    /// libraries scanned before the rename still hold `spectres/`.
-<a href=#135 id=135 data-nosnippet>135</a>    </span><span class="attr">#[test]
-<a href=#136 id=136 data-nosnippet>136</a>    </span><span class="kw">fn </span>generated_spectrogram_folders_are_skipped_under_both_names() {
-<a href=#137 id=137 data-nosnippet>137</a>        <span class="kw">let </span>dir = tempfile::tempdir().expect(<span class="string">"tempdir"</span>);
-<a href=#138 id=138 data-nosnippet>138</a>        <span class="kw">let </span>root = dir.path();
-<a href=#139 id=139 data-nosnippet>139</a>        touch(root, <span class="string">"a.flac"</span>);
-<a href=#140 id=140 data-nosnippet>140</a>        touch(root, <span class="string">"spectrograms/a.flac"</span>);
-<a href=#141 id=141 data-nosnippet>141</a>        touch(root, <span class="string">"spectres/a.flac"</span>);
-<a href=#142 id=142 data-nosnippet>142</a>        touch(root, <span class="string">"album/b.flac"</span>);
-<a href=#143 id=143 data-nosnippet>143</a>        touch(root, <span class="string">"album/spectrograms/b.flac"</span>);
-<a href=#144 id=144 data-nosnippet>144</a>        touch(root, <span class="string">"album/spectres/b.flac"</span>);
-<a href=#145 id=145 data-nosnippet>145</a>
-<a href=#146 id=146 data-nosnippet>146</a>        <span class="kw">let </span>found = list_audio_files(root, <span class="bool-val">true</span>);
-<a href=#147 id=147 data-nosnippet>147</a>        <span class="macro">assert_eq!</span>(found.len(), <span class="number">2</span>, <span class="string">"found: {found:?}"</span>);
-<a href=#148 id=148 data-nosnippet>148</a>        <span class="macro">assert!</span>(found.iter().all(|p| !p
-<a href=#149 id=149 data-nosnippet>149</a>            .components()
-<a href=#150 id=150 data-nosnippet>150</a>            .any(|c| GENERATED_DIRS.iter().any(|d| c.as_os_str() == <span class="kw-2">*</span>d))));
-<a href=#151 id=151 data-nosnippet>151</a>    }
-<a href=#152 id=152 data-nosnippet>152</a>
-<a href=#153 id=153 data-nosnippet>153</a>    <span class="attr">#[test]
-<a href=#154 id=154 data-nosnippet>154</a>    </span><span class="kw">fn </span>non_recursive_stays_in_the_top_folder() {
-<a href=#155 id=155 data-nosnippet>155</a>        <span class="kw">let </span>dir = tempfile::tempdir().expect(<span class="string">"tempdir"</span>);
-<a href=#156 id=156 data-nosnippet>156</a>        <span class="kw">let </span>root = dir.path();
-<a href=#157 id=157 data-nosnippet>157</a>        touch(root, <span class="string">"a.flac"</span>);
-<a href=#158 id=158 data-nosnippet>158</a>        touch(root, <span class="string">"album/b.flac"</span>);
-<a href=#159 id=159 data-nosnippet>159</a>
-<a href=#160 id=160 data-nosnippet>160</a>        <span class="macro">assert_eq!</span>(list_audio_files(root, <span class="bool-val">false</span>).len(), <span class="number">1</span>);
-<a href=#161 id=161 data-nosnippet>161</a>        <span class="macro">assert_eq!</span>(list_audio_files(root, <span class="bool-val">true</span>).len(), <span class="number">2</span>);
-<a href=#162 id=162 data-nosnippet>162</a>    }
-<a href=#163 id=163 data-nosnippet>163</a>
-<a href=#164 id=164 data-nosnippet>164</a>    <span class="doccomment">/// The list is sorted, because it is what the report's row order comes
-<a href=#165 id=165 data-nosnippet>165</a>    /// from before the user reorders anything.
-<a href=#166 id=166 data-nosnippet>166</a>    </span><span class="attr">#[test]
-<a href=#167 id=167 data-nosnippet>167</a>    </span><span class="kw">fn </span>results_are_sorted() {
-<a href=#168 id=168 data-nosnippet>168</a>        <span class="kw">let </span>dir = tempfile::tempdir().expect(<span class="string">"tempdir"</span>);
-<a href=#169 id=169 data-nosnippet>169</a>        <span class="kw">let </span>root = dir.path();
-<a href=#170 id=170 data-nosnippet>170</a>        <span class="kw">for </span>name <span class="kw">in </span>[<span class="string">"c.flac"</span>, <span class="string">"a.flac"</span>, <span class="string">"b.flac"</span>] {
-<a href=#171 id=171 data-nosnippet>171</a>            touch(root, name);
-<a href=#172 id=172 data-nosnippet>172</a>        }
-<a href=#173 id=173 data-nosnippet>173</a>        <span class="kw">let </span>found = list_audio_files(root, <span class="bool-val">false</span>);
-<a href=#174 id=174 data-nosnippet>174</a>        <span class="kw">let </span><span class="kw-2">mut </span>sorted = found.clone();
-<a href=#175 id=175 data-nosnippet>175</a>        sorted.sort();
-<a href=#176 id=176 data-nosnippet>176</a>        <span class="macro">assert_eq!</span>(found, sorted);
-<a href=#177 id=177 data-nosnippet>177</a>    }
-<a href=#178 id=178 data-nosnippet>178</a>
-<a href=#179 id=179 data-nosnippet>179</a>    <span class="doccomment">/// A folder that doesn't exist is an empty list, not a panic — the path
-<a href=#180 id=180 data-nosnippet>180</a>    /// can come from a stale saved report.
-<a href=#181 id=181 data-nosnippet>181</a>    </span><span class="attr">#[test]
-<a href=#182 id=182 data-nosnippet>182</a>    </span><span class="kw">fn </span>a_missing_root_yields_nothing() {
-<a href=#183 id=183 data-nosnippet>183</a>        <span class="kw">let </span>missing = Path::new(<span class="string">"/definitely/not/a/real/folder/anywhere"</span>);
-<a href=#184 id=184 data-nosnippet>184</a>        <span class="macro">assert!</span>(list_audio_files(missing, <span class="bool-val">true</span>).is_empty());
-<a href=#185 id=185 data-nosnippet>185</a>    }
-<a href=#186 id=186 data-nosnippet>186</a>}
+<a href=#93 id=93 data-nosnippet>93</a>#[path = <span class="string">"../tests/unit/scan.rs"</span>]
+<a href=#94 id=94 data-nosnippet>94</a></span><span class="kw">mod </span>tests;
 </code></pre></div></section></main></body></html>

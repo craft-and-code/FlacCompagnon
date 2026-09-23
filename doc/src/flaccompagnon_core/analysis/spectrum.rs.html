@@ -146,49 +146,6 @@
 <a href=#146 id=146 data-nosnippet>146</a>}
 <a href=#147 id=147 data-nosnippet>147</a>
 <a href=#148 id=148 data-nosnippet>148</a><span class="attr">#[cfg(test)]
-<a href=#149 id=149 data-nosnippet>149</a></span><span class="kw">mod </span>tests {
-<a href=#150 id=150 data-nosnippet>150</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
-<a href=#151 id=151 data-nosnippet>151</a>
-<a href=#152 id=152 data-nosnippet>152</a>    <span class="attr">#[test]
-<a href=#153 id=153 data-nosnippet>153</a>    </span><span class="kw">fn </span>cutoff_of_full_band_noise_is_near_nyquist() {
-<a href=#154 id=154 data-nosnippet>154</a>        <span class="kw">let </span>spec = <span class="macro">vec!</span>[<span class="number">0.0f32</span>; <span class="number">4097</span>];
-<a href=#155 id=155 data-nosnippet>155</a>        <span class="kw">let </span>(hz, ratio) = detect_cutoff(<span class="kw-2">&amp;</span>spec, <span class="number">44100</span>, <span class="number">8192</span>);
-<a href=#156 id=156 data-nosnippet>156</a>        <span class="macro">assert!</span>(ratio &gt; <span class="number">0.9</span>, <span class="string">"ratio was {ratio} (hz {hz})"</span>);
-<a href=#157 id=157 data-nosnippet>157</a>    }
-<a href=#158 id=158 data-nosnippet>158</a>
-<a href=#159 id=159 data-nosnippet>159</a>    <span class="attr">#[test]
-<a href=#160 id=160 data-nosnippet>160</a>    </span><span class="kw">fn </span>cutoff_of_band_limited_signal_is_detected() {
-<a href=#161 id=161 data-nosnippet>161</a>        <span class="comment">// Content up to bin 2900 (~15.6 kHz at 44.1k/8192), dead above.
-<a href=#162 id=162 data-nosnippet>162</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>spec = <span class="macro">vec!</span>[-<span class="number">140.0f32</span>; <span class="number">4097</span>];
-<a href=#163 id=163 data-nosnippet>163</a>        <span class="kw">for </span>s <span class="kw">in </span>spec.iter_mut().take(<span class="number">2900</span>) {
-<a href=#164 id=164 data-nosnippet>164</a>            <span class="kw-2">*</span>s = <span class="number">0.0</span>;
-<a href=#165 id=165 data-nosnippet>165</a>        }
-<a href=#166 id=166 data-nosnippet>166</a>        <span class="kw">let </span>(hz, ratio) = detect_cutoff(<span class="kw-2">&amp;</span>spec, <span class="number">44100</span>, <span class="number">8192</span>);
-<a href=#167 id=167 data-nosnippet>167</a>        <span class="macro">assert!</span>((hz - <span class="number">15600.0</span>).abs() &lt; <span class="number">400.0</span>, <span class="string">"hz was {hz}"</span>);
-<a href=#168 id=168 data-nosnippet>168</a>        <span class="macro">assert!</span>(ratio &lt; <span class="number">0.75</span>, <span class="string">"ratio was {ratio}"</span>);
-<a href=#169 id=169 data-nosnippet>169</a>    }
-<a href=#170 id=170 data-nosnippet>170</a>
-<a href=#171 id=171 data-nosnippet>171</a>    <span class="attr">#[test]
-<a href=#172 id=172 data-nosnippet>172</a>    </span><span class="kw">fn </span>faint_hf_content_still_counts() {
-<a href=#173 id=173 data-nosnippet>173</a>        <span class="comment">// Content that decays to -80 dB near Nyquist is genuine, not a cutoff.
-<a href=#174 id=174 data-nosnippet>174</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>spec = <span class="macro">vec!</span>[<span class="number">0.0f32</span>; <span class="number">4097</span>];
-<a href=#175 id=175 data-nosnippet>175</a>        <span class="kw">for </span>(i, s) <span class="kw">in </span>spec.iter_mut().enumerate() {
-<a href=#176 id=176 data-nosnippet>176</a>            <span class="kw-2">*</span>s = -<span class="number">80.0 </span>* (i <span class="kw">as </span>f32 / <span class="number">4096.0</span>); <span class="comment">// 0 dB at DC down to -80 dB at Nyquist
-<a href=#177 id=177 data-nosnippet>177</a>        </span>}
-<a href=#178 id=178 data-nosnippet>178</a>        <span class="kw">let </span>(<span class="kw">_</span>, ratio) = detect_cutoff(<span class="kw-2">&amp;</span>spec, <span class="number">44100</span>, <span class="number">8192</span>);
-<a href=#179 id=179 data-nosnippet>179</a>        <span class="macro">assert!</span>(ratio &gt; <span class="number">0.9</span>, <span class="string">"ratio was {ratio}"</span>);
-<a href=#180 id=180 data-nosnippet>180</a>    }
-<a href=#181 id=181 data-nosnippet>181</a>
-<a href=#182 id=182 data-nosnippet>182</a>    <span class="attr">#[test]
-<a href=#183 id=183 data-nosnippet>183</a>    </span><span class="kw">fn </span>cliff_is_measured() {
-<a href=#184 id=184 data-nosnippet>184</a>        <span class="comment">// 0 dB up to ~15.6 kHz then a drop to -120 dB.
-<a href=#185 id=185 data-nosnippet>185</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>spec = <span class="macro">vec!</span>[-<span class="number">120.0f32</span>; <span class="number">4097</span>];
-<a href=#186 id=186 data-nosnippet>186</a>        <span class="kw">for </span>s <span class="kw">in </span>spec.iter_mut().take(<span class="number">2900</span>) {
-<a href=#187 id=187 data-nosnippet>187</a>            <span class="kw-2">*</span>s = <span class="number">0.0</span>;
-<a href=#188 id=188 data-nosnippet>188</a>        }
-<a href=#189 id=189 data-nosnippet>189</a>        <span class="kw">let </span>(cliff, above) = cutoff_context(<span class="kw-2">&amp;</span>spec, <span class="number">44100</span>, <span class="number">8192</span>, <span class="number">15600.0</span>);
-<a href=#190 id=190 data-nosnippet>190</a>        <span class="macro">assert!</span>(cliff &gt; <span class="number">80.0</span>, <span class="string">"cliff was {cliff}"</span>);
-<a href=#191 id=191 data-nosnippet>191</a>        <span class="macro">assert!</span>(above &lt; -<span class="number">100.0</span>, <span class="string">"above was {above}"</span>);
-<a href=#192 id=192 data-nosnippet>192</a>    }
-<a href=#193 id=193 data-nosnippet>193</a>}
+<a href=#149 id=149 data-nosnippet>149</a>#[path = <span class="string">"../../tests/unit/analysis/spectrum.rs"</span>]
+<a href=#150 id=150 data-nosnippet>150</a></span><span class="kw">mod </span>tests;
 </code></pre></div></section></main></body></html>

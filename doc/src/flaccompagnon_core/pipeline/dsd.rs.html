@@ -123,34 +123,6 @@
 <a href=#123 id=123 data-nosnippet>123</a>}
 <a href=#124 id=124 data-nosnippet>124</a>
 <a href=#125 id=125 data-nosnippet>125</a><span class="attr">#[cfg(test)]
-<a href=#126 id=126 data-nosnippet>126</a></span><span class="kw">mod </span>tests {
-<a href=#127 id=127 data-nosnippet>127</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
-<a href=#128 id=128 data-nosnippet>128</a>
-<a href=#129 id=129 data-nosnippet>129</a>    <span class="attr">#[test]
-<a href=#130 id=130 data-nosnippet>130</a>    </span><span class="kw">fn </span>attributes_the_brick_wall_to_the_right_source_rate() {
-<a href=#131 id=131 data-nosnippet>131</a>        <span class="kw">let </span>cd = pcm_source_detail(dsd_format::PcmSourceCheck {
-<a href=#132 id=132 data-nosnippet>132</a>            boundary_hz: <span class="number">22_050.0</span>,
-<a href=#133 id=133 data-nosnippet>133</a>            drop_db: <span class="number">51.0</span>,
-<a href=#134 id=134 data-nosnippet>134</a>        });
-<a href=#135 id=135 data-nosnippet>135</a>        <span class="macro">assert!</span>(cd.contains(<span class="string">"44.1 kHz"</span>), <span class="string">"{cd}"</span>);
-<a href=#136 id=136 data-nosnippet>136</a>        <span class="macro">assert!</span>(cd.contains(<span class="string">"22.05 kHz"</span>), <span class="string">"{cd}"</span>);
-<a href=#137 id=137 data-nosnippet>137</a>
-<a href=#138 id=138 data-nosnippet>138</a>        <span class="kw">let </span>dvd = pcm_source_detail(dsd_format::PcmSourceCheck {
-<a href=#139 id=139 data-nosnippet>139</a>            boundary_hz: <span class="number">24_000.0</span>,
-<a href=#140 id=140 data-nosnippet>140</a>            drop_db: <span class="number">48.0</span>,
-<a href=#141 id=141 data-nosnippet>141</a>        });
-<a href=#142 id=142 data-nosnippet>142</a>        <span class="macro">assert!</span>(dvd.contains(<span class="string">"48 kHz"</span>), <span class="string">"{dvd}"</span>);
-<a href=#143 id=143 data-nosnippet>143</a>    }
-<a href=#144 id=144 data-nosnippet>144</a>
-<a href=#145 id=145 data-nosnippet>145</a>    <span class="doccomment">/// Header-only checks retain their explanation without a third verdict.
-<a href=#146 id=146 data-nosnippet>146</a>    </span><span class="attr">#[test]
-<a href=#147 id=147 data-nosnippet>147</a>    </span><span class="kw">fn </span>informational_verdicts_flag_nothing() {
-<a href=#148 id=148 data-nosnippet>148</a>        <span class="kw">for </span>v <span class="kw">in </span>[verdict(<span class="bool-val">false</span>, <span class="string">"header only"</span>), verdict(<span class="bool-val">false</span>, <span class="string">"native"</span>)] {
-<a href=#149 id=149 data-nosnippet>149</a>            <span class="macro">assert!</span>(!v.upscaling);
-<a href=#150 id=150 data-nosnippet>150</a>            <span class="macro">assert!</span>(!v.upsampling);
-<a href=#151 id=151 data-nosnippet>151</a>            <span class="macro">assert!</span>(!v.transcoding);
-<a href=#152 id=152 data-nosnippet>152</a>            <span class="macro">assert_eq!</span>(v.summary, <span class="string">"Clean"</span>);
-<a href=#153 id=153 data-nosnippet>153</a>        }
-<a href=#154 id=154 data-nosnippet>154</a>    }
-<a href=#155 id=155 data-nosnippet>155</a>}
+<a href=#126 id=126 data-nosnippet>126</a>#[path = <span class="string">"../../tests/unit/pipeline/dsd.rs"</span>]
+<a href=#127 id=127 data-nosnippet>127</a></span><span class="kw">mod </span>tests;
 </code></pre></div></section></main></body></html>

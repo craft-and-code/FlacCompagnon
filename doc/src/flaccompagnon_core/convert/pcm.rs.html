@@ -112,53 +112,6 @@
 <a href=#112 id=112 data-nosnippet>112</a>}
 <a href=#113 id=113 data-nosnippet>113</a>
 <a href=#114 id=114 data-nosnippet>114</a><span class="attr">#[cfg(test)]
-<a href=#115 id=115 data-nosnippet>115</a></span><span class="kw">mod </span>tests {
-<a href=#116 id=116 data-nosnippet>116</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
-<a href=#117 id=117 data-nosnippet>117</a>
-<a href=#118 id=118 data-nosnippet>118</a>    <span class="attr">#[test]
-<a href=#119 id=119 data-nosnippet>119</a>    </span><span class="kw">fn </span>f32_to_ints_clamps_at_the_target_bit_depth() {
-<a href=#120 id=120 data-nosnippet>120</a>        <span class="kw">let </span>samples = [-<span class="number">2.0f32</span>, -<span class="number">1.0</span>, <span class="number">0.0</span>, <span class="number">0.5</span>, <span class="number">1.0</span>, <span class="number">2.0</span>];
-<a href=#121 id=121 data-nosnippet>121</a>        <span class="kw">let </span>got = f32_to_ints(<span class="kw-2">&amp;</span>samples, <span class="number">16</span>);
-<a href=#122 id=122 data-nosnippet>122</a>        <span class="macro">assert_eq!</span>(got, <span class="macro">vec!</span>[-<span class="number">32768</span>, -<span class="number">32768</span>, <span class="number">0</span>, <span class="number">16384</span>, <span class="number">32767</span>, <span class="number">32767</span>]);
-<a href=#123 id=123 data-nosnippet>123</a>    }
-<a href=#124 id=124 data-nosnippet>124</a>
-<a href=#125 id=125 data-nosnippet>125</a>    <span class="doccomment">/// Halving the rate must halve the frame count (not the sample count —
-<a href=#126 id=126 data-nosnippet>126</a>    /// that stays interleaved by `channels`), and the resampled frames must
-<a href=#127 id=127 data-nosnippet>127</a>    /// still be interleaved in the same channel order. A resampler that
-<a href=#128 id=128 data-nosnippet>128</a>    /// treated the buffer as mono would pass a frame-count check and still
-<a href=#129 id=129 data-nosnippet>129</a>    /// scramble left and right, which is why this asserts on values too.
-<a href=#130 id=130 data-nosnippet>130</a>    </span><span class="attr">#[test]
-<a href=#131 id=131 data-nosnippet>131</a>    </span><span class="kw">fn </span>halving_the_rate_halves_the_frames_and_keeps_the_channels_apart() {
-<a href=#132 id=132 data-nosnippet>132</a>        <span class="comment">// Two channels held at distinct constant values: any interpolation
-<a href=#133 id=133 data-nosnippet>133</a>        // between them stays at that value, so a channel swap is visible.
-<a href=#134 id=134 data-nosnippet>134</a>        </span><span class="kw">let </span>channels = <span class="number">2</span>;
-<a href=#135 id=135 data-nosnippet>135</a>        <span class="kw">let </span>samples: Vec&lt;f32&gt; = (<span class="number">0</span>..<span class="number">8</span>).flat_map(|<span class="kw">_</span>| [<span class="number">1.0f32</span>, -<span class="number">1.0</span>]).collect();
-<a href=#136 id=136 data-nosnippet>136</a>        <span class="kw">let </span>got = resample_linear(<span class="kw-2">&amp;</span>samples, channels, <span class="number">48_000</span>, <span class="number">24_000</span>);
-<a href=#137 id=137 data-nosnippet>137</a>        <span class="macro">assert_eq!</span>(got.len(), <span class="number">4 </span>* channels);
-<a href=#138 id=138 data-nosnippet>138</a>        <span class="kw">for </span>frame <span class="kw">in </span>got.chunks(channels) {
-<a href=#139 id=139 data-nosnippet>139</a>            <span class="macro">assert_eq!</span>(frame[<span class="number">0</span>], <span class="number">1.0</span>);
-<a href=#140 id=140 data-nosnippet>140</a>            <span class="macro">assert_eq!</span>(frame[<span class="number">1</span>], -<span class="number">1.0</span>);
-<a href=#141 id=141 data-nosnippet>141</a>        }
-<a href=#142 id=142 data-nosnippet>142</a>    }
-<a href=#143 id=143 data-nosnippet>143</a>
-<a href=#144 id=144 data-nosnippet>144</a>    <span class="attr">#[test]
-<a href=#145 id=145 data-nosnippet>145</a>    </span><span class="kw">fn </span>an_unchanged_rate_is_returned_verbatim() {
-<a href=#146 id=146 data-nosnippet>146</a>        <span class="kw">let </span>samples = <span class="macro">vec!</span>[<span class="number">0.25f32</span>, -<span class="number">0.25</span>, <span class="number">0.5</span>, -<span class="number">0.5</span>];
-<a href=#147 id=147 data-nosnippet>147</a>        <span class="macro">assert_eq!</span>(resample_linear(<span class="kw-2">&amp;</span>samples, <span class="number">2</span>, <span class="number">44_100</span>, <span class="number">44_100</span>), samples);
-<a href=#148 id=148 data-nosnippet>148</a>    }
-<a href=#149 id=149 data-nosnippet>149</a>
-<a href=#150 id=150 data-nosnippet>150</a>    <span class="doccomment">/// Degenerate inputs must return rather than panicking on a
-<a href=#151 id=151 data-nosnippet>151</a>    /// divide-by-zero or an out-of-range index — the callers hand this
-<a href=#152 id=152 data-nosnippet>152</a>    /// whatever `decode_to_pcm` produced, and a zero-length or zero-channel
-<a href=#153 id=153 data-nosnippet>153</a>    /// decode is exactly the malformed-file case this app exists to run
-<a href=#154 id=154 data-nosnippet>154</a>    /// into. A zero channel count has no frame layout to resample *to*, so
-<a href=#155 id=155 data-nosnippet>155</a>    /// the buffer comes back untouched rather than emptied: dropping the
-<a href=#156 id=156 data-nosnippet>156</a>    /// samples would turn a header oddity into silent data loss further down
-<a href=#157 id=157 data-nosnippet>157</a>    /// the encoder chain.
-<a href=#158 id=158 data-nosnippet>158</a>    </span><span class="attr">#[test]
-<a href=#159 id=159 data-nosnippet>159</a>    </span><span class="kw">fn </span>empty_or_zero_channel_input_does_not_panic() {
-<a href=#160 id=160 data-nosnippet>160</a>        <span class="macro">assert!</span>(resample_linear(<span class="kw-2">&amp;</span>[], <span class="number">2</span>, <span class="number">44_100</span>, <span class="number">48_000</span>).is_empty());
-<a href=#161 id=161 data-nosnippet>161</a>        <span class="macro">assert_eq!</span>(resample_linear(<span class="kw-2">&amp;</span>[<span class="number">0.1</span>, <span class="number">0.2</span>], <span class="number">0</span>, <span class="number">44_100</span>, <span class="number">48_000</span>), <span class="macro">vec!</span>[<span class="number">0.1</span>, <span class="number">0.2</span>]);
-<a href=#162 id=162 data-nosnippet>162</a>    }
-<a href=#163 id=163 data-nosnippet>163</a>}
+<a href=#115 id=115 data-nosnippet>115</a>#[path = <span class="string">"../../tests/unit/convert/pcm.rs"</span>]
+<a href=#116 id=116 data-nosnippet>116</a></span><span class="kw">mod </span>tests;
 </code></pre></div></section></main></body></html>

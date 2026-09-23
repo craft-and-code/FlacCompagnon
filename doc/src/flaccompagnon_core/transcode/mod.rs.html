@@ -167,20 +167,6 @@
 <a href=#167 id=167 data-nosnippet>167</a>}
 <a href=#168 id=168 data-nosnippet>168</a>
 <a href=#169 id=169 data-nosnippet>169</a><span class="attr">#[cfg(test)]
-<a href=#170 id=170 data-nosnippet>170</a></span><span class="kw">mod </span>tests {
-<a href=#171 id=171 data-nosnippet>171</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
-<a href=#172 id=172 data-nosnippet>172</a>
-<a href=#173 id=173 data-nosnippet>173</a>    <span class="attr">#[test]
-<a href=#174 id=174 data-nosnippet>174</a>    </span><span class="kw">fn </span>only_the_three_tabulated_rates_are_supported() {
-<a href=#175 id=175 data-nosnippet>175</a>        <span class="macro">assert_eq!</span>(supported_rate_khz(<span class="number">44_100</span>), <span class="prelude-val">Some</span>(<span class="number">44</span>));
-<a href=#176 id=176 data-nosnippet>176</a>        <span class="macro">assert_eq!</span>(supported_rate_khz(<span class="number">48_000</span>), <span class="prelude-val">Some</span>(<span class="number">48</span>));
-<a href=#177 id=177 data-nosnippet>177</a>        <span class="macro">assert_eq!</span>(supported_rate_khz(<span class="number">32_000</span>), <span class="prelude-val">Some</span>(<span class="number">32</span>));
-<a href=#178 id=178 data-nosnippet>178</a>        <span class="comment">// Hi-res: a band limit here is upsampling, not a lossy source.
-<a href=#179 id=179 data-nosnippet>179</a>        </span><span class="macro">assert_eq!</span>(supported_rate_khz(<span class="number">96_000</span>), <span class="prelude-val">None</span>);
-<a href=#180 id=180 data-nosnippet>180</a>        <span class="macro">assert_eq!</span>(supported_rate_khz(<span class="number">88_200</span>), <span class="prelude-val">None</span>);
-<a href=#181 id=181 data-nosnippet>181</a>        <span class="comment">// Odd rates from games or old hardware have no tabulated bands.
-<a href=#182 id=182 data-nosnippet>182</a>        </span><span class="macro">assert_eq!</span>(supported_rate_khz(<span class="number">22_050</span>), <span class="prelude-val">None</span>);
-<a href=#183 id=183 data-nosnippet>183</a>        <span class="macro">assert_eq!</span>(supported_rate_khz(<span class="number">0</span>), <span class="prelude-val">None</span>);
-<a href=#184 id=184 data-nosnippet>184</a>    }
-<a href=#185 id=185 data-nosnippet>185</a>}
+<a href=#170 id=170 data-nosnippet>170</a>#[path = <span class="string">"../../tests/unit/transcode/mod.rs"</span>]
+<a href=#171 id=171 data-nosnippet>171</a></span><span class="kw">mod </span>tests;
 </code></pre></div></section></main></body></html>

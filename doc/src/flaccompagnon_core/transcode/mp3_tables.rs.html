@@ -322,61 +322,6 @@
 <a href=#322 id=322 data-nosnippet>322</a>}
 <a href=#323 id=323 data-nosnippet>323</a>
 <a href=#324 id=324 data-nosnippet>324</a><span class="attr">#[cfg(test)]
-<a href=#325 id=325 data-nosnippet>325</a></span><span class="kw">mod </span>tests {
-<a href=#326 id=326 data-nosnippet>326</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
-<a href=#327 id=327 data-nosnippet>327</a>
-<a href=#328 id=328 data-nosnippet>328</a>    <span class="doccomment">/// The property that distinguishes the standard's table from a mistyped
-<a href=#329 id=329 data-nosnippet>329</a>    /// one, and the reason it is asserted rather than trusted: 512 numbers
-<a href=#330 id=330 data-nosnippet>330</a>    /// copied by hand or by script are exactly the kind of thing that goes
-<a href=#331 id=331 data-nosnippet>331</a>    /// wrong silently.
-<a href=#332 id=332 data-nosnippet>332</a>    </span><span class="attr">#[test]
-<a href=#333 id=333 data-nosnippet>333</a>    </span><span class="kw">fn </span>the_analysis_window_is_symmetric_in_magnitude() {
-<a href=#334 id=334 data-nosnippet>334</a>        <span class="kw">for </span>i <span class="kw">in </span><span class="number">1</span>..<span class="number">256 </span>{
-<a href=#335 id=335 data-nosnippet>335</a>            <span class="kw">let </span>a = PQMF_WINDOW[i].abs();
-<a href=#336 id=336 data-nosnippet>336</a>            <span class="kw">let </span>b = PQMF_WINDOW[<span class="number">512 </span>- i].abs();
-<a href=#337 id=337 data-nosnippet>337</a>            <span class="macro">assert!</span>((a - b).abs() &lt; <span class="number">1e-12</span>, <span class="string">"i={i}: {a} vs {b}"</span>);
-<a href=#338 id=338 data-nosnippet>338</a>        }
-<a href=#339 id=339 data-nosnippet>339</a>        <span class="comment">// Its peak sits at the centre.
-<a href=#340 id=340 data-nosnippet>340</a>        </span><span class="kw">let </span>peak = PQMF_WINDOW.iter().map(|v| v.abs()).fold(<span class="number">0.0f64</span>, f64::max);
-<a href=#341 id=341 data-nosnippet>341</a>        <span class="macro">assert!</span>((PQMF_WINDOW[<span class="number">256</span>].abs() - peak).abs() &lt; <span class="number">1e-12</span>);
-<a href=#342 id=342 data-nosnippet>342</a>        <span class="macro">assert_eq!</span>(PQMF_WINDOW[<span class="number">0</span>], <span class="number">0.0</span>);
-<a href=#343 id=343 data-nosnippet>343</a>    }
-<a href=#344 id=344 data-nosnippet>344</a>
-<a href=#345 id=345 data-nosnippet>345</a>    <span class="attr">#[test]
-<a href=#346 id=346 data-nosnippet>346</a>    </span><span class="kw">fn </span>bands_are_contiguous_and_stop_below_the_full_spectrum() {
-<a href=#347 id=347 data-nosnippet>347</a>        <span class="kw">for </span>rate <span class="kw">in </span>[<span class="number">32u32</span>, <span class="number">44</span>, <span class="number">48</span>] {
-<a href=#348 id=348 data-nosnippet>348</a>            <span class="kw">for </span>(b, limit, what) <span class="kw">in </span>[
-<a href=#349 id=349 data-nosnippet>349</a>                (long_bands(rate).expect(<span class="string">"long"</span>), GRANULE_LEN, <span class="string">"long"</span>),
-<a href=#350 id=350 data-nosnippet>350</a>                (short_bands(rate).expect(<span class="string">"short"</span>), GRANULE_LEN / SHORT_COUNT, <span class="string">"short"</span>),
-<a href=#351 id=351 data-nosnippet>351</a>            ] {
-<a href=#352 id=352 data-nosnippet>352</a>                <span class="macro">assert_eq!</span>(b[<span class="number">0</span>].start, <span class="number">0</span>, <span class="string">"{rate}k {what}"</span>);
-<a href=#353 id=353 data-nosnippet>353</a>                <span class="kw">for </span>pair <span class="kw">in </span>b.windows(<span class="number">2</span>) {
-<a href=#354 id=354 data-nosnippet>354</a>                    <span class="macro">assert_eq!</span>(pair[<span class="number">0</span>].end, pair[<span class="number">1</span>].start, <span class="string">"{rate}k {what}: gap"</span>);
-<a href=#355 id=355 data-nosnippet>355</a>                }
-<a href=#356 id=356 data-nosnippet>356</a>                <span class="kw">for </span>x <span class="kw">in </span><span class="kw-2">&amp;</span>b {
-<a href=#357 id=357 data-nosnippet>357</a>                    <span class="macro">assert!</span>(x.width() &gt; <span class="number">0</span>, <span class="string">"{rate}k {what}: empty band {x:?}"</span>);
-<a href=#358 id=358 data-nosnippet>358</a>                }
-<a href=#359 id=359 data-nosnippet>359</a>                <span class="comment">// The defining difference from AAC: coverage stops short.
-<a href=#360 id=360 data-nosnippet>360</a>                </span><span class="kw">let </span>last = b[b.len() - <span class="number">1</span>].end;
-<a href=#361 id=361 data-nosnippet>361</a>                <span class="macro">assert!</span>(last &lt; limit, <span class="string">"{rate}k {what}: {last} should stop below {limit}"</span>);
-<a href=#362 id=362 data-nosnippet>362</a>            }
-<a href=#363 id=363 data-nosnippet>363</a>        }
-<a href=#364 id=364 data-nosnippet>364</a>        <span class="macro">assert!</span>(long_bands(<span class="number">96</span>).is_none());
-<a href=#365 id=365 data-nosnippet>365</a>    }
-<a href=#366 id=366 data-nosnippet>366</a>
-<a href=#367 id=367 data-nosnippet>367</a>    <span class="attr">#[test]
-<a href=#368 id=368 data-nosnippet>368</a>    </span><span class="kw">fn </span>butterfly_factors_satisfy_their_identity() {
-<a href=#369 id=369 data-nosnippet>369</a>        <span class="kw">let </span>(cs, ca) = butterfly_coefficients();
-<a href=#370 id=370 data-nosnippet>370</a>        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..<span class="number">8 </span>{
-<a href=#371 id=371 data-nosnippet>371</a>            <span class="comment">// cs^2 + ca^2 == 1: the butterfly is a rotation, so it preserves
-<a href=#372 id=372 data-nosnippet>372</a>            // energy. A typo in `ci` would break this.
-<a href=#373 id=373 data-nosnippet>373</a>            </span><span class="macro">assert!</span>((cs[i] * cs[i] + ca[i] * ca[i] - <span class="number">1.0</span>).abs() &lt; <span class="number">1e-12</span>, <span class="string">"i={i}"</span>);
-<a href=#374 id=374 data-nosnippet>374</a>            <span class="macro">assert!</span>(cs[i] &gt; <span class="number">0.0 </span>&amp;&amp; ca[i] &lt; <span class="number">0.0</span>, <span class="string">"i={i}: {} {}"</span>, cs[i], ca[i]);
-<a href=#375 id=375 data-nosnippet>375</a>        }
-<a href=#376 id=376 data-nosnippet>376</a>        <span class="comment">// The corrections shrink with distance from the band edge.
-<a href=#377 id=377 data-nosnippet>377</a>        </span><span class="kw">for </span>i <span class="kw">in </span><span class="number">1</span>..<span class="number">8 </span>{
-<a href=#378 id=378 data-nosnippet>378</a>            <span class="macro">assert!</span>(ca[i].abs() &lt; ca[i - <span class="number">1</span>].abs(), <span class="string">"i={i}"</span>);
-<a href=#379 id=379 data-nosnippet>379</a>        }
-<a href=#380 id=380 data-nosnippet>380</a>    }
-<a href=#381 id=381 data-nosnippet>381</a>}
+<a href=#325 id=325 data-nosnippet>325</a>#[path = <span class="string">"../../tests/unit/transcode/mp3_tables.rs"</span>]
+<a href=#326 id=326 data-nosnippet>326</a></span><span class="kw">mod </span>tests;
 </code></pre></div></section></main></body></html>
