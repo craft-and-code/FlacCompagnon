@@ -36,6 +36,7 @@ fn hires_pcm(codec: Option<&str>) -> FileAnalysis {
         badge: None,
         clipping: ClippingInfo::unmeasured(),
         dr_db: Some(14.0),
+        integrated_lufs: Some(-23.0),
         flac_md5: None,
         file_md5: None,
         file_crc32: None,

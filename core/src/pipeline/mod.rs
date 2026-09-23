@@ -166,6 +166,7 @@ fn apply_outcome(
     result.lattice_score = transcoded.as_ref().ok().map(|e| e.likelihood as f32);
     result.clipping = summary.clipping.clone();
     result.dr_db = summary.dr_db;
+    result.integrated_lufs = summary.integrated_lufs;
     result.bit_depth_evidence = summary.bit_depth_evidence;
 
     if outcome.channels >= 2 {

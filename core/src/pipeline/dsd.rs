@@ -64,6 +64,7 @@ pub(super) fn analyze(path: &Path, opts: &ScanOptions, result: &mut FileAnalysis
                 result.cutoff_ratio = Some(summary.cutoff_ratio);
                 result.clipping = summary.clipping.clone();
                 result.dr_db = summary.dr_db;
+                result.integrated_lufs = summary.integrated_lufs;
                 if info.channels >= 2 {
                     result.fake_stereo = Some(summary.fake_stereo);
                 }

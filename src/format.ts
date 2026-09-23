@@ -331,6 +331,9 @@ export function fileSearchFields(f: FileAnalysis, tag?: TagSet | null): string[]
       ? `${f.clipping.true_peak_dbtp.toFixed(1)} dbtp true peak`
       : "",
     f.dr_db != null && Number.isFinite(f.dr_db) ? `${f.dr_db.toFixed(1)} db dynamics` : "",
+    f.integrated_lufs != null && Number.isFinite(f.integrated_lufs)
+      ? `${f.integrated_lufs.toFixed(1)} lufs loudness`
+      : "",
     detectionLabels(f.detections).join(" ").toLowerCase(),
     f.detections.detail,
     f.badge ?? "",

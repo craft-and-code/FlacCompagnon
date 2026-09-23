@@ -29,6 +29,7 @@ import {
   ClippingCell,
   DetectionsCell,
   DynamicRangeCell,
+  IntegratedLoudnessCell,
   FileHashCell,
   Md5Cell,
   QualityBadgeCell,
@@ -57,6 +58,7 @@ export type ColumnKey =
   | "fileMd5"
   | "fileCrc32"
   | "dynamics"
+  | "loudness"
   | "artist"
   | "album"
   | "title"
@@ -223,6 +225,13 @@ export const ALL_COLUMNS: ColumnDef[] = [
     sort: "truePeak",
     defaultVisible: true,
     render: (f) => <TruePeakCell dbtp={f.clipping.true_peak_dbtp} />,
+  },
+  {
+    key: "loudness",
+    label: "LUFS",
+    sort: "loudness",
+    defaultVisible: true,
+    render: (f) => <IntegratedLoudnessCell lufs={f.integrated_lufs} />,
   },
   {
     key: "dynamics",

@@ -7,6 +7,7 @@
 //! * spectrum      -> Hann-windowed FFT of a mono downmix, averaged over windows
 //! * clipping      -> full-scale sample counting with run detection
 //! * stereo        -> L-R difference, L/R correlation and mono cancellation
+//! * loudness      -> K-weighted gated integrated LUFS
 //! * real bitdepth -> exact unused bits and persistent lower-depth integer grids
 //!
 //! Nothing here depends on a specific file format; [`decode`](crate::decode)
@@ -16,7 +17,7 @@
 //!
 //! Over CLAUDE.md's 300-line ceiling, deliberately. Each metric already lives
 //! in its own module ([`spectrum`], [`clipping`], [`stereo`](super::stereo),
-//! [`bitdepth`], [`mdct`](super::mdct)); what is left here is the single hot
+//! [`bitdepth`], [`loudness`](super::loudness), [`mdct`](super::mdct)); what is left here is the single hot
 //! loop that feeds them all from one pass over the samples,
 //! plus the state that loop carries. That single pass *is* the design — the
 //! whole reason this type exists rather than five independent analyzers is
@@ -30,7 +31,7 @@ use rustfft::{num_complex::Complex, Fft, FftPlanner};
 
 use super::mdct::{Mdct, AAC_N};
 use super::truepeak::TruePeak;
-use super::{bitdepth, clipping, spectrum};
+use super::{bitdepth, clipping, loudness::LoudnessMeter, spectrum};
 use crate::ClippingInfo;
 
 /// Full-scale detection threshold (normalized). Samples with |value| at or
@@ -90,6 +91,8 @@ pub struct AnalysisSummary {
     /// High values (>= 12 dB) indicate a dynamic master; low values (< 8 dB)
     /// a loudness-war master. `None` for silent or extremely short streams.
     pub dr_db: Option<f32>,
+    /// EBU R 128 integrated loudness, in LUFS; absent when unmeasurable.
+    pub integrated_lufs: Option<f32>,
 
     // --- MDCT (AAC-SIN) transcode evidence ---
     /// Mean per-frame MDCT cutoff as a fraction of Nyquist (dead-zone frames).
@@ -131,6 +134,7 @@ pub struct StreamAnalyzer {
     // --- clipping ---
     clip_state: clipping::ClipState,
     true_peak: TruePeak,
+    loudness: Option<LoudnessMeter>,
 
     // --- stereo relationship ---
     diff_energy: f64,
@@ -163,7 +167,7 @@ pub struct StreamAnalyzer {
 
 impl StreamAnalyzer {
     /// Start a fresh analysis for a stream with `channels` audio channels.
-    pub fn new(channels: usize) -> Self {
+    pub fn new(channels: usize, sample_rate: u32) -> Self {
         let mut planner = FftPlanner::<f32>::new();
         let fft = planner.plan_fft_forward(FFT_SIZE);
         let hann: Vec<f32> = (0..FFT_SIZE)
@@ -181,6 +185,7 @@ impl StreamAnalyzer {
             window_count: 0,
             clip_state: clipping::ClipState::new(CLIP_THRESHOLD),
             true_peak: TruePeak::new(channels.max(1)),
+            loudness: LoudnessMeter::new(sample_rate, channels),
             diff_energy: 0.0,
             l_energy: 0.0,
             r_energy: 0.0,
@@ -223,6 +228,9 @@ impl StreamAnalyzer {
         self.dyn_block_sumsq += frame_sumsq / samples.len() as f64;
         self.dyn_block_frames += 1;
         self.true_peak.push_frame(samples);
+        if let Some(loudness) = &mut self.loudness {
+            loudness.push_frame(samples);
+        }
         if self.dyn_block_frames == DYN_BLOCK_FRAMES {
             self.dyn_blocks
                 .push(self.dyn_block_sumsq / self.dyn_block_frames as f64);
@@ -432,6 +440,7 @@ impl StreamAnalyzer {
             real_bit_depth,
             bit_depth_evidence,
             dr_db,
+            integrated_lufs: self.loudness.as_ref().and_then(LoudnessMeter::integrated_lufs),
             mdct_cutoff_ratio,
             mdct_dead_db,
             mdct_dead_fraction,

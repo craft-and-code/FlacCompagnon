@@ -34,6 +34,7 @@ export type SortColumn =
   | "fileMd5"
   | "fileCrc32"
   | "dynamics"
+  | "loudness"
   | "md5";
 
 export type SortDirection = "asc" | "desc";
@@ -114,6 +115,8 @@ function sortValue(f: FileAnalysis, col: SortColumn): string | number | null {
       return Number.isFinite(f.clipping.true_peak_dbtp) ? f.clipping.true_peak_dbtp : null;
     case "dynamics":
       return f.dr_db;
+    case "loudness":
+      return f.integrated_lufs ?? null;
     case "md5":
       return md5Rank(f.flac_md5);
   }

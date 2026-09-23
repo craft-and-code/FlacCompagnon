@@ -42,7 +42,7 @@ pub fn decode_and_analyze(path: &Path) -> Result<DecodeOutcome, AnalysisError> {
         .filter(|b| (1..=32).contains(b))
         .map(|b| 32 - b);
 
-    let mut analyzer = StreamAnalyzer::new(channels);
+    let mut analyzer = StreamAnalyzer::new(channels, sample_rate);
     let mut buf = InterleavedBuf::<f32>::default();
     let mut int_buf = InterleavedBuf::<i32>::default();
     let mut int_packet: Vec<i32> = Vec::new();

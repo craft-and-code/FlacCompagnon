@@ -41,6 +41,17 @@ export function DynamicRangeCell({ dr }: { dr: number | null }) {
   );
 }
 
+export function IntegratedLoudnessCell({ lufs }: { lufs: number | null | undefined }) {
+  if (lufs == null || !Number.isFinite(lufs)) {
+    return <td className="c-muted has-tip" title="No integrated LUFS reading is available for silence, audio shorter than 400 ms, unsupported sample rates or channel layouts, and older saved reports.">—</td>;
+  }
+  return (
+    <td className="has-tip" title="Integrated loudness measured across the whole track using ITU-R BS.1770-5 / EBU R 128 K-weighting and gates. This is a level measurement, not a quality verdict or a target for every release.">
+      {lufs.toFixed(1)} LUFS
+    </td>
+  );
+}
+
 /// True peak is a level measurement, not an event count, so it shows for every
 /// track whether or not sample-domain clipping fired.
 ///

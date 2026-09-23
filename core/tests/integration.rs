@@ -153,6 +153,30 @@ fn inverted_stereo_channels_are_reported_as_a_phase_problem() {
     std::fs::remove_file(&path).ok();
 }
 
+/// EBU Tech 3341 test 1 specifies -23 LUFS for an in-phase stereo 1 kHz sine
+/// whose per-channel peak is -23 dBFS. Verify the decode-to-report path too.
+#[test]
+fn stereo_wav_reports_ebu_reference_integrated_loudness() {
+    let sample_rate = 48_000;
+    let frames = sample_rate * 2;
+    let amplitude = 32767.0 * 10f64.powf(-23.0 / 20.0);
+    let mut samples = Vec::with_capacity(frames as usize * 2);
+    for n in 0..frames {
+        let sample = (amplitude
+            * (2.0 * std::f64::consts::PI * 1_000.0 * n as f64 / sample_rate as f64).sin())
+            as i16;
+        samples.extend([sample, sample]);
+    }
+    let path = tmp("lufs_reference.wav");
+    write_wav_i16(&path, sample_rate, 2, &samples);
+
+    let result = analyze_file(&path, &ScanOptions::default());
+    assert!(result.error.is_none(), "{:?}", result.error);
+    let measured = result.integrated_lufs.expect("integrated loudness");
+    assert!((measured + 23.0).abs() < 0.2, "{measured} LUFS");
+    std::fs::remove_file(&path).ok();
+}
+
 /// The regression that motivated replacing the spectral heuristics.
 ///
 /// A naturally dark master — content rolling off from 12 kHz — used to be

@@ -4,7 +4,7 @@ use super::*;
 /// estimate on a steady full-scale sine must land there.
 #[test]
 fn dr_of_a_pure_sine_is_3db() {
-    let mut a = StreamAnalyzer::new(1);
+    let mut a = StreamAnalyzer::new(1, 44_100);
     let rate = 44_100.0f64;
     for n in 0..(DYN_BLOCK_FRAMES * 2) {
         let s = (2.0 * std::f64::consts::PI * 1000.0 * n as f64 / rate).sin() as f32 * 0.9;
@@ -19,7 +19,7 @@ fn dr_of_a_pure_sine_is_3db() {
 /// crest factor tends to 0 dB — the loudness-war signature.
 #[test]
 fn dr_of_a_squashed_sine_is_low() {
-    let mut a = StreamAnalyzer::new(1);
+    let mut a = StreamAnalyzer::new(1, 44_100);
     let rate = 44_100.0f64;
     for n in 0..(DYN_BLOCK_FRAMES * 2) {
         let raw = (2.0 * std::f64::consts::PI * 1000.0 * n as f64 / rate).sin() * 8.0;
@@ -34,7 +34,7 @@ fn dr_of_a_squashed_sine_is_low() {
 /// Silence yields no DR value rather than a bogus number.
 #[test]
 fn dr_of_silence_is_none() {
-    let mut a = StreamAnalyzer::new(1);
+    let mut a = StreamAnalyzer::new(1, 44_100);
     for _ in 0..(DYN_BLOCK_FRAMES + 10) {
         a.push_frame(&[0.0], None);
     }

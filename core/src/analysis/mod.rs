@@ -6,7 +6,7 @@
 //! the *result* ([`crate::types`], [`detections::Detections`]), not the
 //! measuring.
 //!
-//! These nine modules were top-level files next to `report.rs`, `playlist.rs`
+//! These metric modules used to be top-level files next to `report.rs`, `playlist.rs`
 //! and `scan.rs`, which made the crate root read as a flat pile where the
 //! export helpers and the DSP sat at the same level. They are one subsystem
 //! and they change together — a new detection touches the analyzer, a metric
@@ -18,10 +18,10 @@
 //!
 //! * [`analyzer`] runs that single streaming pass and owns the state it needs
 //!   across packets. It is the only module here the decode paths talk to.
-//! * The per-metric modules do one measurement each and hold no session
-//!   state: [`spectrum`] (FFT, cut-off), [`bitdepth`] (effective depth),
+//! * The per-metric modules do one measurement each: [`spectrum`] (FFT, cut-off),
+//!   [`bitdepth`] (effective depth),
 //!   [`stereo`] (dual-mono disguised as stereo), [`clipping`] (full-scale
-//!   runs), [`truepeak`] (inter-sample peaks, dBTP).
+//!   runs), [`truepeak`] (inter-sample peaks, dBTP), [`loudness`] (integrated LUFS).
 //! * [`mdct`] and [`requant`] are the AAC-grid detection: the transform, then
 //!   the search for coefficients that fall back onto the quantization lattice
 //!   only an AAC encoder produces.
@@ -37,6 +37,7 @@ pub mod analyzer;
 pub mod bitdepth;
 pub mod clipping;
 pub mod detections;
+pub mod loudness;
 pub mod mdct;
 pub mod requant;
 pub mod spectrum;

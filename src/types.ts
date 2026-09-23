@@ -69,6 +69,8 @@ export interface FileAnalysis {
   badge: string | null;
   clipping: ClippingInfo;
   dr_db: number | null;
+  // Older JSON reports omit this measurement.
+  integrated_lufs?: number | null;
   flac_md5: FlacMd5Status | null;
   // Fingerprints of the *file's bytes* — tags and cover art included — as
   // lowercase hex. Not to be confused with `flac_md5`, which is about the

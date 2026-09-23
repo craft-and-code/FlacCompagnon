@@ -158,6 +158,10 @@ pub struct FileAnalysis {
     /// High (>= 12 dB) == dynamic master (Full Dynamic Range editions);
     /// low (< 8 dB) == loudness-war master. `None` when not measurable.
     pub dr_db: Option<f32>,
+    /// ITU-R BS.1770-5 integrated loudness in LUFS. Absent for silence, short
+    /// files, unsupported channel layouts and older saved reports.
+    #[serde(default)]
+    pub integrated_lufs: Option<f32>,
 
     /// FLAC MD5 signature status. `None` for non-FLAC files (no column shown).
     pub flac_md5: Option<crate::decode::FlacMd5Status>,

@@ -123,7 +123,7 @@ pub fn decode_and_analyze_flac(
     let bytes_per_sample = bits.div_ceil(8) as usize;
     let mut hasher = (has_signature && verify_md5).then(Md5::new);
 
-    let mut analyzer = StreamAnalyzer::new(channels);
+    let mut analyzer = StreamAnalyzer::new(channels, sample_rate);
     let mut frame_f32 = vec![0.0f32; channels];
     let mut frame_i32 = vec![0i32; channels];
     let mut byte_row: Vec<u8> = Vec::new();

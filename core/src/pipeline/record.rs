@@ -58,6 +58,7 @@ pub(super) fn skeleton(path: &Path) -> FileAnalysis {
         badge: None,
         clipping: ClippingInfo::unmeasured(),
         dr_db: None,
+        integrated_lufs: None,
         flac_md5: None,
         // Computed here, beside `size_bytes` and `modified_unix`, and for the
         // same reason: it describes the file as an object rather than the
