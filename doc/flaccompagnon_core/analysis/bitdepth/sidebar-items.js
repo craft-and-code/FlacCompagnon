@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["effective_bits","is_fake_hires"],"struct":["Grid16Evidence"]};
+window.SIDEBAR_ITEMS = {"enum":["BitDepthMethod"],"fn":["effective_bits","is_fake_hires"],"struct":["BitDepthEvidence"]};

@@ -3,7 +3,7 @@ lattice?</p>
 <p>Implements §1.4 of the paper. The shape of the search is a stack of loops,
 and every level exists because the detector does not know something the
 encoder did:</p>
-<div><table><thead><tr><th>Unknown</th><th>Response</th></tr></thead><tbody>
+<div><table><thead><tr><th>Parameter to infer</th><th>Search strategy</th></tr></thead><tbody>
 <tr><td>where the encoder’s frames began</td><td>try all 1024 sample alignments</td></tr>
 <tr><td>which window shape each frame used</td><td>try all four, keep the best</td></tr>
 <tr><td>what scalefactor each band carried</td><td>try a grid of them</td></tr>

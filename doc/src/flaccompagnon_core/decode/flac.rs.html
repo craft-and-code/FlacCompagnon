@@ -4,15 +4,15 @@
 <a href=#4 id=4 data-nosnippet>4</a>//! Fused because both need every sample of the file: doing them separately
 <a href=#5 id=5 data-nosnippet>5</a>//! would decode the whole track twice for no gain. claxon is used here rather
 <a href=#6 id=6 data-nosnippet>6</a>//! than Symphonia because it hands back the raw decoded integers, which is
-<a href=#7 id=7 data-nosnippet>7</a>//! what the MD5 must be computed over — a float round-trip would not be
-<a href=#8 id=8 data-nosnippet>8</a>//! bit-exact for the hash even though it is exact for the analysis.
+<a href=#7 id=7 data-nosnippet>7</a>//! what the MD5 and bit-depth measurement must use. Spectral analysis can
+<a href=#8 id=8 data-nosnippet>8</a>//! use normalized floats without discarding the raw integer evidence.
 <a href=#9 id=9 data-nosnippet>9</a>
 <a href=#10 id=10 data-nosnippet>10</a></span><span class="kw">use </span>std::path::Path;
 <a href=#11 id=11 data-nosnippet>11</a>
 <a href=#12 id=12 data-nosnippet>12</a><span class="kw">use </span>md5::{Digest, Md5};
 <a href=#13 id=13 data-nosnippet>13</a>
-<a href=#14 id=14 data-nosnippet>14</a><span class="kw">use </span><span class="kw">super</span>::DecodeOutcome;
-<a href=#15 id=15 data-nosnippet>15</a><span class="kw">use </span><span class="kw">super</span>::FlacMd5Status;
+<a href=#14 id=14 data-nosnippet>14</a><span class="kw">use </span><span class="kw">super</span>::FlacMd5Status;
+<a href=#15 id=15 data-nosnippet>15</a><span class="kw">use super</span>::{validate_decoded_frames, DecodeOutcome};
 <a href=#16 id=16 data-nosnippet>16</a><span class="kw">use </span><span class="kw">crate</span>::analysis::analyzer::StreamAnalyzer;
 <a href=#17 id=17 data-nosnippet>17</a><span class="kw">use </span><span class="kw">crate</span>::AnalysisError;
 <a href=#18 id=18 data-nosnippet>18</a>
@@ -63,105 +63,105 @@
 <a href=#63 id=63 data-nosnippet>63</a>
 <a href=#64 id=64 data-nosnippet>64</a>    <span class="kw">let </span><span class="kw-2">mut </span>blocks = reader.blocks();
 <a href=#65 id=65 data-nosnippet>65</a>    <span class="kw">let </span><span class="kw-2">mut </span>buffer: Vec&lt;i32&gt; = Vec::new();
-<a href=#66 id=66 data-nosnippet>66</a>    <span class="kw">loop </span>{
-<a href=#67 id=67 data-nosnippet>67</a>        <span class="kw">let </span>block = <span class="kw">match </span>blocks.read_next_or_eof(buffer) {
-<a href=#68 id=68 data-nosnippet>68</a>            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(b)) =&gt; b,
-<a href=#69 id=69 data-nosnippet>69</a>            <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; <span class="kw">break</span>,
-<a href=#70 id=70 data-nosnippet>70</a>            <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(AnalysisError::Decode(<span class="macro">format!</span>(<span class="string">"flac decode error: {e}"</span>))),
-<a href=#71 id=71 data-nosnippet>71</a>        };
-<a href=#72 id=72 data-nosnippet>72</a>        <span class="kw">for </span>t <span class="kw">in </span><span class="number">0</span>..block.duration() <span class="kw">as </span>usize {
-<a href=#73 id=73 data-nosnippet>73</a>            <span class="kw">for </span>c <span class="kw">in </span><span class="number">0</span>..channels {
-<a href=#74 id=74 data-nosnippet>74</a>                <span class="comment">// `channel()` panics on an out-of-range index, so the channel
-<a href=#75 id=75 data-nosnippet>75</a>                // count is taken from STREAMINFO and validated above rather
-<a href=#76 id=76 data-nosnippet>76</a>                // than from the block.
-<a href=#77 id=77 data-nosnippet>77</a>                </span>samples.push(block.channel(c <span class="kw">as </span>u32)[t] <span class="kw">as </span>f32 * scale);
-<a href=#78 id=78 data-nosnippet>78</a>            }
-<a href=#79 id=79 data-nosnippet>79</a>        }
+<a href=#66 id=66 data-nosnippet>66</a>    <span class="kw">let </span><span class="kw-2">mut </span>frame_count = <span class="number">0</span>;
+<a href=#67 id=67 data-nosnippet>67</a>    <span class="kw">loop </span>{
+<a href=#68 id=68 data-nosnippet>68</a>        <span class="kw">let </span>block = <span class="kw">match </span>blocks.read_next_or_eof(buffer) {
+<a href=#69 id=69 data-nosnippet>69</a>            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(b)) =&gt; b,
+<a href=#70 id=70 data-nosnippet>70</a>            <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; <span class="kw">break</span>,
+<a href=#71 id=71 data-nosnippet>71</a>            <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(AnalysisError::Decode(<span class="macro">format!</span>(<span class="string">"flac decode error: {e}"</span>))),
+<a href=#72 id=72 data-nosnippet>72</a>        };
+<a href=#73 id=73 data-nosnippet>73</a>        validate_block_channels(<span class="kw-2">&amp;</span>block, channels)<span class="question-mark">?</span>;
+<a href=#74 id=74 data-nosnippet>74</a>        <span class="kw">for </span>t <span class="kw">in </span><span class="number">0</span>..block.duration() <span class="kw">as </span>usize {
+<a href=#75 id=75 data-nosnippet>75</a>            <span class="kw">for </span>c <span class="kw">in </span><span class="number">0</span>..channels {
+<a href=#76 id=76 data-nosnippet>76</a>                samples.push(block_sample(<span class="kw-2">&amp;</span>block, c, t)<span class="question-mark">? </span><span class="kw">as </span>f32 * scale);
+<a href=#77 id=77 data-nosnippet>77</a>            }
+<a href=#78 id=78 data-nosnippet>78</a>        }
+<a href=#79 id=79 data-nosnippet>79</a>        frame_count += u64::from(block.duration());
 <a href=#80 id=80 data-nosnippet>80</a>        buffer = block.into_buffer();
 <a href=#81 id=81 data-nosnippet>81</a>    }
-<a href=#82 id=82 data-nosnippet>82</a>    <span class="kw">if </span>samples.is_empty() {
-<a href=#83 id=83 data-nosnippet>83</a>        <span class="kw">return </span><span class="prelude-val">Err</span>(AnalysisError::Decode(<span class="string">"no audio data decoded"</span>.into()));
-<a href=#84 id=84 data-nosnippet>84</a>    }
-<a href=#85 id=85 data-nosnippet>85</a>    <span class="prelude-val">Ok</span>(<span class="kw">crate</span>::decode::PcmAudio {
-<a href=#86 id=86 data-nosnippet>86</a>        samples,
-<a href=#87 id=87 data-nosnippet>87</a>        sample_rate,
-<a href=#88 id=88 data-nosnippet>88</a>        channels,
-<a href=#89 id=89 data-nosnippet>89</a>    })
-<a href=#90 id=90 data-nosnippet>90</a>}
-<a href=#91 id=91 data-nosnippet>91</a>
-<a href=#92 id=92 data-nosnippet>92</a><span class="doccomment">/// Fused single-pass FLAC decode.
-<a href=#93 id=93 data-nosnippet>93</a>///
-<a href=#94 id=94 data-nosnippet>94</a>/// Correctness guarantees:
-<a href=#95 id=95 data-nosnippet>95</a>/// * The MD5 is hashed from claxon's raw decoded integers — no float
-<a href=#96 id=96 data-nosnippet>96</a>///   round-trip — using the exact layout mandated by the FLAC spec:
-<a href=#97 id=97 data-nosnippet>97</a>///   interleaved samples, each written as `ceil(bits/8)` little-endian
-<a href=#98 id=98 data-nosnippet>98</a>///   two's-complement bytes. Bit-identical to what `flac -t` verifies.
-<a href=#99 id=99 data-nosnippet>99</a>/// * The analyzer receives `s / 2^(bits-1)` as `f32`, which is exact for
-<a href=#100 id=100 data-nosnippet>100</a>///   FLAC's ≤ 24-bit integers (every such integer fits in the f32 mantissa),
-<a href=#101 id=101 data-nosnippet>101</a>///   plus the raw integers for effective-bit-depth analysis.
-<a href=#102 id=102 data-nosnippet>102</a>///
-<a href=#103 id=103 data-nosnippet>103</a>/// When `verify_md5` is false the hash comparison is skipped (the decode cost
-<a href=#104 id=104 data-nosnippet>104</a>/// is the same either way since analysis needs every sample).
-<a href=#105 id=105 data-nosnippet>105</a></span><span class="kw">pub fn </span>decode_and_analyze_flac(
-<a href=#106 id=106 data-nosnippet>106</a>    path: <span class="kw-2">&amp;</span>Path,
-<a href=#107 id=107 data-nosnippet>107</a>    verify_md5: bool,
-<a href=#108 id=108 data-nosnippet>108</a>) -&gt; <span class="prelude-ty">Result</span>&lt;(DecodeOutcome, FlacMd5Status), AnalysisError&gt; {
-<a href=#109 id=109 data-nosnippet>109</a>    <span class="kw">let </span><span class="kw-2">mut </span>reader = claxon::FlacReader::open(path)
-<a href=#110 id=110 data-nosnippet>110</a>        .map_err(|e| AnalysisError::Decode(<span class="macro">format!</span>(<span class="string">"flac open failed: {e}"</span>)))<span class="question-mark">?</span>;
-<a href=#111 id=111 data-nosnippet>111</a>    <span class="kw">let </span>info = reader.streaminfo();
-<a href=#112 id=112 data-nosnippet>112</a>    <span class="kw">let </span>sample_rate = info.sample_rate;
-<a href=#113 id=113 data-nosnippet>113</a>    <span class="kw">let </span>channels = info.channels <span class="kw">as </span>usize;
-<a href=#114 id=114 data-nosnippet>114</a>    <span class="kw">let </span>bits = info.bits_per_sample;
-<a href=#115 id=115 data-nosnippet>115</a>    <span class="comment">// Guards the shifts and the per-sample byte width below; a STREAMINFO
-<a href=#116 id=116 data-nosnippet>116</a>    // claiming 0 or &gt; 32 bits is either corrupt or hostile.
-<a href=#117 id=117 data-nosnippet>117</a>    </span><span class="kw">if </span>sample_rate == <span class="number">0 </span>|| channels == <span class="number">0 </span>|| bits == <span class="number">0 </span>|| bits &gt; <span class="number">32 </span>{
-<a href=#118 id=118 data-nosnippet>118</a>        <span class="kw">return </span><span class="prelude-val">Err</span>(AnalysisError::Decode(<span class="string">"invalid FLAC stream info"</span>.into()));
-<a href=#119 id=119 data-nosnippet>119</a>    }
-<a href=#120 id=120 data-nosnippet>120</a>    <span class="kw">let </span>total_frames_hint = info.samples;
-<a href=#121 id=121 data-nosnippet>121</a>    <span class="kw">let </span>stored = info.md5sum;
-<a href=#122 id=122 data-nosnippet>122</a>    <span class="kw">let </span>has_signature = stored != [<span class="number">0u8</span>; <span class="number">16</span>];
-<a href=#123 id=123 data-nosnippet>123</a>
-<a href=#124 id=124 data-nosnippet>124</a>    <span class="kw">let </span>scale = <span class="number">1.0f32 </span>/ (<span class="number">1u64 </span>&lt;&lt; (bits - <span class="number">1</span>)) <span class="kw">as </span>f32;
-<a href=#125 id=125 data-nosnippet>125</a>    <span class="kw">let </span>bytes_per_sample = bits.div_ceil(<span class="number">8</span>) <span class="kw">as </span>usize;
-<a href=#126 id=126 data-nosnippet>126</a>    <span class="kw">let </span><span class="kw-2">mut </span>hasher = (has_signature &amp;&amp; verify_md5).then(Md5::new);
-<a href=#127 id=127 data-nosnippet>127</a>
-<a href=#128 id=128 data-nosnippet>128</a>    <span class="kw">let </span><span class="kw-2">mut </span>analyzer = StreamAnalyzer::new(channels);
-<a href=#129 id=129 data-nosnippet>129</a>    <span class="kw">let </span><span class="kw-2">mut </span>frame_f32 = <span class="macro">vec!</span>[<span class="number">0.0f32</span>; channels];
-<a href=#130 id=130 data-nosnippet>130</a>    <span class="kw">let </span><span class="kw-2">mut </span>frame_i32 = <span class="macro">vec!</span>[<span class="number">0i32</span>; channels];
-<a href=#131 id=131 data-nosnippet>131</a>    <span class="kw">let </span><span class="kw-2">mut </span>byte_row: Vec&lt;u8&gt; = Vec::new();
-<a href=#132 id=132 data-nosnippet>132</a>    <span class="kw">let </span><span class="kw-2">mut </span>frame_count: u64 = <span class="number">0</span>;
-<a href=#133 id=133 data-nosnippet>133</a>
-<a href=#134 id=134 data-nosnippet>134</a>    <span class="kw">let </span><span class="kw-2">mut </span>blocks = reader.blocks();
-<a href=#135 id=135 data-nosnippet>135</a>    <span class="kw">let </span><span class="kw-2">mut </span>buffer: Vec&lt;i32&gt; = Vec::new();
-<a href=#136 id=136 data-nosnippet>136</a>    <span class="kw">loop </span>{
-<a href=#137 id=137 data-nosnippet>137</a>        <span class="kw">let </span>block = <span class="kw">match </span>blocks.read_next_or_eof(buffer) {
-<a href=#138 id=138 data-nosnippet>138</a>            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(b)) =&gt; b,
-<a href=#139 id=139 data-nosnippet>139</a>            <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; <span class="kw">break</span>,
-<a href=#140 id=140 data-nosnippet>140</a>            <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(AnalysisError::Decode(<span class="macro">format!</span>(<span class="string">"flac decode error: {e}"</span>))),
-<a href=#141 id=141 data-nosnippet>141</a>        };
-<a href=#142 id=142 data-nosnippet>142</a>        <span class="kw">let </span>n = block.duration() <span class="kw">as </span>usize;
-<a href=#143 id=143 data-nosnippet>143</a>        <span class="kw">if </span>hasher.is_some() {
-<a href=#144 id=144 data-nosnippet>144</a>            byte_row.clear();
-<a href=#145 id=145 data-nosnippet>145</a>            byte_row.reserve(n * channels * bytes_per_sample);
-<a href=#146 id=146 data-nosnippet>146</a>        }
-<a href=#147 id=147 data-nosnippet>147</a>        <span class="kw">for </span>t <span class="kw">in </span><span class="number">0</span>..n {
-<a href=#148 id=148 data-nosnippet>148</a>            <span class="kw">for </span>c <span class="kw">in </span><span class="number">0</span>..channels {
-<a href=#149 id=149 data-nosnippet>149</a>                <span class="kw">let </span>s = block.channel(c <span class="kw">as </span>u32)[t];
-<a href=#150 id=150 data-nosnippet>150</a>                frame_i32[c] = s;
-<a href=#151 id=151 data-nosnippet>151</a>                frame_f32[c] = s <span class="kw">as </span>f32 * scale;
-<a href=#152 id=152 data-nosnippet>152</a>                <span class="kw">if </span>hasher.is_some() {
-<a href=#153 id=153 data-nosnippet>153</a>                    <span class="kw">let </span>le = (s <span class="kw">as </span>u32).to_le_bytes();
-<a href=#154 id=154 data-nosnippet>154</a>                    byte_row.extend_from_slice(<span class="kw-2">&amp;</span>le[..bytes_per_sample]);
-<a href=#155 id=155 data-nosnippet>155</a>                }
-<a href=#156 id=156 data-nosnippet>156</a>            }
-<a href=#157 id=157 data-nosnippet>157</a>            analyzer.push_frame(<span class="kw-2">&amp;</span>frame_f32, <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>frame_i32));
-<a href=#158 id=158 data-nosnippet>158</a>            frame_count += <span class="number">1</span>;
-<a href=#159 id=159 data-nosnippet>159</a>        }
-<a href=#160 id=160 data-nosnippet>160</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(h) = <span class="kw-2">&amp;mut </span>hasher {
-<a href=#161 id=161 data-nosnippet>161</a>            h.update(<span class="kw-2">&amp;</span>byte_row);
-<a href=#162 id=162 data-nosnippet>162</a>        }
-<a href=#163 id=163 data-nosnippet>163</a>        buffer = block.into_buffer();
-<a href=#164 id=164 data-nosnippet>164</a>    }
+<a href=#82 id=82 data-nosnippet>82</a>    validate_decoded_frames(frame_count, info.samples)<span class="question-mark">?</span>;
+<a href=#83 id=83 data-nosnippet>83</a>    <span class="prelude-val">Ok</span>(<span class="kw">crate</span>::decode::PcmAudio {
+<a href=#84 id=84 data-nosnippet>84</a>        samples,
+<a href=#85 id=85 data-nosnippet>85</a>        sample_rate,
+<a href=#86 id=86 data-nosnippet>86</a>        channels,
+<a href=#87 id=87 data-nosnippet>87</a>    })
+<a href=#88 id=88 data-nosnippet>88</a>}
+<a href=#89 id=89 data-nosnippet>89</a>
+<a href=#90 id=90 data-nosnippet>90</a><span class="doccomment">/// Fused single-pass FLAC decode.
+<a href=#91 id=91 data-nosnippet>91</a>///
+<a href=#92 id=92 data-nosnippet>92</a>/// Correctness guarantees:
+<a href=#93 id=93 data-nosnippet>93</a>/// * The MD5 is hashed from claxon's raw decoded integers — no float
+<a href=#94 id=94 data-nosnippet>94</a>///   round-trip — using the exact layout mandated by the FLAC spec:
+<a href=#95 id=95 data-nosnippet>95</a>///   interleaved samples, each written as `ceil(bits/8)` little-endian
+<a href=#96 id=96 data-nosnippet>96</a>///   two's-complement bytes. Bit-identical to what `flac -t` verifies.
+<a href=#97 id=97 data-nosnippet>97</a>/// * The analyzer receives `s / 2^(bits-1)` as `f32`, which is exact for
+<a href=#98 id=98 data-nosnippet>98</a>///   FLAC's ≤ 24-bit integers (every such integer fits in the f32 mantissa),
+<a href=#99 id=99 data-nosnippet>99</a>///   plus the raw integers for effective-bit-depth analysis.
+<a href=#100 id=100 data-nosnippet>100</a>///
+<a href=#101 id=101 data-nosnippet>101</a>/// When `verify_md5` is false the hash comparison is skipped (the decode cost
+<a href=#102 id=102 data-nosnippet>102</a>/// is the same either way since analysis needs every sample).
+<a href=#103 id=103 data-nosnippet>103</a></span><span class="kw">pub fn </span>decode_and_analyze_flac(
+<a href=#104 id=104 data-nosnippet>104</a>    path: <span class="kw-2">&amp;</span>Path,
+<a href=#105 id=105 data-nosnippet>105</a>    verify_md5: bool,
+<a href=#106 id=106 data-nosnippet>106</a>) -&gt; <span class="prelude-ty">Result</span>&lt;(DecodeOutcome, FlacMd5Status), AnalysisError&gt; {
+<a href=#107 id=107 data-nosnippet>107</a>    <span class="kw">let </span><span class="kw-2">mut </span>reader = claxon::FlacReader::open(path)
+<a href=#108 id=108 data-nosnippet>108</a>        .map_err(|e| AnalysisError::Decode(<span class="macro">format!</span>(<span class="string">"flac open failed: {e}"</span>)))<span class="question-mark">?</span>;
+<a href=#109 id=109 data-nosnippet>109</a>    <span class="kw">let </span>info = reader.streaminfo();
+<a href=#110 id=110 data-nosnippet>110</a>    <span class="kw">let </span>sample_rate = info.sample_rate;
+<a href=#111 id=111 data-nosnippet>111</a>    <span class="kw">let </span>channels = info.channels <span class="kw">as </span>usize;
+<a href=#112 id=112 data-nosnippet>112</a>    <span class="kw">let </span>bits = info.bits_per_sample;
+<a href=#113 id=113 data-nosnippet>113</a>    <span class="comment">// Guards the shifts and the per-sample byte width below; a STREAMINFO
+<a href=#114 id=114 data-nosnippet>114</a>    // claiming 0 or &gt; 32 bits is either corrupt or hostile.
+<a href=#115 id=115 data-nosnippet>115</a>    </span><span class="kw">if </span>sample_rate == <span class="number">0 </span>|| channels == <span class="number">0 </span>|| bits == <span class="number">0 </span>|| bits &gt; <span class="number">32 </span>{
+<a href=#116 id=116 data-nosnippet>116</a>        <span class="kw">return </span><span class="prelude-val">Err</span>(AnalysisError::Decode(<span class="string">"invalid FLAC stream info"</span>.into()));
+<a href=#117 id=117 data-nosnippet>117</a>    }
+<a href=#118 id=118 data-nosnippet>118</a>    <span class="kw">let </span>total_frames_hint = info.samples;
+<a href=#119 id=119 data-nosnippet>119</a>    <span class="kw">let </span>stored = info.md5sum;
+<a href=#120 id=120 data-nosnippet>120</a>    <span class="kw">let </span>has_signature = stored != [<span class="number">0u8</span>; <span class="number">16</span>];
+<a href=#121 id=121 data-nosnippet>121</a>
+<a href=#122 id=122 data-nosnippet>122</a>    <span class="kw">let </span>scale = <span class="number">1.0f32 </span>/ (<span class="number">1u64 </span>&lt;&lt; (bits - <span class="number">1</span>)) <span class="kw">as </span>f32;
+<a href=#123 id=123 data-nosnippet>123</a>    <span class="kw">let </span>bytes_per_sample = bits.div_ceil(<span class="number">8</span>) <span class="kw">as </span>usize;
+<a href=#124 id=124 data-nosnippet>124</a>    <span class="kw">let </span><span class="kw-2">mut </span>hasher = (has_signature &amp;&amp; verify_md5).then(Md5::new);
+<a href=#125 id=125 data-nosnippet>125</a>
+<a href=#126 id=126 data-nosnippet>126</a>    <span class="kw">let </span><span class="kw-2">mut </span>analyzer = StreamAnalyzer::new(channels);
+<a href=#127 id=127 data-nosnippet>127</a>    <span class="kw">let </span><span class="kw-2">mut </span>frame_f32 = <span class="macro">vec!</span>[<span class="number">0.0f32</span>; channels];
+<a href=#128 id=128 data-nosnippet>128</a>    <span class="kw">let </span><span class="kw-2">mut </span>frame_i32 = <span class="macro">vec!</span>[<span class="number">0i32</span>; channels];
+<a href=#129 id=129 data-nosnippet>129</a>    <span class="kw">let </span><span class="kw-2">mut </span>byte_row: Vec&lt;u8&gt; = Vec::new();
+<a href=#130 id=130 data-nosnippet>130</a>    <span class="kw">let </span><span class="kw-2">mut </span>frame_count: u64 = <span class="number">0</span>;
+<a href=#131 id=131 data-nosnippet>131</a>
+<a href=#132 id=132 data-nosnippet>132</a>    <span class="kw">let </span><span class="kw-2">mut </span>blocks = reader.blocks();
+<a href=#133 id=133 data-nosnippet>133</a>    <span class="kw">let </span><span class="kw-2">mut </span>buffer: Vec&lt;i32&gt; = Vec::new();
+<a href=#134 id=134 data-nosnippet>134</a>    <span class="kw">loop </span>{
+<a href=#135 id=135 data-nosnippet>135</a>        <span class="kw">let </span>block = <span class="kw">match </span>blocks.read_next_or_eof(buffer) {
+<a href=#136 id=136 data-nosnippet>136</a>            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(b)) =&gt; b,
+<a href=#137 id=137 data-nosnippet>137</a>            <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; <span class="kw">break</span>,
+<a href=#138 id=138 data-nosnippet>138</a>            <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(AnalysisError::Decode(<span class="macro">format!</span>(<span class="string">"flac decode error: {e}"</span>))),
+<a href=#139 id=139 data-nosnippet>139</a>        };
+<a href=#140 id=140 data-nosnippet>140</a>        validate_block_channels(<span class="kw-2">&amp;</span>block, channels)<span class="question-mark">?</span>;
+<a href=#141 id=141 data-nosnippet>141</a>        <span class="kw">let </span>n = block.duration() <span class="kw">as </span>usize;
+<a href=#142 id=142 data-nosnippet>142</a>        <span class="kw">if </span>hasher.is_some() {
+<a href=#143 id=143 data-nosnippet>143</a>            byte_row.clear();
+<a href=#144 id=144 data-nosnippet>144</a>            byte_row.reserve(n * channels * bytes_per_sample);
+<a href=#145 id=145 data-nosnippet>145</a>        }
+<a href=#146 id=146 data-nosnippet>146</a>        <span class="kw">for </span>t <span class="kw">in </span><span class="number">0</span>..n {
+<a href=#147 id=147 data-nosnippet>147</a>            <span class="kw">for </span>c <span class="kw">in </span><span class="number">0</span>..channels {
+<a href=#148 id=148 data-nosnippet>148</a>                <span class="kw">let </span>s = block_sample(<span class="kw-2">&amp;</span>block, c, t)<span class="question-mark">?</span>;
+<a href=#149 id=149 data-nosnippet>149</a>                frame_i32[c] = s;
+<a href=#150 id=150 data-nosnippet>150</a>                frame_f32[c] = s <span class="kw">as </span>f32 * scale;
+<a href=#151 id=151 data-nosnippet>151</a>                <span class="kw">if </span>hasher.is_some() {
+<a href=#152 id=152 data-nosnippet>152</a>                    <span class="kw">let </span>le = (s <span class="kw">as </span>u32).to_le_bytes();
+<a href=#153 id=153 data-nosnippet>153</a>                    byte_row.extend_from_slice(<span class="kw-2">&amp;</span>le[..bytes_per_sample]);
+<a href=#154 id=154 data-nosnippet>154</a>                }
+<a href=#155 id=155 data-nosnippet>155</a>            }
+<a href=#156 id=156 data-nosnippet>156</a>            analyzer.push_frame(<span class="kw-2">&amp;</span>frame_f32, <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>frame_i32));
+<a href=#157 id=157 data-nosnippet>157</a>            frame_count += <span class="number">1</span>;
+<a href=#158 id=158 data-nosnippet>158</a>        }
+<a href=#159 id=159 data-nosnippet>159</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(h) = <span class="kw-2">&amp;mut </span>hasher {
+<a href=#160 id=160 data-nosnippet>160</a>            h.update(<span class="kw-2">&amp;</span>byte_row);
+<a href=#161 id=161 data-nosnippet>161</a>        }
+<a href=#162 id=162 data-nosnippet>162</a>        buffer = block.into_buffer();
+<a href=#163 id=163 data-nosnippet>163</a>    }
+<a href=#164 id=164 data-nosnippet>164</a>    validate_decoded_frames(frame_count, total_frames_hint)<span class="question-mark">?</span>;
 <a href=#165 id=165 data-nosnippet>165</a>
 <a href=#166 id=166 data-nosnippet>166</a>    <span class="kw">let </span>md5_status = <span class="kw">if </span>!has_signature {
 <a href=#167 id=167 data-nosnippet>167</a>        FlacMd5Status::NoSignature
@@ -195,44 +195,162 @@
 <a href=#195 id=195 data-nosnippet>195</a>    ))
 <a href=#196 id=196 data-nosnippet>196</a>}
 <a href=#197 id=197 data-nosnippet>197</a>
-<a href=#198 id=198 data-nosnippet>198</a><span class="attr">#[cfg(test)]
-<a href=#199 id=199 data-nosnippet>199</a></span><span class="kw">mod </span>tests {
-<a href=#200 id=200 data-nosnippet>200</a>    <span class="doccomment">/// The fused FLAC path feeds the analyzer with `s * (1 / 2^(bits-1))` as
-<a href=#201 id=201 data-nosnippet>201</a>    /// f32. This must be a *lossless* round-trip for every integer the format
-<a href=#202 id=202 data-nosnippet>202</a>    /// can produce at ≤ 24 bits — otherwise analysis results could drift from
-<a href=#203 id=203 data-nosnippet>203</a>    /// the exact samples the MD5 is computed over.
-<a href=#204 id=204 data-nosnippet>204</a>    </span><span class="attr">#[test]
-<a href=#205 id=205 data-nosnippet>205</a>    </span><span class="kw">fn </span>f32_normalization_roundtrips_exactly_up_to_24_bits() {
-<a href=#206 id=206 data-nosnippet>206</a>        <span class="kw">for </span>bits <span class="kw">in </span>[<span class="number">8u32</span>, <span class="number">12</span>, <span class="number">16</span>, <span class="number">20</span>, <span class="number">24</span>] {
-<a href=#207 id=207 data-nosnippet>207</a>            <span class="kw">let </span>scale = <span class="number">1.0f32 </span>/ (<span class="number">1u64 </span>&lt;&lt; (bits - <span class="number">1</span>)) <span class="kw">as </span>f32;
-<a href=#208 id=208 data-nosnippet>208</a>            <span class="kw">let </span>max = (<span class="number">1i64 </span>&lt;&lt; (bits - <span class="number">1</span>)) - <span class="number">1</span>;
-<a href=#209 id=209 data-nosnippet>209</a>            <span class="kw">let </span>probes = [
-<a href=#210 id=210 data-nosnippet>210</a>                <span class="number">0i64</span>,
-<a href=#211 id=211 data-nosnippet>211</a>                <span class="number">1</span>,
-<a href=#212 id=212 data-nosnippet>212</a>                -<span class="number">1</span>,
-<a href=#213 id=213 data-nosnippet>213</a>                <span class="number">2</span>,
-<a href=#214 id=214 data-nosnippet>214</a>                -<span class="number">2</span>,
-<a href=#215 id=215 data-nosnippet>215</a>                max,
-<a href=#216 id=216 data-nosnippet>216</a>                -max - <span class="number">1</span>,
-<a href=#217 id=217 data-nosnippet>217</a>                max / <span class="number">3</span>,
-<a href=#218 id=218 data-nosnippet>218</a>                -(max / <span class="number">7</span>),
-<a href=#219 id=219 data-nosnippet>219</a>                max - <span class="number">1</span>,
-<a href=#220 id=220 data-nosnippet>220</a>            ];
-<a href=#221 id=221 data-nosnippet>221</a>            <span class="kw">for </span><span class="kw-2">&amp;</span>s <span class="kw">in </span><span class="kw-2">&amp;</span>probes {
-<a href=#222 id=222 data-nosnippet>222</a>                <span class="kw">let </span>f = s <span class="kw">as </span>f32 * scale;
-<a href=#223 id=223 data-nosnippet>223</a>                <span class="kw">let </span>back = (f / scale).round() <span class="kw">as </span>i64;
-<a href=#224 id=224 data-nosnippet>224</a>                <span class="macro">assert_eq!</span>(back, s, <span class="string">"bits={bits} sample={s}"</span>);
-<a href=#225 id=225 data-nosnippet>225</a>            }
-<a href=#226 id=226 data-nosnippet>226</a>        }
-<a href=#227 id=227 data-nosnippet>227</a>    }
-<a href=#228 id=228 data-nosnippet>228</a>
-<a href=#229 id=229 data-nosnippet>229</a>    <span class="doccomment">/// The byte width the MD5 is fed must match the FLAC spec's
-<a href=#230 id=230 data-nosnippet>230</a>    /// `ceil(bits/8)` for every depth the format allows.
-<a href=#231 id=231 data-nosnippet>231</a>    </span><span class="attr">#[test]
-<a href=#232 id=232 data-nosnippet>232</a>    </span><span class="kw">fn </span>bytes_per_sample_matches_the_spec() {
-<a href=#233 id=233 data-nosnippet>233</a>        <span class="kw">for </span>(bits, expected) <span class="kw">in </span>[(<span class="number">8u32</span>, <span class="number">1usize</span>), (<span class="number">12</span>, <span class="number">2</span>), (<span class="number">16</span>, <span class="number">2</span>), (<span class="number">20</span>, <span class="number">3</span>), (<span class="number">24</span>, <span class="number">3</span>), (<span class="number">32</span>, <span class="number">4</span>)] {
-<a href=#234 id=234 data-nosnippet>234</a>            <span class="macro">assert_eq!</span>(bits.div_ceil(<span class="number">8</span>) <span class="kw">as </span>usize, expected, <span class="string">"bits={bits}"</span>);
-<a href=#235 id=235 data-nosnippet>235</a>        }
-<a href=#236 id=236 data-nosnippet>236</a>    }
-<a href=#237 id=237 data-nosnippet>237</a>}
+<a href=#198 id=198 data-nosnippet>198</a><span class="kw">fn </span>validate_block_channels(
+<a href=#199 id=199 data-nosnippet>199</a>    block: <span class="kw-2">&amp;</span>claxon::frame::Block,
+<a href=#200 id=200 data-nosnippet>200</a>    channels: usize,
+<a href=#201 id=201 data-nosnippet>201</a>) -&gt; <span class="prelude-ty">Result</span>&lt;(), AnalysisError&gt; {
+<a href=#202 id=202 data-nosnippet>202</a>    <span class="kw">if </span>block.channels() <span class="kw">as </span>usize != channels {
+<a href=#203 id=203 data-nosnippet>203</a>        <span class="kw">return </span><span class="prelude-val">Err</span>(AnalysisError::Decode(
+<a href=#204 id=204 data-nosnippet>204</a>            <span class="string">"FLAC channel count changed during decoding"</span>.into(),
+<a href=#205 id=205 data-nosnippet>205</a>        ));
+<a href=#206 id=206 data-nosnippet>206</a>    }
+<a href=#207 id=207 data-nosnippet>207</a>    <span class="prelude-val">Ok</span>(())
+<a href=#208 id=208 data-nosnippet>208</a>}
+<a href=#209 id=209 data-nosnippet>209</a>
+<a href=#210 id=210 data-nosnippet>210</a><span class="kw">fn </span>block_sample(
+<a href=#211 id=211 data-nosnippet>211</a>    block: <span class="kw-2">&amp;</span>claxon::frame::Block,
+<a href=#212 id=212 data-nosnippet>212</a>    channel: usize,
+<a href=#213 id=213 data-nosnippet>213</a>    frame: usize,
+<a href=#214 id=214 data-nosnippet>214</a>) -&gt; <span class="prelude-ty">Result</span>&lt;i32, AnalysisError&gt; {
+<a href=#215 id=215 data-nosnippet>215</a>    <span class="comment">// `channel()` can panic, so validate against this block, not STREAMINFO.
+<a href=#216 id=216 data-nosnippet>216</a>    </span><span class="kw">if </span>channel &gt;= block.channels() <span class="kw">as </span>usize {
+<a href=#217 id=217 data-nosnippet>217</a>        <span class="kw">return </span><span class="prelude-val">Err</span>(AnalysisError::Decode(<span class="string">"invalid FLAC channel index"</span>.into()));
+<a href=#218 id=218 data-nosnippet>218</a>    }
+<a href=#219 id=219 data-nosnippet>219</a>    block
+<a href=#220 id=220 data-nosnippet>220</a>        .channel(channel <span class="kw">as </span>u32)
+<a href=#221 id=221 data-nosnippet>221</a>        .get(frame)
+<a href=#222 id=222 data-nosnippet>222</a>        .copied()
+<a href=#223 id=223 data-nosnippet>223</a>        .ok_or_else(|| AnalysisError::Decode(<span class="string">"incomplete FLAC block"</span>.into()))
+<a href=#224 id=224 data-nosnippet>224</a>}
+<a href=#225 id=225 data-nosnippet>225</a>
+<a href=#226 id=226 data-nosnippet>226</a><span class="attr">#[cfg(test)]
+<a href=#227 id=227 data-nosnippet>227</a></span><span class="kw">mod </span>tests {
+<a href=#228 id=228 data-nosnippet>228</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href=#229 id=229 data-nosnippet>229</a>    <span class="kw">use </span>flacenc::component::BitRepr;
+<a href=#230 id=230 data-nosnippet>230</a>    <span class="kw">use </span>flacenc::error::Verify;
+<a href=#231 id=231 data-nosnippet>231</a>
+<a href=#232 id=232 data-nosnippet>232</a>    <span class="kw">fn </span>encoded_flac(samples: <span class="kw-2">&amp;</span>[i32], channels: usize, bits: usize) -&gt; Vec&lt;u8&gt; {
+<a href=#233 id=233 data-nosnippet>233</a>        <span class="kw">let </span><span class="kw-2">mut </span>config = flacenc::config::Encoder::default();
+<a href=#234 id=234 data-nosnippet>234</a>        config.multithread = <span class="bool-val">false</span>;
+<a href=#235 id=235 data-nosnippet>235</a>        <span class="kw">let </span>config = config.into_verified().expect(<span class="string">"valid encoder settings"</span>);
+<a href=#236 id=236 data-nosnippet>236</a>        <span class="kw">let </span>source = flacenc::source::MemSource::from_samples(samples, channels, bits, <span class="number">96_000</span>);
+<a href=#237 id=237 data-nosnippet>237</a>        <span class="kw">let </span>stream = flacenc::encode_with_fixed_block_size(<span class="kw-2">&amp;</span>config, source, config.block_size)
+<a href=#238 id=238 data-nosnippet>238</a>            .expect(<span class="string">"reference FLAC encoding"</span>);
+<a href=#239 id=239 data-nosnippet>239</a>        <span class="kw">let </span><span class="kw-2">mut </span>sink = flacenc::bitsink::ByteSink::new();
+<a href=#240 id=240 data-nosnippet>240</a>        stream.write(<span class="kw-2">&amp;mut </span>sink).expect(<span class="string">"serialize reference FLAC"</span>);
+<a href=#241 id=241 data-nosnippet>241</a>        sink.as_slice().to_vec()
+<a href=#242 id=242 data-nosnippet>242</a>    }
+<a href=#243 id=243 data-nosnippet>243</a>
+<a href=#244 id=244 data-nosnippet>244</a>    <span class="attr">#[test]
+<a href=#245 id=245 data-nosnippet>245</a>    </span><span class="kw">fn </span>independent_flac_encoder_preserves_zero_padding_and_low_bits() {
+<a href=#246 id=246 data-nosnippet>246</a>        <span class="kw">let </span>dir = tempfile::tempdir().expect(<span class="string">"temporary directory"</span>);
+<a href=#247 id=247 data-nosnippet>247</a>        <span class="kw">let </span>path = dir.path().join(<span class="string">"integer.flac"</span>);
+<a href=#248 id=248 data-nosnippet>248</a>        <span class="kw">for </span>(samples, expected) <span class="kw">in </span>[
+<a href=#249 id=249 data-nosnippet>249</a>            ([<span class="number">123 </span>&lt;&lt; <span class="number">8</span>, -<span class="number">125 </span>&lt;&lt; <span class="number">8</span>, <span class="number">0</span>, <span class="number">127 </span>&lt;&lt; <span class="number">8</span>].repeat(<span class="number">16</span>), <span class="number">16</span>),
+<a href=#250 id=250 data-nosnippet>250</a>            (
+<a href=#251 id=251 data-nosnippet>251</a>                [<span class="number">0x40_0001</span>, -<span class="number">0x40_0001</span>, <span class="number">0x20_0001</span>, -<span class="number">0x20_0001</span>].repeat(<span class="number">16</span>),
+<a href=#252 id=252 data-nosnippet>252</a>                <span class="number">24</span>,
+<a href=#253 id=253 data-nosnippet>253</a>            ),
+<a href=#254 id=254 data-nosnippet>254</a>            (<span class="macro">vec!</span>[<span class="number">0</span>; <span class="number">64</span>], <span class="number">1</span>),
+<a href=#255 id=255 data-nosnippet>255</a>        ] {
+<a href=#256 id=256 data-nosnippet>256</a>            std::fs::write(<span class="kw-2">&amp;</span>path, encoded_flac(<span class="kw-2">&amp;</span>samples, <span class="number">2</span>, <span class="number">24</span>)).expect(<span class="string">"write FLAC"</span>);
+<a href=#257 id=257 data-nosnippet>257</a>            <span class="kw">let </span>(decoded, md5) = decode_and_analyze_flac(<span class="kw-2">&amp;</span>path, <span class="bool-val">true</span>).expect(<span class="string">"decode FLAC"</span>);
+<a href=#258 id=258 data-nosnippet>258</a>            <span class="macro">assert_eq!</span>(md5, FlacMd5Status::Match);
+<a href=#259 id=259 data-nosnippet>259</a>            <span class="macro">assert_eq!</span>(
+<a href=#260 id=260 data-nosnippet>260</a>                decoded
+<a href=#261 id=261 data-nosnippet>261</a>                    .analyzer
+<a href=#262 id=262 data-nosnippet>262</a>                    .finish(decoded.sample_rate, decoded.declared_bits)
+<a href=#263 id=263 data-nosnippet>263</a>                    .real_bit_depth,
+<a href=#264 id=264 data-nosnippet>264</a>                <span class="prelude-val">Some</span>(expected)
+<a href=#265 id=265 data-nosnippet>265</a>            );
+<a href=#266 id=266 data-nosnippet>266</a>        }
+<a href=#267 id=267 data-nosnippet>267</a>    }
+<a href=#268 id=268 data-nosnippet>268</a>
+<a href=#269 id=269 data-nosnippet>269</a>    <span class="attr">#[test]
+<a href=#270 id=270 data-nosnippet>270</a>    </span><span class="kw">fn </span>missing_flac_frames_are_rejected_even_without_md5_verification() {
+<a href=#271 id=271 data-nosnippet>271</a>        <span class="kw">let </span>dir = tempfile::tempdir().expect(<span class="string">"temporary directory"</span>);
+<a href=#272 id=272 data-nosnippet>272</a>        <span class="kw">let </span>path = dir.path().join(<span class="string">"missing-tail.flac"</span>);
+<a href=#273 id=273 data-nosnippet>273</a>        <span class="kw">let </span><span class="kw-2">mut </span>bytes = encoded_flac(<span class="kw-2">&amp;</span>[<span class="number">123 </span>&lt;&lt; <span class="number">8</span>; <span class="number">128</span>], <span class="number">1</span>, <span class="number">24</span>);
+<a href=#274 id=274 data-nosnippet>274</a>        <span class="comment">// RFC 9639 STREAMINFO: the low 36 bits of this eight-byte field
+<a href=#275 id=275 data-nosnippet>275</a>        // contain the total sample count. The file now lacks 128 frames.
+<a href=#276 id=276 data-nosnippet>276</a>        </span><span class="kw">let </span>packed = u64::from_be_bytes(bytes[<span class="number">18</span>..<span class="number">26</span>].try_into().expect(<span class="string">"STREAMINFO field"</span>));
+<a href=#277 id=277 data-nosnippet>277</a>        <span class="kw">let </span>count_mask = (<span class="number">1u64 </span>&lt;&lt; <span class="number">36</span>) - <span class="number">1</span>;
+<a href=#278 id=278 data-nosnippet>278</a>        bytes[<span class="number">18</span>..<span class="number">26</span>].copy_from_slice(<span class="kw-2">&amp;</span>((packed &amp; !count_mask) | <span class="number">256</span>).to_be_bytes());
+<a href=#279 id=279 data-nosnippet>279</a>        std::fs::write(<span class="kw-2">&amp;</span>path, bytes).expect(<span class="string">"write truncated declaration"</span>);
+<a href=#280 id=280 data-nosnippet>280</a>        <span class="macro">assert!</span>(decode_and_analyze_flac(<span class="kw-2">&amp;</span>path, <span class="bool-val">false</span>).is_err());
+<a href=#281 id=281 data-nosnippet>281</a>        <span class="macro">assert!</span>(decode_flac_to_pcm(<span class="kw-2">&amp;</span>path).is_err());
+<a href=#282 id=282 data-nosnippet>282</a>    }
+<a href=#283 id=283 data-nosnippet>283</a>
+<a href=#284 id=284 data-nosnippet>284</a>    <span class="attr">#[test]
+<a href=#285 id=285 data-nosnippet>285</a>    </span><span class="kw">fn </span>inconsistent_flac_channels_return_an_error_instead_of_panicking() {
+<a href=#286 id=286 data-nosnippet>286</a>        <span class="kw">let </span>dir = tempfile::tempdir().expect(<span class="string">"temporary directory"</span>);
+<a href=#287 id=287 data-nosnippet>287</a>        <span class="kw">let </span>path = dir.path().join(<span class="string">"wrong-channels.flac"</span>);
+<a href=#288 id=288 data-nosnippet>288</a>        <span class="kw">let </span><span class="kw-2">mut </span>bytes = encoded_flac(<span class="kw-2">&amp;</span>[<span class="number">123 </span>&lt;&lt; <span class="number">8</span>; <span class="number">128</span>], <span class="number">1</span>, <span class="number">24</span>);
+<a href=#289 id=289 data-nosnippet>289</a>        <span class="comment">// STREAMINFO says stereo while the frame remains mono.
+<a href=#290 id=290 data-nosnippet>290</a>        </span>bytes[<span class="number">20</span>] |= <span class="number">0b10</span>;
+<a href=#291 id=291 data-nosnippet>291</a>        std::fs::write(<span class="kw-2">&amp;</span>path, bytes).expect(<span class="string">"write contradictory header"</span>);
+<a href=#292 id=292 data-nosnippet>292</a>        <span class="macro">assert!</span>(decode_and_analyze_flac(<span class="kw-2">&amp;</span>path, <span class="bool-val">false</span>).is_err());
+<a href=#293 id=293 data-nosnippet>293</a>        <span class="macro">assert!</span>(decode_flac_to_pcm(<span class="kw-2">&amp;</span>path).is_err());
+<a href=#294 id=294 data-nosnippet>294</a>    }
+<a href=#295 id=295 data-nosnippet>295</a>
+<a href=#296 id=296 data-nosnippet>296</a>    <span class="attr">#[test]
+<a href=#297 id=297 data-nosnippet>297</a>    </span><span class="kw">fn </span>metadata_only_flac_is_rejected() {
+<a href=#298 id=298 data-nosnippet>298</a>        <span class="kw">let </span>dir = tempfile::tempdir().expect(<span class="string">"temporary directory"</span>);
+<a href=#299 id=299 data-nosnippet>299</a>        <span class="kw">let </span>path = dir.path().join(<span class="string">"empty.flac"</span>);
+<a href=#300 id=300 data-nosnippet>300</a>        <span class="kw">let </span><span class="kw-2">mut </span>bytes = encoded_flac(<span class="kw-2">&amp;</span>[<span class="number">0</span>; <span class="number">128</span>], <span class="number">1</span>, <span class="number">24</span>);
+<a href=#301 id=301 data-nosnippet>301</a>        <span class="kw">let </span><span class="kw-2">mut </span>offset = <span class="number">4</span>;
+<a href=#302 id=302 data-nosnippet>302</a>        <span class="kw">loop </span>{
+<a href=#303 id=303 data-nosnippet>303</a>            <span class="kw">let </span>last = bytes[offset] &amp; <span class="number">0x80 </span>!= <span class="number">0</span>;
+<a href=#304 id=304 data-nosnippet>304</a>            <span class="kw">let </span>length =
+<a href=#305 id=305 data-nosnippet>305</a>                u32::from_be_bytes([<span class="number">0</span>, bytes[offset + <span class="number">1</span>], bytes[offset + <span class="number">2</span>], bytes[offset + <span class="number">3</span>]])
+<a href=#306 id=306 data-nosnippet>306</a>                    <span class="kw">as </span>usize;
+<a href=#307 id=307 data-nosnippet>307</a>            offset += <span class="number">4 </span>+ length;
+<a href=#308 id=308 data-nosnippet>308</a>            <span class="kw">if </span>last {
+<a href=#309 id=309 data-nosnippet>309</a>                <span class="kw">break</span>;
+<a href=#310 id=310 data-nosnippet>310</a>            }
+<a href=#311 id=311 data-nosnippet>311</a>        }
+<a href=#312 id=312 data-nosnippet>312</a>        bytes.truncate(offset);
+<a href=#313 id=313 data-nosnippet>313</a>        std::fs::write(<span class="kw-2">&amp;</span>path, bytes).expect(<span class="string">"write metadata-only fixture"</span>);
+<a href=#314 id=314 data-nosnippet>314</a>        <span class="macro">assert!</span>(decode_and_analyze_flac(<span class="kw-2">&amp;</span>path, <span class="bool-val">false</span>).is_err());
+<a href=#315 id=315 data-nosnippet>315</a>        <span class="macro">assert!</span>(decode_flac_to_pcm(<span class="kw-2">&amp;</span>path).is_err());
+<a href=#316 id=316 data-nosnippet>316</a>    }
+<a href=#317 id=317 data-nosnippet>317</a>
+<a href=#318 id=318 data-nosnippet>318</a>    <span class="doccomment">/// The fused FLAC path feeds the analyzer with `s * (1 / 2^(bits-1))` as
+<a href=#319 id=319 data-nosnippet>319</a>    /// f32. This must be a *lossless* round-trip for every integer the format
+<a href=#320 id=320 data-nosnippet>320</a>    /// can produce at ≤ 24 bits — otherwise analysis results could drift from
+<a href=#321 id=321 data-nosnippet>321</a>    /// the exact samples the MD5 is computed over.
+<a href=#322 id=322 data-nosnippet>322</a>    </span><span class="attr">#[test]
+<a href=#323 id=323 data-nosnippet>323</a>    </span><span class="kw">fn </span>f32_normalization_roundtrips_exactly_up_to_24_bits() {
+<a href=#324 id=324 data-nosnippet>324</a>        <span class="kw">for </span>bits <span class="kw">in </span>[<span class="number">8u32</span>, <span class="number">12</span>, <span class="number">16</span>, <span class="number">20</span>, <span class="number">24</span>] {
+<a href=#325 id=325 data-nosnippet>325</a>            <span class="kw">let </span>scale = <span class="number">1.0f32 </span>/ (<span class="number">1u64 </span>&lt;&lt; (bits - <span class="number">1</span>)) <span class="kw">as </span>f32;
+<a href=#326 id=326 data-nosnippet>326</a>            <span class="kw">let </span>max = (<span class="number">1i64 </span>&lt;&lt; (bits - <span class="number">1</span>)) - <span class="number">1</span>;
+<a href=#327 id=327 data-nosnippet>327</a>            <span class="kw">let </span>probes = [
+<a href=#328 id=328 data-nosnippet>328</a>                <span class="number">0i64</span>,
+<a href=#329 id=329 data-nosnippet>329</a>                <span class="number">1</span>,
+<a href=#330 id=330 data-nosnippet>330</a>                -<span class="number">1</span>,
+<a href=#331 id=331 data-nosnippet>331</a>                <span class="number">2</span>,
+<a href=#332 id=332 data-nosnippet>332</a>                -<span class="number">2</span>,
+<a href=#333 id=333 data-nosnippet>333</a>                max,
+<a href=#334 id=334 data-nosnippet>334</a>                -max - <span class="number">1</span>,
+<a href=#335 id=335 data-nosnippet>335</a>                max / <span class="number">3</span>,
+<a href=#336 id=336 data-nosnippet>336</a>                -(max / <span class="number">7</span>),
+<a href=#337 id=337 data-nosnippet>337</a>                max - <span class="number">1</span>,
+<a href=#338 id=338 data-nosnippet>338</a>            ];
+<a href=#339 id=339 data-nosnippet>339</a>            <span class="kw">for </span><span class="kw-2">&amp;</span>s <span class="kw">in </span><span class="kw-2">&amp;</span>probes {
+<a href=#340 id=340 data-nosnippet>340</a>                <span class="kw">let </span>f = s <span class="kw">as </span>f32 * scale;
+<a href=#341 id=341 data-nosnippet>341</a>                <span class="kw">let </span>back = (f / scale).round() <span class="kw">as </span>i64;
+<a href=#342 id=342 data-nosnippet>342</a>                <span class="macro">assert_eq!</span>(back, s, <span class="string">"bits={bits} sample={s}"</span>);
+<a href=#343 id=343 data-nosnippet>343</a>            }
+<a href=#344 id=344 data-nosnippet>344</a>        }
+<a href=#345 id=345 data-nosnippet>345</a>    }
+<a href=#346 id=346 data-nosnippet>346</a>
+<a href=#347 id=347 data-nosnippet>347</a>    <span class="doccomment">/// The byte width the MD5 is fed must match the FLAC spec's
+<a href=#348 id=348 data-nosnippet>348</a>    /// `ceil(bits/8)` for every depth the format allows.
+<a href=#349 id=349 data-nosnippet>349</a>    </span><span class="attr">#[test]
+<a href=#350 id=350 data-nosnippet>350</a>    </span><span class="kw">fn </span>bytes_per_sample_matches_the_spec() {
+<a href=#351 id=351 data-nosnippet>351</a>        <span class="kw">for </span>(bits, expected) <span class="kw">in </span>[(<span class="number">8u32</span>, <span class="number">1usize</span>), (<span class="number">12</span>, <span class="number">2</span>), (<span class="number">16</span>, <span class="number">2</span>), (<span class="number">20</span>, <span class="number">3</span>), (<span class="number">24</span>, <span class="number">3</span>), (<span class="number">32</span>, <span class="number">4</span>)] {
+<a href=#352 id=352 data-nosnippet>352</a>            <span class="macro">assert_eq!</span>(bits.div_ceil(<span class="number">8</span>) <span class="kw">as </span>usize, expected, <span class="string">"bits={bits}"</span>);
+<a href=#353 id=353 data-nosnippet>353</a>        }
+<a href=#354 id=354 data-nosnippet>354</a>    }
+<a href=#355 id=355 data-nosnippet>355</a>}
 </code></pre></div></section></main></body></html>
