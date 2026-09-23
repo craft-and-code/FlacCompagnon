@@ -196,12 +196,9 @@ export function stereoBalanceLabel(balance: FileAnalysis["stereo_balance"]): str
   return magnitude === "0.0" ? "0.0 dB" : `${difference < 0 ? "L" : "R"} +${magnitude} dB`;
 }
 
-/// Candidate counts are listening cues, not a confirmed corruption verdict.
-export function discontinuityLabel(summary: { count: number } | null | undefined, kind: "clicks" | "dropouts"): string {
-  if (!summary) return "—";
-  if (summary.count === 0) return "0";
-  const name = summary.count === 1 ? kind.slice(0, -1) : kind;
-  return `${summary.count} ${name}?`;
+/// The table already identifies the metric in its header; cells need only the count.
+export function discontinuityCount(summary: { count: number } | null | undefined): string {
+  return summary ? String(summary.count) : "—";
 }
 
 /// The deepest folder containing every one of `paths`. With a single folder of
@@ -346,8 +343,8 @@ export function fileSearchFields(f: FileAnalysis, tag?: TagSet | null): string[]
     `${f.channels}ch`,
     `${stereoLabel(f)}${f.fake_stereo ? " fake stereo" : ""}${f.phase_inverted ? " inverted polarity phase" : ""}`,
     f.stereo_balance ? `${stereoBalanceLabel(f.stereo_balance)} balance` : "",
-    f.discontinuities ? discontinuityLabel(f.discontinuities.clicks, "clicks") : "",
-    f.discontinuities ? discontinuityLabel(f.discontinuities.dropouts, "dropouts") : "",
+    f.discontinuities?.clicks.count ? `${f.discontinuities.clicks.count} impulses` : "",
+    f.discontinuities?.dropouts.count ? `${f.discontinuities.dropouts.count} dropouts` : "",
     f.clipping.clipped ? `${f.clipping.clip_events} clip events clipping` : "no clipping",
     Number.isFinite(f.clipping.true_peak_dbtp)
       ? `${f.clipping.true_peak_dbtp.toFixed(1)} dbtp true peak`

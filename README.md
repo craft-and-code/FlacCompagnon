@@ -1,18 +1,12 @@
 # FlacCompagnon
 
-[![CI](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/ci.yml/badge.svg)](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/ci.yml)
-[![Release](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/release.yml/badge.svg)](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/release.yml)
-[![Deploy to GitHub Pages](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/site.yml/badge.svg)](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/site.yml)
+[![CI](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/ci.yml/badge.svg)](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/ci.yml) [![Release](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/release.yml/badge.svg)](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/release.yml) [![Deploy to GitHub Pages](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/site.yml/badge.svg)](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/site.yml)
 
-[![Site: GitHub Pages](https://img.shields.io/badge/site-GitHub%20Pages-4b82f0?logo=github&logoColor=white)](https://craft-and-code.github.io/FlacCompagnon/)
-[![Docs: rustdoc](https://img.shields.io/badge/docs-rustdoc-7b4ff0?logo=rust&logoColor=white)](https://craft-and-code.github.io/FlacCompagnon/doc/)
-[![Latest release](https://img.shields.io/github/v/release/craft-and-code/FlacCompagnon?label=download&color=3ecf8e&logo=github)](https://github.com/craft-and-code/FlacCompagnon/releases/latest)
-[![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
+[![Site: GitHub Pages](https://img.shields.io/badge/site-GitHub%20Pages-4b82f0?logo=github&logoColor=white)](https://craft-and-code.github.io/FlacCompagnon/) [![Docs: rustdoc](https://img.shields.io/badge/docs-rustdoc-7b4ff0?logo=rust&logoColor=white)](https://craft-and-code.github.io/FlacCompagnon/doc/) [![Latest release](https://img.shields.io/github/v/release/craft-and-code/FlacCompagnon?label=download&color=3ecf8e&logo=github)](https://github.com/craft-and-code/FlacCompagnon/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
 **A cross-platform desktop tool that checks whether your "lossless" audio is actually lossless.**
 
-> [!NOTE]
-> **Transcoding detection.** My sincere thanks to Olivier Derrien for agreeing to release his original MATLAB implementation of the transcoding detector as open source: [craft-and-code/lac-transcoded](https://github.com/craft-and-code/lac-transcoded). It has been fully reimplemented in Rust and integrated into FlacCompagnon. In current comparisons, FlacCompagnon identifies the files reported as transcoded by Lossless Audio Checker, as well as additional candidates. The two implementations are not identical, however, and their remaining differences and calibration are being reviewed with Olivier. A transcoding result is statistical evidence, not proof of a file's origin.
+> [!NOTE] **Transcoding detection.** My sincere thanks to Olivier Derrien for agreeing to release his original MATLAB implementation of the transcoding detector as open source: [craft-and-code/lac-transcoded](https://github.com/craft-and-code/lac-transcoded). It has been fully reimplemented in Rust and integrated into FlacCompagnon. In current comparisons, FlacCompagnon identifies the files reported as transcoded by Lossless Audio Checker, as well as additional candidates. The two implementations are not identical, however, and their remaining differences and calibration are being reviewed with Olivier. A transcoding result is statistical evidence, not proof of a file's origin.
 >
 > The **Upscaling** detector (shown as **Upscaled** in the app) currently appears consistent with Lossless Audio Checker, but still needs broader validation on real-world material. The **Upsampling** detector also needs further work and validation. Audio engineers with Rust experience are warmly invited to contribute; help testing the algorithms against well-documented source material would be especially valuable.
 
@@ -32,10 +26,10 @@ Built with **Rust** and **Tauri v2**, it compiles to a small native app for **Li
 
 FlacCompagnon runs the same three **independent** detections as the original Lossless Audio Checker. A file can trip none, one, or several; if none fire it is reported **Clean**. The **Detections** column shows a coloured tag per finding, and hovering it explains the reasoning.
 
-| Detection       | Meaning                                                                                                                                                                                                                                                                                                                                                                                                       |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Upscaling**   | Unused integer precision, or a persistent lower-depth quantization grid beneath low-level export noise. Grid-based depths are marked as estimates. |
-| **Upsampling**  | Possible resampling: a high-rate container with limited bandwidth, which is an indicator rather than proof of origin.                                                                                                                                                                                                                                                                                              |
+| Detection       | Meaning                                                                                                                                                                                                                                                                                                                                                               |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Upscaling**   | Unused integer precision, or a persistent lower-depth quantization grid beneath low-level export noise. Grid-based depths are marked as estimates.                                                                                                                                                                                                                    |
+| **Upsampling**  | Possible resampling: a high-rate container with limited bandwidth, which is an indicator rather than proof of origin.                                                                                                                                                                                                                                                 |
 | **Transcoding** | Lossy source re-wrapped as lossless. Detected from the codec's own **quantization lattice**: rounding is irreversible, so a decoded lossy signal still sits exactly where its encoder put it, and re-wrapping it as FLAC preserves that. The statistical search can produce false positives, including on tonal signals. Missing checks are explained in the tooltip. |
 
 See [Detection algorithms](#detection-algorithms) below for how each works, and its limitations. **Upscaling** measures zero low bits exactly and can estimate a lower-depth grid hidden by small residuals. **Transcoding** is statistical evidence requiring validation, while **Upsampling** remains a spectral heuristic. None of these checks certifies a recording's history.
@@ -250,8 +244,7 @@ Two codecs are searched, and both must be, because they look in different transf
 
 Each codec keeps its own parameters (scalefactor bias, δ range, significance threshold) as the standards and the author's tuning define them; they are not interchangeable. The score is the fraction of (band, scalefactor) trials whose rounding error fell below its statistical threshold, pooled across selected frames after choosing each frame's best window shape, then maximised over alignments and tested channel modes (L/R/M/S). It runs at 32/44.1/48 kHz, the rates the scalefactor band tables cover.
 
-> [!WARNING]
-> **Calibration is preliminary.** AAC uses 64 frames × 64 scalefactors and λ = 0.0125; MP3 uses 8 × 8 and the provisional λ = 0.031. Both now reuse one frame selection across channel modes. A detector that lacks its full frame count abstains rather than reusing its threshold on fewer observations. Rejecting all-zero quantization trials changes the statistic and needs corpus validation of sensitivity as well as false positives. A pure lossless 24-bit sine can still cross the AAC threshold. The score is not proof of provenance.
+> [!WARNING] **Calibration is preliminary.** AAC uses 64 frames × 64 scalefactors and λ = 0.0125; MP3 uses 8 × 8 and the provisional λ = 0.031. Both now reuse one frame selection across channel modes. A detector that lacks its full frame count abstains rather than reusing its threshold on fewer observations. Rejecting all-zero quantization trials changes the statistic and needs corpus validation of sensitivity as well as false positives. A pure lossless 24-bit sine can still cross the AAC threshold. The score is not proof of provenance.
 
 The score is exported in the CSV as `lattice_score`, and shown in the Detection column's tooltip. An empty value means the search did not complete — which is not the same as a low score — and the tooltip gives the reason (untabulated sample rate, file too short, decode failure, cancelled).
 
@@ -273,12 +266,8 @@ All cut-off-based detection assumes genuine music has energy up near Nyquist. Ac
 
 - [Rust](https://rustup.rs/) (stable) and Cargo.
 - [Node.js](https://nodejs.org/) 18+ and npm.
-- Tauri v2 system dependencies for your OS — see
-  <https://v2.tauri.app/start/prerequisites/> (on Linux: `webkit2gtk`, `libayatana-appindicator`, etc.).
-- **autoconf, automake and libtool** — build-time only, for the Opus encoder.
-  The `audiopus_sys` crate compiles a vendored libopus with the autotools, so
-  `autoreconf` has to be on `PATH` or the build stops at "Failed to autogen
-  Opus". Most Linux setups already have them; macOS does not:
+- Tauri v2 system dependencies for your OS — see <https://v2.tauri.app/start/prerequisites/> (on Linux: `webkit2gtk`, `libayatana-appindicator`, etc.).
+- **autoconf, automake and libtool** — build-time only, for the Opus encoder. The `audiopus_sys` crate compiles a vendored libopus with the autotools, so `autoreconf` has to be on `PATH` or the build stops at "Failed to autogen Opus". Most Linux setups already have them; macOS does not:
   - macOS: `brew install autoconf automake libtool`
   - Debian/Ubuntu: `sudo apt install autoconf automake libtool`
 - **ffmpeg** — only needed for the spectrogram feature. Install it with your package manager:

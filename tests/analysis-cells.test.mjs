@@ -46,14 +46,14 @@ test("short LRA readings are visibly approximate and explained", () => {
 
 test("suspected discontinuities expose channel/time and distinguish zero from unavailable", () => {
   const summary = { count: 2, events: [{ channel: 2, start_secs: 1.25, duration_secs: 0.02 }] };
-  for (const [kind, singular] of [["clicks", "click"], ["dropouts", "dropout"]]) {
+  for (const kind of ["clicks", "dropouts"]) {
     const measured = { discontinuities: { [kind]: summary } };
-    assert.match(render(kind, measured), new RegExp(`>2 ${kind}\\?<`));
+    assert.match(render(kind, measured), />2</);
     assert.match(render(kind, measured), /Ch 2 · 1\.250 s · 20\.000 ms/);
     assert.match(render(kind, measured), /First 1 locations shown/);
     assert.match(render(kind, measured), /Counts are per channel/);
     assert.match(render(kind, { discontinuities: { [kind]: { count: 0, events: [] } } }), />0</);
-    assert.match(render(kind, { discontinuities: { [kind]: { count: 1, events: [] } } }), new RegExp(`>1 ${singular}\\?<`));
+    assert.match(render(kind, { discontinuities: { [kind]: { count: 1, events: [] } } }), />1</);
     assert.match(render(kind, {}), />—</);
   }
 });

@@ -58,12 +58,12 @@ test("suspected discontinuities are searchable without flagging old or clear rep
   const fields = fileSearchFields({ ...sampleFile, discontinuities: {
     clicks: { count: 1, events: [] }, dropouts: { count: 2, events: [] },
   } });
-  assert.equal(matchesSearch(fields, "click"), true);
+  assert.equal(matchesSearch(fields, "impulse"), true);
   assert.equal(matchesSearch(fields, "dropout"), true);
-  assert.equal(matchesSearch(fileSearchFields(sampleFile), "click"), false);
+  assert.equal(matchesSearch(fileSearchFields(sampleFile), "impulse"), false);
   assert.equal(matchesSearch(fileSearchFields({ ...sampleFile, discontinuities: {
     clicks: { count: 0, events: [] }, dropouts: { count: 0, events: [] },
-  } }), "click"), false);
+  } }), "impulse"), false);
 });
 
 test("loudness range is searchable by its LU value", () => {

@@ -227,14 +227,14 @@ export const ALL_COLUMNS: ColumnDef[] = [
   },
   {
     key: "clicks",
-    label: "Clicks?",
+    label: "Impulses",
     sort: "clicks",
     defaultVisible: true,
     render: (f) => <DiscontinuityCell summary={f.discontinuities?.clicks} kind="clicks" />,
   },
   {
     key: "dropouts",
-    label: "Dropouts?",
+    label: "Dropouts",
     sort: "dropouts",
     defaultVisible: true,
     render: (f) => <DiscontinuityCell summary={f.discontinuities?.dropouts} kind="dropouts" />,
