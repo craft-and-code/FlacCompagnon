@@ -60,7 +60,7 @@ pub fn build_csv(report: &FolderReport) -> String {
         "file,format,codec,badge,bitrate_kbps,sample_rate,declared_bits,real_bit_depth,\
          duration_s,size_bytes,status,upscaling,upsampling,transcoding,lattice_score,cutoff_hz,\
          cutoff_ratio,channels,fake_stereo,phase_correlation,phase_inverted,clipped,clip_events,peak_dbfs,true_peak_dbtp,integrated_lufs,loudness_range_lu,dr_db,\
-         md5,bit_depth_method,stored_bits,balance_right_minus_left_db,balance_silent_channel,modified_unix,file_md5,file_crc32\n",
+         md5,bit_depth_method,stored_bits,balance_right_minus_left_db,balance_silent_channel,suspected_clicks,suspected_dropouts,click_locations,dropout_locations,modified_unix,file_md5,file_crc32\n",
     );
     for f in &report.files {
         let md5 = f
@@ -82,7 +82,7 @@ pub fn build_csv(report: &FolderReport) -> String {
             None => (String::new(), ""),
         };
         out.push_str(&format!(
-            "{},{},{},{},{},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.2},{:.2},{},{},{},{},{},{},{},{},{},{},{}\n",
+            "{},{},{},{},{},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.2},{:.2},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
             csv_escape(&f.file_name),
             f.format,
             f.codec.clone().unwrap_or_default(),
@@ -121,12 +121,22 @@ pub fn build_csv(report: &FolderReport) -> String {
             opt(f.bit_depth_evidence.map(|e| e.stored_bits)),
             balance_db,
             silent_channel,
+            opt(f.discontinuities.as_ref().map(|d| d.clicks.count)),
+            opt(f.discontinuities.as_ref().map(|d| d.dropouts.count)),
+            discontinuity_locations(f.discontinuities.as_ref().map(|d| &d.clicks)),
+            discontinuity_locations(f.discontinuities.as_ref().map(|d| &d.dropouts)),
             opt(f.modified_unix),
             f.file_md5.clone().unwrap_or_default(),
             f.file_crc32.clone().unwrap_or_default(),
         ));
     }
     out
+}
+
+fn discontinuity_locations(summary: Option<&crate::analysis::discontinuities::EventSummary>) -> String {
+    summary.map(|s| s.events.iter().map(|event| {
+        format!("ch{}@{:.6}s/{:.6}s", event.channel, event.start_secs, event.duration_secs)
+    }).collect::<Vec<_>>().join(";")).unwrap_or_default()
 }
 
 /// Write the CSV report to `dest`.

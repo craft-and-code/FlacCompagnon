@@ -54,6 +54,18 @@ test("balance is searchable by direction, amount and silent channel", () => {
   assert.equal(matchesSearch(fileSearchFields(sampleFile), "balance"), false);
 });
 
+test("suspected discontinuities are searchable without flagging old or clear reports", () => {
+  const fields = fileSearchFields({ ...sampleFile, discontinuities: {
+    clicks: { count: 1, events: [] }, dropouts: { count: 2, events: [] },
+  } });
+  assert.equal(matchesSearch(fields, "click"), true);
+  assert.equal(matchesSearch(fields, "dropout"), true);
+  assert.equal(matchesSearch(fileSearchFields(sampleFile), "click"), false);
+  assert.equal(matchesSearch(fileSearchFields({ ...sampleFile, discontinuities: {
+    clicks: { count: 0, events: [] }, dropouts: { count: 0, events: [] },
+  } }), "click"), false);
+});
+
 test("loudness range is searchable by its LU value", () => {
   const fields = fileSearchFields({ ...sampleFile, loudness_range_lu: 10.0 });
   assert.equal(matchesSearch(fields, "10.0 lu"), true);

@@ -37,6 +37,23 @@ export type StereoBalance =
   | { state: "LeftSilent" }
   | { state: "RightSilent" };
 
+export interface DiscontinuityEvent {
+  channel: number;
+  start_secs: number;
+  duration_secs: number;
+}
+
+export interface EventSummary {
+  // Events on different channels count separately; at most 32 locations.
+  count: number;
+  events: DiscontinuityEvent[];
+}
+
+export interface DiscontinuityAnalysis {
+  clicks: EventSummary;
+  dropouts: EventSummary;
+}
+
 export interface FileAnalysis {
   path: string;
   file_name: string;
@@ -78,6 +95,7 @@ export interface FileAnalysis {
   // Older JSON reports omit this measurement.
   integrated_lufs?: number | null;
   loudness_range_lu?: number | null;
+  discontinuities?: DiscontinuityAnalysis | null;
   flac_md5: FlacMd5Status | null;
   // Fingerprints of the *file's bytes* — tags and cover art included — as
   // lowercase hex. Not to be confused with `flac_md5`, which is about the

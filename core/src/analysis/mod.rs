@@ -37,6 +37,7 @@ pub mod analyzer;
 pub mod bitdepth;
 pub mod clipping;
 pub mod detections;
+pub mod discontinuities;
 pub mod loudness;
 pub mod mdct;
 pub mod requant;

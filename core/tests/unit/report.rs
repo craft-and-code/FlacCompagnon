@@ -45,11 +45,44 @@ fn sample_file() -> FileAnalysis {
         dr_db: Some(12.3),
         integrated_lufs: Some(-23.0),
         loudness_range_lu: Some(10.0),
+        discontinuities: None,
         flac_md5: Some(FlacMd5Status::Match),
         file_md5: Some("0123456789abcdef0123456789abcdef".into()),
         file_crc32: Some("0a1b2c3d".into()),
         error: None,
     }
+}
+
+#[test]
+fn discontinuity_counts_and_locations_survive_json_and_csv() {
+    use crate::analysis::discontinuities::{DiscontinuityAnalysis, DiscontinuityEvent, EventSummary};
+    let mut file = sample_file();
+    file.discontinuities = Some(DiscontinuityAnalysis {
+        clicks: EventSummary { count: 35, events: vec![DiscontinuityEvent {
+            channel: 2, start_secs: 1.25, duration_secs: 0.0001,
+        }] },
+        dropouts: EventSummary::default(),
+    });
+    let report = FolderReport { root: "/music".into(), files: vec![file], has_flac: true };
+    let json = build_json(&report).unwrap();
+    let read = parse_json(&json).unwrap();
+    assert_eq!(read.files[0].discontinuities, report.files[0].discontinuities);
+    let csv = build_csv(&report);
+    let lines: Vec<_> = csv.lines().collect();
+    let header: Vec<_> = lines[0].split(',').collect();
+    let row: Vec<_> = lines[1].split(',').collect();
+    assert_eq!(header.len(), row.len());
+    for (name, expected) in [("suspected_clicks", "35"), ("suspected_dropouts", "0"),
+        ("click_locations", "ch2@1.250000s/0.000100s"), ("dropout_locations", "")] {
+        assert_eq!(row[header.iter().position(|&value| value == name).unwrap()], expected);
+    }
+    let mut old: serde_json::Value = serde_json::from_str(&json).unwrap();
+    old["report"]["files"][0].as_object_mut().unwrap().remove("discontinuities");
+    let old = parse_json(&serde_json::to_string(&old).unwrap()).unwrap();
+    assert_eq!(old.files[0].discontinuities, None);
+    let old_csv = build_csv(&old);
+    let old_row: Vec<_> = old_csv.lines().nth(1).unwrap().split(',').collect();
+    assert_eq!(old_row[header.iter().position(|&v| v == "suspected_clicks").unwrap()], "");
 }
 
 #[test]
@@ -228,6 +261,7 @@ fn the_json_carries_every_analysis_field() {
         "dr_db",
         "integrated_lufs",
         "loudness_range_lu",
+        "discontinuities",
         "flac_md5",
         "file_md5",
         "file_crc32",

@@ -67,6 +67,9 @@ pub(super) fn analyze(path: &Path, opts: &ScanOptions, result: &mut FileAnalysis
                 result.integrated_lufs = summary.integrated_lufs;
                 result.loudness_range_lu = summary.loudness_range_lu;
                 result.stereo_balance = summary.stereo_balance;
+                // Leave discontinuities unmeasured: DSD-to-PCM filtering
+                // changes impulse shapes and exact-zero runs on which these
+                // conservative PCM heuristics depend.
                 if info.channels >= 2 {
                     result.fake_stereo = Some(summary.fake_stereo);
                 }

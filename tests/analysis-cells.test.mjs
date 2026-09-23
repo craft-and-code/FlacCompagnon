@@ -43,3 +43,31 @@ test("short LRA readings are visibly approximate and explained", () => {
   assert.match(render("lra", { duration_secs: 60 }), />—</);
   assert.doesNotMatch(render("loudness", { integrated_lufs: -23, duration_secs: 5 }), /≈/);
 });
+
+test("suspected discontinuities expose channel/time and distinguish zero from unavailable", () => {
+  const summary = { count: 2, events: [{ channel: 2, start_secs: 1.25, duration_secs: 0.02 }] };
+  for (const [kind, singular] of [["clicks", "click"], ["dropouts", "dropout"]]) {
+    const measured = { discontinuities: { [kind]: summary } };
+    assert.match(render(kind, measured), new RegExp(`>2 ${kind}\\?<`));
+    assert.match(render(kind, measured), /Ch 2 · 1\.250 s · 20\.000 ms/);
+    assert.match(render(kind, measured), /First 1 locations shown/);
+    assert.match(render(kind, measured), /Counts are per channel/);
+    assert.match(render(kind, { discontinuities: { [kind]: { count: 0, events: [] } } }), />0</);
+    assert.match(render(kind, { discontinuities: { [kind]: { count: 1, events: [] } } }), new RegExp(`>1 ${singular}\\?<`));
+    assert.match(render(kind, {}), />—</);
+  }
+});
+
+test("discontinuity counts sort numerically and leave missing reports last", () => {
+  for (const column of ["clicks", "dropouts"]) {
+    const files = [
+      { file_name: "old" },
+      { file_name: "ten", discontinuities: { [column]: { count: 10, events: [] } } },
+      { file_name: "two", discontinuities: { [column]: { count: 2, events: [] } } },
+      { file_name: "zero", discontinuities: { [column]: { count: 0, events: [] } } },
+    ];
+    const names = (direction) => sortFiles(files, { column, direction }).map((f) => f.file_name);
+    assert.deepEqual(names("asc"), ["zero", "two", "ten", "old"]);
+    assert.deepEqual(names("desc"), ["ten", "two", "zero", "old"]);
+  }
+});

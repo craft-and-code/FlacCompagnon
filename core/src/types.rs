@@ -170,6 +170,10 @@ pub struct FileAnalysis {
     /// files, unsupported channel layouts and older saved reports.
     #[serde(default)]
     pub loudness_range_lu: Option<f32>,
+    /// Suspected clicks and abrupt digital dropouts, with bounded locations.
+    /// Absent for DSD, invalid/short/unsupported streams and older reports.
+    #[serde(default)]
+    pub discontinuities: Option<crate::analysis::discontinuities::DiscontinuityAnalysis>,
 
     /// FLAC MD5 signature status. `None` for non-FLAC files (no column shown).
     pub flac_md5: Option<crate::decode::FlacMd5Status>,

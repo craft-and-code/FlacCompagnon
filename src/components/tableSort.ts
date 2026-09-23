@@ -30,6 +30,8 @@ export type SortColumn =
   | "channels"
   | "stereo"
   | "balance"
+  | "clicks"
+  | "dropouts"
   | "clipping"
   | "truePeak"
   | "fileMd5"
@@ -122,6 +124,9 @@ function sortValue(f: FileAnalysis, col: SortColumn): string | number | null {
     }
     case "clipping":
       return f.clipping.clipped ? f.clipping.clip_events : 0;
+    case "clicks":
+    case "dropouts":
+      return f.discontinuities?.[col].count ?? null;
     case "truePeak":
       return Number.isFinite(f.clipping.true_peak_dbtp) ? f.clipping.true_peak_dbtp : null;
     case "dynamics":

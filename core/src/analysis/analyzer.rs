@@ -30,6 +30,7 @@ use std::sync::Arc;
 use rustfft::{num_complex::Complex, Fft, FftPlanner};
 
 use super::mdct::{Mdct, AAC_N};
+use super::discontinuities::{DiscontinuityAnalysis, DiscontinuityDetector};
 use super::truepeak::TruePeak;
 use super::{bitdepth, clipping, loudness::LoudnessMeter, spectrum};
 use crate::ClippingInfo;
@@ -97,6 +98,8 @@ pub struct AnalysisSummary {
     pub integrated_lufs: Option<f32>,
     /// EBU Tech 3342 loudness range, in LU; absent when unmeasurable.
     pub loudness_range_lu: Option<f32>,
+    /// Suspected short pulses and digital dropouts; absent if unmeasurable.
+    pub discontinuities: Option<DiscontinuityAnalysis>,
 
     // --- MDCT (AAC-SIN) transcode evidence ---
     /// Mean per-frame MDCT cutoff as a fraction of Nyquist (dead-zone frames).
@@ -139,6 +142,7 @@ pub struct StreamAnalyzer {
     clip_state: clipping::ClipState,
     true_peak: TruePeak,
     loudness: Option<LoudnessMeter>,
+    discontinuities: Option<DiscontinuityDetector>,
 
     // --- stereo relationship ---
     diff_energy: f64,
@@ -190,6 +194,7 @@ impl StreamAnalyzer {
             clip_state: clipping::ClipState::new(CLIP_THRESHOLD),
             true_peak: TruePeak::new(channels.max(1)),
             loudness: LoudnessMeter::new(sample_rate, channels),
+            discontinuities: DiscontinuityDetector::new(sample_rate, channels),
             diff_energy: 0.0,
             l_energy: 0.0,
             r_energy: 0.0,
@@ -234,6 +239,9 @@ impl StreamAnalyzer {
         self.true_peak.push_frame(samples);
         if let Some(loudness) = &mut self.loudness {
             loudness.push_frame(samples);
+        }
+        if let Some(discontinuities) = &mut self.discontinuities {
+            discontinuities.push_frame(samples);
         }
         if self.dyn_block_frames == DYN_BLOCK_FRAMES {
             self.dyn_blocks
@@ -456,6 +464,7 @@ impl StreamAnalyzer {
             dr_db,
             integrated_lufs,
             loudness_range_lu,
+            discontinuities: self.discontinuities.take().and_then(DiscontinuityDetector::finish),
             mdct_cutoff_ratio,
             mdct_dead_db,
             mdct_dead_fraction,

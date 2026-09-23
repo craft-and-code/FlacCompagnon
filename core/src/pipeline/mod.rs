@@ -168,6 +168,9 @@ fn apply_outcome(
     result.dr_db = summary.dr_db;
     result.integrated_lufs = summary.integrated_lufs;
     result.loudness_range_lu = summary.loudness_range_lu;
+    // Bounded event lists are cheap to copy; classification still borrows
+    // the complete summary below.
+    result.discontinuities = summary.discontinuities.clone();
     result.stereo_balance = summary.stereo_balance;
     result.bit_depth_evidence = summary.bit_depth_evidence;
 

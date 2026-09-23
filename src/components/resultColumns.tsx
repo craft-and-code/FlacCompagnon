@@ -24,6 +24,7 @@
 import type { ReactNode } from "react";
 import type { FileAnalysis, TagSet } from "../types";
 import type { SortColumn } from "./tableSort";
+import { DiscontinuityCell } from "./DiscontinuityCell";
 import { fmtBitrate, fmtCutoff, fmtDuration, fmtModified, fmtSize } from "../format";
 import {
   ClippingCell,
@@ -55,6 +56,8 @@ export type ColumnKey =
   | "channels"
   | "stereo"
   | "balance"
+  | "clicks"
+  | "dropouts"
   | "clipping"
   | "truePeak"
   | "fileMd5"
@@ -221,6 +224,20 @@ export const ALL_COLUMNS: ColumnDef[] = [
     sort: "balance",
     defaultVisible: true,
     render: (f) => <StereoBalanceCell f={f} />,
+  },
+  {
+    key: "clicks",
+    label: "Clicks?",
+    sort: "clicks",
+    defaultVisible: true,
+    render: (f) => <DiscontinuityCell summary={f.discontinuities?.clicks} kind="clicks" />,
+  },
+  {
+    key: "dropouts",
+    label: "Dropouts?",
+    sort: "dropouts",
+    defaultVisible: true,
+    render: (f) => <DiscontinuityCell summary={f.discontinuities?.dropouts} kind="dropouts" />,
   },
   {
     key: "clipping",
