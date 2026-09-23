@@ -1,9 +1,9 @@
-//! Integrated loudness for mono and stereo audio, per ITU-R BS.1770-5.
+//! Integrated loudness and loudness range for mono and stereo audio.
 //!
-//! The meter keeps 400 ms of K-weighted power and one power value per 100 ms
-//! gate. It does not retain decoded samples. Channel positions are required
+//! The meter keeps 400 ms and 3 s of K-weighted power and sampled gate values.
+//! It does not retain decoded samples. Channel positions are required
 //! for a correct multichannel measurement, so unsupported layouts yield no
-//! value rather than an incorrectly weighted LUFS number.
+//! value rather than incorrectly weighted loudness measurements.
 
 /// ITU-R BS.1770-5, Annex 1, Tables 1 and 2 (48 kHz reference filters).
 const SHELF_48K: ([f64; 3], [f64; 3]) = (
@@ -23,6 +23,10 @@ const HIGH_PASS_48K: ([f64; 3], [f64; 3]) = (
 const LOUDNESS_OFFSET: f64 = -0.691;
 const ABSOLUTE_GATE_LUFS: f64 = -70.0;
 const RELATIVE_GATE_LU: f64 = 10.0;
+/// EBU Tech 3342 (2023), section 3.1: LRA gating and percentile bounds.
+const LRA_RELATIVE_GATE_LU: f64 = 20.0;
+const LRA_LOW_PERCENTILE: f64 = 0.10;
+const LRA_HIGH_PERCENTILE: f64 = 0.95;
 
 #[derive(Clone, Copy)]
 struct Biquad {
@@ -95,7 +99,7 @@ impl ChannelFilter {
     }
 }
 
-/// Streaming EBU R 128 integrated-loudness meter for mono or stereo PCM.
+/// Streaming EBU R 128 integrated-loudness and Tech 3342 range meter.
 pub struct LoudnessMeter {
     filters: Vec<ChannelFilter>,
     power_ring: Vec<f64>,
@@ -104,14 +108,19 @@ pub struct LoudnessMeter {
     frames: u64,
     step_frames: u64,
     block_powers: Vec<f64>,
+    short_ring: Vec<f32>,
+    short_ring_at: usize,
+    short_window_power: f64,
+    short_powers: Vec<f64>,
+    short_valid: bool,
 }
 
 impl LoudnessMeter {
     /// Create a meter for a stream. The channel count is limited to one or two
     /// until decode paths can supply reliable speaker positions and LFE roles.
     pub fn new(sample_rate: u32, channels: usize) -> Option<Self> {
-        // 768 kHz bounds the 400 ms ring to 307,200 f64 values (~2.5 MB) even
-        // for a hostile header; below 8 kHz K-weighting loses useful bandwidth.
+        // 768 kHz bounds both rings to ~12 MB even for a hostile header;
+        // below 8 kHz K-weighting loses useful bandwidth.
         if !(1..=2).contains(&channels) || !(8_000..=768_000).contains(&sample_rate) {
             return None;
         }
@@ -129,6 +138,11 @@ impl LoudnessMeter {
             frames: 0,
             step_frames,
             block_powers: Vec::new(),
+            short_ring: vec![0.0; sample_rate as usize * 3],
+            short_ring_at: 0,
+            short_window_power: 0.0,
+            short_powers: Vec::new(),
+            short_valid: true,
         })
     }
 
@@ -146,6 +160,19 @@ impl LoudnessMeter {
         self.window_power += power - self.power_ring[self.ring_at];
         self.power_ring[self.ring_at] = power;
         self.ring_at = (self.ring_at + 1) % self.power_ring.len();
+
+        // A f32 power ring limits the 3 s history to 9 MB at the highest
+        // supported rate; the running sum and final gates remain f64.
+        // Float PCM can contain enormous finite samples. If their squared
+        // power exceeds f32, the compact ring cannot represent the signal;
+        // withhold LRA instead of exporting an infinite or fabricated value.
+        if !power.is_finite() || power > f32::MAX as f64 {
+            self.short_valid = false;
+        }
+        let short_power = if self.short_valid { power as f32 } else { 0.0 };
+        self.short_window_power += short_power as f64 - self.short_ring[self.short_ring_at] as f64;
+        self.short_ring[self.short_ring_at] = short_power;
+        self.short_ring_at = (self.short_ring_at + 1) % self.short_ring.len();
         self.frames += 1;
 
         let block_frames = self.power_ring.len() as u64;
@@ -154,6 +181,13 @@ impl LoudnessMeter {
         {
             self.block_powers
                 .push((self.window_power / block_frames as f64).max(0.0));
+        }
+        let short_frames = self.short_ring.len() as u64;
+        if self.frames >= short_frames
+            && (self.frames - short_frames).is_multiple_of(self.step_frames)
+        {
+            self.short_powers
+                .push((self.short_window_power / short_frames as f64).max(0.0));
         }
     }
 
@@ -183,6 +217,45 @@ impl LoudnessMeter {
             return None;
         }
         Some((LOUDNESS_OFFSET + 10.0 * (sum / count as f64).log10()) as f32)
+    }
+
+    /// EBU Tech 3342 loudness range in LU. Consumes the meter because the
+    /// standard's file measurement extends the stream by 1.5 s of silence to
+    /// centre the last 3 s analysis window on the end of the actual audio.
+    pub fn loudness_range_lu(mut self) -> Option<f32> {
+        if !self.short_valid || self.frames < self.short_ring.len() as u64 {
+            return None;
+        }
+        let silence = vec![0.0; self.filters.len()];
+        for _ in 0..self.short_ring.len() / 2 {
+            self.push_frame(&silence);
+        }
+
+        let absolute_power = 10f64.powf((ABSOLUTE_GATE_LUFS - LOUDNESS_OFFSET) / 10.0);
+        let (sum, count) = self
+            .short_powers
+            .iter()
+            .filter(|&&power| power >= absolute_power)
+            .fold((0.0, 0usize), |(sum, count), &power| {
+                (sum + power, count + 1)
+            });
+        if count == 0 {
+            return None;
+        }
+        let relative_power = (sum / count as f64) / 10f64.powf(LRA_RELATIVE_GATE_LU / 10.0);
+        let mut gated: Vec<f64> = self
+            .short_powers
+            .into_iter()
+            .filter(|&power| power >= absolute_power && power >= relative_power)
+            .collect();
+        if gated.is_empty() {
+            return None;
+        }
+        gated.sort_by(f64::total_cmp);
+        let percentile = |fraction: f64| ((gated.len() - 1) as f64 * fraction).round() as usize;
+        let low = gated[percentile(LRA_LOW_PERCENTILE)];
+        let high = gated[percentile(LRA_HIGH_PERCENTILE)];
+        Some((10.0 * (high / low).log10()) as f32)
     }
 }
 

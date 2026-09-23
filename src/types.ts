@@ -71,6 +71,7 @@ export interface FileAnalysis {
   dr_db: number | null;
   // Older JSON reports omit this measurement.
   integrated_lufs?: number | null;
+  loudness_range_lu?: number | null;
   flac_md5: FlacMd5Status | null;
   // Fingerprints of the *file's bytes* — tags and cover art included — as
   // lowercase hex. Not to be confused with `flac_md5`, which is about the

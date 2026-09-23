@@ -35,6 +35,7 @@ export type SortColumn =
   | "fileCrc32"
   | "dynamics"
   | "loudness"
+  | "lra"
   | "md5";
 
 export type SortDirection = "asc" | "desc";
@@ -117,6 +118,8 @@ function sortValue(f: FileAnalysis, col: SortColumn): string | number | null {
       return f.dr_db;
     case "loudness":
       return f.integrated_lufs ?? null;
+    case "lra":
+      return f.loudness_range_lu ?? null;
     case "md5":
       return md5Rank(f.flac_md5);
   }

@@ -43,6 +43,7 @@ fn sample_file() -> FileAnalysis {
         },
         dr_db: Some(12.3),
         integrated_lufs: Some(-23.0),
+        loudness_range_lu: Some(10.0),
         flac_md5: Some(FlacMd5Status::Match),
         file_md5: Some("0123456789abcdef0123456789abcdef".into()),
         file_crc32: Some("0a1b2c3d".into()),
@@ -115,6 +116,8 @@ fn csv_exports_integrated_loudness_without_a_unit_suffix() {
     let row: Vec<_> = lines.next().expect("file row").split(',').collect();
     let at = header.iter().position(|&name| name == "integrated_lufs").expect("LUFS column");
     assert_eq!(row[at], "-23.0");
+    let at = header.iter().position(|&name| name == "loudness_range_lu").expect("LRA column");
+    assert_eq!(row[at], "10.0");
 }
 
 #[test]
@@ -185,6 +188,7 @@ fn the_json_carries_every_analysis_field() {
         "clipping",
         "dr_db",
         "integrated_lufs",
+        "loudness_range_lu",
         "flac_md5",
         "file_md5",
         "file_crc32",
@@ -230,6 +234,19 @@ fn older_json_without_integrated_lufs_still_loads() {
     json["report"]["files"][0].as_object_mut().unwrap().remove("integrated_lufs");
     let read = parse_json(&serde_json::to_string(&json).unwrap()).unwrap();
     assert_eq!(read.files[0].integrated_lufs, None);
+}
+
+#[test]
+fn older_json_without_loudness_range_still_loads() {
+    let report = FolderReport {
+        root: "/music".into(),
+        files: vec![sample_file()],
+        has_flac: true,
+    };
+    let mut json: serde_json::Value = serde_json::from_str(&build_json(&report).unwrap()).unwrap();
+    json["report"]["files"][0].as_object_mut().unwrap().remove("loudness_range_lu");
+    let read = parse_json(&serde_json::to_string(&json).unwrap()).unwrap();
+    assert_eq!(read.files[0].loudness_range_lu, None);
 }
 
 /// Files come out in the order they went in — the table's display order,
@@ -356,6 +373,7 @@ fn json_round_trips_the_full_report() {
     assert_eq!(parsed.files[0].file_name, "a.flac");
     assert_eq!(parsed.files[0].dr_db, Some(12.3));
     assert_eq!(parsed.files[0].integrated_lufs, Some(-23.0));
+    assert_eq!(parsed.files[0].loudness_range_lu, Some(10.0));
     assert_eq!(parsed.files[0].clipping.true_peak_dbtp, -0.7);
     assert_eq!(parsed.files[0].flac_md5, Some(FlacMd5Status::Match));
     assert_eq!(parsed.files[0].size_bytes, 32_345_678);

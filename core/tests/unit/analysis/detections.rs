@@ -46,6 +46,7 @@ fn summ(
         bit_depth_evidence: None,
         dr_db: None,
         integrated_lufs: None,
+        loudness_range_lu: None,
         mdct_cutoff_ratio: mcr,
         mdct_dead_db: mdb,
         mdct_dead_fraction: frac,

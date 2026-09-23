@@ -134,3 +134,57 @@ fn silence_short_files_and_unmapped_multichannel_audio_have_no_reading() {
     assert_eq!(short.integrated_lufs(), None);
     assert!(LoudnessMeter::new(48_000, 6).is_none());
 }
+
+#[test]
+fn ebu_tech_3342_reference_two_level_ranges() {
+    // EBU Tech 3342 (2023), Table 1, test cases 1-3.
+    for (first, second, expected) in [
+        (-20.0, -30.0, 10.0),
+        (-20.0, -15.0, 5.0),
+        (-40.0, -20.0, 20.0),
+    ] {
+        let mut meter = LoudnessMeter::new(48_000, 2).expect("stereo supported");
+        let at = push_tone(&mut meter, 48_000, 20.0, first, 0);
+        push_tone(&mut meter, 48_000, 20.0, second, at);
+        let range = meter.loudness_range_lu().expect("range measured");
+        assert!(
+            (range - expected).abs() <= 1.0,
+            "{first}/{second} dBFS yielded {range} LU"
+        );
+    }
+}
+
+#[test]
+fn ebu_tech_3342_reference_five_level_range_gates_low_background() {
+    // EBU Tech 3342 (2023), Table 1, test case 4: the -50 dBFS parts fall
+    // below the relative gate, leaving a 15 LU range.
+    let mut meter = LoudnessMeter::new(48_000, 2).expect("stereo supported");
+    let mut at = 0;
+    for level in [-50.0, -35.0, -20.0, -35.0, -50.0] {
+        at = push_tone(&mut meter, 48_000, 20.0, level, at);
+    }
+    let range = meter.loudness_range_lu().expect("range measured");
+    assert!((range - 15.0).abs() <= 1.0, "{range} LU");
+}
+
+#[test]
+fn lra_needs_three_seconds_and_a_non_silent_signal() {
+    let mut short = LoudnessMeter::new(48_000, 2).expect("stereo supported");
+    push_tone(&mut short, 48_000, 2.0, -23.0, 0);
+    assert_eq!(short.loudness_range_lu(), None);
+    let mut silent = LoudnessMeter::new(48_000, 2).expect("stereo supported");
+    for _ in 0..(48_000 * 10) {
+        silent.push_frame(&[0.0, 0.0]);
+    }
+    assert_eq!(silent.loudness_range_lu(), None);
+}
+
+#[test]
+fn extreme_float_samples_do_not_produce_a_nonfinite_range() {
+    let mut meter = LoudnessMeter::new(48_000, 2).expect("stereo supported");
+    meter.push_frame(&[f32::MAX, f32::MAX]);
+    for _ in 0..(48_000 * 4) {
+        meter.push_frame(&[0.0, 0.0]);
+    }
+    assert_eq!(meter.loudness_range_lu(), None);
+}

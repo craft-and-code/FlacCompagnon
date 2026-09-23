@@ -174,6 +174,33 @@ fn stereo_wav_reports_ebu_reference_integrated_loudness() {
     assert!(result.error.is_none(), "{:?}", result.error);
     let measured = result.integrated_lufs.expect("integrated loudness");
     assert!((measured + 23.0).abs() < 0.2, "{measured} LUFS");
+    assert_eq!(result.loudness_range_lu, None);
+    std::fs::remove_file(&path).ok();
+}
+
+/// EBU Tech 3342 test 1 specifies 10 ±1 LU for consecutive 20 s stereo
+/// 1 kHz tones at -20 and -30 dBFS per-channel peak.
+#[test]
+fn stereo_wav_reports_ebu_reference_loudness_range() {
+    let sample_rate = 48_000;
+    let segment_frames = sample_rate * 20;
+    let mut samples = Vec::with_capacity(segment_frames as usize * 4);
+    for peak_dbfs in [-20.0, -30.0] {
+        let amplitude = 32767.0 * 10f64.powf(peak_dbfs / 20.0);
+        for n in 0..segment_frames {
+            let sample = (amplitude
+                * (2.0 * std::f64::consts::PI * 1_000.0 * n as f64 / sample_rate as f64).sin())
+                as i16;
+            samples.extend([sample, sample]);
+        }
+    }
+    let path = tmp("lra_reference.wav");
+    write_wav_i16(&path, sample_rate, 2, &samples);
+
+    let result = analyze_file(&path, &ScanOptions::default());
+    assert!(result.error.is_none(), "{:?}", result.error);
+    let range = result.loudness_range_lu.expect("loudness range");
+    assert!((range - 10.0).abs() <= 1.0, "{range} LU");
     std::fs::remove_file(&path).ok();
 }
 

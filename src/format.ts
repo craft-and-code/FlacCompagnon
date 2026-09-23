@@ -334,6 +334,9 @@ export function fileSearchFields(f: FileAnalysis, tag?: TagSet | null): string[]
     f.integrated_lufs != null && Number.isFinite(f.integrated_lufs)
       ? `${f.integrated_lufs.toFixed(1)} lufs loudness`
       : "",
+    f.loudness_range_lu != null && Number.isFinite(f.loudness_range_lu)
+      ? `${f.loudness_range_lu.toFixed(1)} lu lra loudness range`
+      : "",
     detectionLabels(f.detections).join(" ").toLowerCase(),
     f.detections.detail,
     f.badge ?? "",

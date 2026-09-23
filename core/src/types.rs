@@ -162,6 +162,10 @@ pub struct FileAnalysis {
     /// files, unsupported channel layouts and older saved reports.
     #[serde(default)]
     pub integrated_lufs: Option<f32>,
+    /// EBU Tech 3342 loudness range in LU. Absent for silence, very short
+    /// files, unsupported channel layouts and older saved reports.
+    #[serde(default)]
+    pub loudness_range_lu: Option<f32>,
 
     /// FLAC MD5 signature status. `None` for non-FLAC files (no column shown).
     pub flac_md5: Option<crate::decode::FlacMd5Status>,

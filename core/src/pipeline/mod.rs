@@ -167,6 +167,7 @@ fn apply_outcome(
     result.clipping = summary.clipping.clone();
     result.dr_db = summary.dr_db;
     result.integrated_lufs = summary.integrated_lufs;
+    result.loudness_range_lu = summary.loudness_range_lu;
     result.bit_depth_evidence = summary.bit_depth_evidence;
 
     if outcome.channels >= 2 {

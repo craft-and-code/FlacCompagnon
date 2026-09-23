@@ -41,13 +41,18 @@ export function DynamicRangeCell({ dr }: { dr: number | null }) {
   );
 }
 
-export function IntegratedLoudnessCell({ lufs }: { lufs: number | null | undefined }) {
-  if (lufs == null || !Number.isFinite(lufs)) {
-    return <td className="c-muted has-tip" title="No integrated LUFS reading is available for silence, audio shorter than 400 ms, unsupported sample rates or channel layouts, and older saved reports.">—</td>;
+export function LoudnessCell({ value, mode }: { value: number | null | undefined; mode: "integrated" | "range" }) {
+  const isRange = mode === "range";
+  if (value == null || !Number.isFinite(value)) {
+    const reason = isRange ? "3 s" : "400 ms";
+    return <td className="c-muted has-tip" title={`No ${isRange ? "LRA" : "LUFS"} reading is available for silence, audio shorter than ${reason}, unsupported sample rates or channel layouts, and older saved reports.`}>—</td>;
   }
+  const title = isRange
+    ? "Loudness range (EBU Tech 3342): variation between the 10th and 95th percentiles of short-term loudness. A larger value means more level variation, not necessarily better quality."
+    : "Integrated loudness measured across the whole track using ITU-R BS.1770-5 / EBU R 128 K-weighting and gates. This is a level measurement, not a quality verdict or a target for every release.";
   return (
-    <td className="has-tip" title="Integrated loudness measured across the whole track using ITU-R BS.1770-5 / EBU R 128 K-weighting and gates. This is a level measurement, not a quality verdict or a target for every release.">
-      {lufs.toFixed(1)} LUFS
+    <td className="has-tip" title={title}>
+      {value.toFixed(1)} {isRange ? "LU" : "LUFS"}
     </td>
   );
 }

@@ -29,7 +29,7 @@ import {
   ClippingCell,
   DetectionsCell,
   DynamicRangeCell,
-  IntegratedLoudnessCell,
+  LoudnessCell,
   FileHashCell,
   Md5Cell,
   QualityBadgeCell,
@@ -59,6 +59,7 @@ export type ColumnKey =
   | "fileCrc32"
   | "dynamics"
   | "loudness"
+  | "lra"
   | "artist"
   | "album"
   | "title"
@@ -231,7 +232,14 @@ export const ALL_COLUMNS: ColumnDef[] = [
     label: "LUFS",
     sort: "loudness",
     defaultVisible: true,
-    render: (f) => <IntegratedLoudnessCell lufs={f.integrated_lufs} />,
+    render: (f) => <LoudnessCell value={f.integrated_lufs} mode="integrated" />,
+  },
+  {
+    key: "lra",
+    label: "LRA",
+    sort: "lra",
+    defaultVisible: true,
+    render: (f) => <LoudnessCell value={f.loudness_range_lu} mode="range" />,
   },
   {
     key: "dynamics",

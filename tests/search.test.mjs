@@ -46,6 +46,12 @@ test("integrated loudness is searchable, while older reports remain usable", () 
   assert.equal(matchesSearch(fileSearchFields(sampleFile), "lufs"), false);
 });
 
+test("loudness range is searchable by its LU value", () => {
+  const fields = fileSearchFields({ ...sampleFile, loudness_range_lu: 10.0 });
+  assert.equal(matchesSearch(fields, "10.0 lu"), true);
+  assert.equal(matchesSearch(fields, "lra"), true);
+});
+
 test("partial words, closed numbers, and accented names remain searchable", () => {
   assert.equal(matchesSearch(["16-bit"], "16-"), true);
   assert.equal(matchesSearch(["160 MB"], "16-"), false);

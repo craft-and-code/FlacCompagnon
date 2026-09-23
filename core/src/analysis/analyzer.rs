@@ -7,7 +7,7 @@
 //! * spectrum      -> Hann-windowed FFT of a mono downmix, averaged over windows
 //! * clipping      -> full-scale sample counting with run detection
 //! * stereo        -> L-R difference, L/R correlation and mono cancellation
-//! * loudness      -> K-weighted gated integrated LUFS
+//! * loudness      -> K-weighted integrated LUFS and loudness range
 //! * real bitdepth -> exact unused bits and persistent lower-depth integer grids
 //!
 //! Nothing here depends on a specific file format; [`decode`](crate::decode)
@@ -93,6 +93,8 @@ pub struct AnalysisSummary {
     pub dr_db: Option<f32>,
     /// EBU R 128 integrated loudness, in LUFS; absent when unmeasurable.
     pub integrated_lufs: Option<f32>,
+    /// EBU Tech 3342 loudness range, in LU; absent when unmeasurable.
+    pub loudness_range_lu: Option<f32>,
 
     // --- MDCT (AAC-SIN) transcode evidence ---
     /// Mean per-frame MDCT cutoff as a fraction of Nyquist (dead-zone frames).
@@ -427,6 +429,11 @@ impl StreamAnalyzer {
             (None, None, None)
         };
 
+        // Compute programme loudness before the LRA meter appends 1.5 s of
+        // analysis-only silence for its centred 3 s tail windows.
+        let integrated_lufs = self.loudness.as_ref().and_then(LoudnessMeter::integrated_lufs);
+        let loudness_range_lu = self.loudness.take().and_then(LoudnessMeter::loudness_range_lu);
+
         AnalysisSummary {
             cutoff_hz,
             cutoff_ratio,
@@ -440,7 +447,8 @@ impl StreamAnalyzer {
             real_bit_depth,
             bit_depth_evidence,
             dr_db,
-            integrated_lufs: self.loudness.as_ref().and_then(LoudnessMeter::integrated_lufs),
+            integrated_lufs,
+            loudness_range_lu,
             mdct_cutoff_ratio,
             mdct_dead_db,
             mdct_dead_fraction,
