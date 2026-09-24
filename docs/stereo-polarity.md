@@ -18,7 +18,7 @@ No correlation is reported when either channel is silent, either energy is inval
 
 A value near +1 means the channels move together, a value near 0 means little whole-track linear correlation, and a value near −1 means they move in opposite directions. The indication is deliberately conservative: values above −0.95 are still useful information for mono compatibility, but are not labelled as an inversion by the app.
 
-The result is whole-track average behaviour. A brief inverted section can be diluted by the rest of a track, while intentional spatial effects, stereo ambience and phase processing can make correlation a poor quality judgement. Listen in mono and inspect the source before changing audio.
+The result is whole-track average behaviour. A brief inverted section can be diluted by the rest of a track, while intentional spatial effects, stereo ambience and phase processing can make correlation a poor quality judgement. The separate [local and frequency-band phase analysis](local-phase.md) measures short windows and four frequency ranges to reveal opposition hidden by this average. Listen in mono and inspect the source before changing audio.
 
 ## Tests and manual fixture
 

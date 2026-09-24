@@ -207,6 +207,18 @@ export function dcOffsetPercent(value: number, signed = false): string {
   return `${signed && rounded > 0 ? "+" : ""}${rounded.toFixed(3)}`;
 }
 
+/// Both phase columns rank the lowest eligible local correlation, not its magnitude.
+export function localPhaseMinimum(phase: FileAnalysis["local_phase"], mode: "local" | "bands"): number | null {
+  const summaries = mode === "local" ? [phase?.broadband] : phase?.bands.map((band) => band.summary) ?? [];
+  const values = summaries.map((summary) => summary?.minimum_correlation)
+    .filter((value): value is number => value != null && Number.isFinite(value));
+  return values.length ? Math.min(...values) : null;
+}
+
+export function phaseCorrelationLabel(value: number): string {
+  return Number(value.toFixed(3)).toFixed(3);
+}
+
 /// The table already identifies the metric in its header; cells need only the count.
 export function discontinuityCount(summary: { count: number } | null | undefined): string {
   return summary ? String(summary.count) : "—";
@@ -342,6 +354,8 @@ function tagSearchFields(tag: TagSet | null | undefined): string[] {
 /// is searchable by its analysis data while its tags load, then by both.
 export function fileSearchFields(f: FileAnalysis, tag?: TagSet | null): string[] {
   const dc = dcOffsetMagnitude(f.dc_offset);
+  const localPhase = localPhaseMinimum(f.local_phase, "local");
+  const bandPhase = localPhaseMinimum(f.local_phase, "bands");
   const parts = [
     f.file_name,
     f.format,
@@ -354,6 +368,8 @@ export function fileSearchFields(f: FileAnalysis, tag?: TagSet | null): string[]
     fmtCutoff(f),
     `${f.channels}ch`,
     `${stereoLabel(f)}${f.fake_stereo ? " fake stereo" : ""}${f.phase_inverted ? " inverted polarity phase" : ""}`,
+    localPhase == null ? "" : `${phaseCorrelationLabel(localPhase)} local phase`,
+    bandPhase == null ? "" : `${phaseCorrelationLabel(bandPhase)} band phase`,
     f.stereo_balance ? `${stereoBalanceLabel(f.stereo_balance)} balance` : "",
     dc != null ? `${dcOffsetPercent(dc)}% dc offset` : "",
     f.high_frequency_stereo

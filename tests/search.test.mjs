@@ -54,6 +54,16 @@ test("DC offset is searchable in displayed percent while old reports stay absent
   assert.equal(matchesSearch(fileSearchFields({ ...sampleFile, dc_offset: { channel_means: [0], max_abs: 0 } }), "0.000%"), true);
 });
 
+test("local and band phase search follows the numeric columns and omits unavailable readings", () => {
+  const fields = fileSearchFields({ ...sampleFile, local_phase: {
+    broadband: { minimum_correlation: 0.6 }, bands: [{ summary: { minimum_correlation: -1 } }, { summary: null }],
+  } });
+  assert.equal(matchesSearch(fields, "0.600 local phase"), true);
+  assert.equal(matchesSearch(fields, "-1.000 band phase"), true);
+  assert.equal(matchesSearch(fileSearchFields(sampleFile), "local phase"), false);
+  assert.equal(matchesSearch(fileSearchFields(sampleFile), "band phase"), false);
+});
+
 test("balance is searchable by direction, amount and silent channel", () => {
   const fields = fileSearchFields({ ...sampleFile, stereo_balance: { state: "Measured", right_minus_left_db: -6.0206 } });
   assert.equal(matchesSearch(fields, "L +6.0 dB"), true);

@@ -175,6 +175,7 @@ fn apply_outcome(
     result.high_frequency_stereo = summary.high_frequency_stereo;
     // At most 32 means; retain the summary for classification below.
     result.dc_offset = summary.dc_offset.clone();
+    result.local_phase = summary.local_phase;
     result.bit_depth_evidence = summary.bit_depth_evidence;
 
     if outcome.channels >= 2 {

@@ -158,6 +158,9 @@ pub struct FileAnalysis {
     /// empty/invalid/unsupported streams, decode failures and older reports.
     #[serde(default)]
     pub dc_offset: Option<crate::analysis::dc_offset::DcOffset>,
+    /// Local and per-band L/R correlation; absent in older reports or when unmeasurable.
+    #[serde(default)]
+    pub local_phase: Option<crate::analysis::local_phase::LocalPhase>,
     /// Verified quality badge: `Some("Hi-Res")` for > 48 kHz or > 16-bit PCM,
     /// `Some("DSD64")` etc. for DSD — granted only when no detection
     /// invalidates the claim (no upscaling/upsampling/transcoding).

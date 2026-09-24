@@ -52,6 +52,28 @@ export interface DcOffset {
   max_abs: number;
 }
 
+export interface PhaseSummary {
+  correlation: number;
+  minimum_correlation: number;
+  minimum_start_secs: number;
+  opposed_fraction: number;
+  eligible_windows: number;
+}
+
+export interface BandPhase {
+  low_hz: number;
+  high_hz: number;
+  summary: PhaseSummary | null;
+}
+
+export interface LocalPhase {
+  window_secs: number;
+  hop_secs: number;
+  analyzed_windows: number;
+  broadband: PhaseSummary | null;
+  bands: BandPhase[];
+}
+
 export interface DiscontinuityEvent {
   channel: number;
   start_secs: number;
@@ -106,6 +128,7 @@ export interface FileAnalysis {
   stereo_balance?: StereoBalance | null;
   high_frequency_stereo?: HighFrequencyStereo | null;
   dc_offset?: DcOffset | null;
+  local_phase?: LocalPhase | null;
   badge: string | null;
   clipping: ClippingInfo;
   dr_db: number | null;

@@ -20,6 +20,39 @@ const { ALL_COLUMNS, sortFiles, renderToStaticMarkup } = await import(
 );
 const render = (key, file) => renderToStaticMarkup(ALL_COLUMNS.find((c) => c.key === key).render(file, null));
 
+test("local and band phase expose distinct signed minima, locations and coverage", () => {
+  const summary = (minimum) => ({ correlation: 0.4, minimum_correlation: minimum, minimum_start_secs: 2.5, opposed_fraction: 0.25, eligible_windows: 12 });
+  const phase = (local, band) => ({ window_secs: 16384 / 48000, hop_secs: 8192 / 48000, analyzed_windows: 15,
+    broadband: summary(local), bands: [
+      { low_hz: 20, high_hz: 200, summary: null },
+      { low_hz: 6000, high_hz: 20000, summary: summary(band) },
+    ],
+  });
+  const files = [
+    { file_name: "old", sample_rate: 48000 },
+    { file_name: "local opposition", sample_rate: 48000, local_phase: phase(-0.9, -0.2) },
+    { file_name: "band opposition", sample_rate: 48000, local_phase: phase(0.6, -1) },
+    { file_name: "zero", sample_rate: 48000, local_phase: phase(0, 0) },
+  ];
+  const names = (column, direction) => sortFiles(files, { column, direction }).map((f) => f.file_name);
+  assert.deepEqual(names("localPhase", "asc"), ["local opposition", "zero", "band opposition", "old"]);
+  assert.deepEqual(names("bandPhase", "asc"), ["band opposition", "local opposition", "zero", "old"]);
+  assert.deepEqual(names("bandPhase", "desc"), ["zero", "local opposition", "band opposition", "old"]);
+  assert.match(render("localPhase", files[1]), />-0\.900</);
+  assert.match(render("localPhase", files[1]), /at 2\.500 s/);
+  assert.match(render("localPhase", files[1]), /25\.0% of 12 eligible windows/);
+  assert.match(render("localPhase", files[1]), /341\.3 ms/);
+  assert.match(render("bandPhase", files[2]), />-1\.000</);
+  assert.match(render("bandPhase", files[2]), /6000–20000 Hz/);
+  assert.match(render("bandPhase", files[2]), /20–200 Hz: unavailable/);
+  assert.match(render("bandPhase", files[3]), />0\.000</);
+  for (const key of ["localPhase", "bandPhase"]) {
+    assert.match(render(key, files[0]), />—</);
+    assert.match(render(key, { local_phase: phase(NaN, NaN) }), />—</);
+  }
+  assert.doesNotMatch(render("localPhase", { sample_rate: 48000, local_phase: phase(-1e-10, 0) }), /-0\.000/);
+});
+
 test("DC means retain channel signs while the column sorts absolute magnitudes", () => {
   const files = [
     { file_name: "old" },

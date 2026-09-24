@@ -27,6 +27,7 @@ import type { SortColumn } from "./tableSort";
 import { HighFrequencyStereoCell } from "./HighFrequencyStereoCell";
 import { DiscontinuityCell } from "./DiscontinuityCell";
 import { DcOffsetCell } from "./DcOffsetCell";
+import { LocalPhaseCell } from "./LocalPhaseCell";
 import { fmtBitrate, fmtCutoff, fmtDuration, fmtModified, fmtSize } from "../format";
 import {
   ClippingCell,
@@ -60,6 +61,8 @@ export type ColumnKey =
   | "balance"
   | "hfStereo"
   | "dcOffset"
+  | "localPhase"
+  | "bandPhase"
   | "clicks"
   | "dropouts"
   | "clipping"
@@ -221,6 +224,20 @@ export const ALL_COLUMNS: ColumnDef[] = [
     sort: "stereo",
     defaultVisible: true,
     render: (f) => <StereoCell f={f} />,
+  },
+  {
+    key: "localPhase",
+    label: "Local phase",
+    sort: "localPhase",
+    defaultVisible: true,
+    render: (f) => <LocalPhaseCell f={f} mode="local" />,
+  },
+  {
+    key: "bandPhase",
+    label: "Band phase",
+    sort: "bandPhase",
+    defaultVisible: true,
+    render: (f) => <LocalPhaseCell f={f} mode="bands" />,
   },
   {
     key: "balance",

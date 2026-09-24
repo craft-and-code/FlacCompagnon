@@ -12,6 +12,7 @@ The app decodes a file once and feeds the decoded frames to streaming measuremen
 | Descriptive spectrum   | Content cutoff                | Cutoff frequency, cliff and upper-band level | [Spectral cutoff](spectral-cutoff.md)             |
 | Channel relationship   | Dual mono                     | Fake-stereo indication                       | [Fake stereo](fake-stereo.md)                     |
 | Channel relationship   | L/R polarity                  | Correlation and polarity indication          | [Stereo polarity](stereo-polarity.md)             |
+| Channel relationship   | Local and band correlation    | Local phase, Band phase                      | [Local phase](local-phase.md)                     |
 | Channel relationship   | L/R level                     | Balance                                      | [Stereo balance](stereo-balance.md)               |
 | Channel relationship   | High-frequency stereo width   | HF Stereo                                    | [High-frequency stereo](high-frequency-stereo.md) |
 | Level                  | Mean displacement from zero   | DC (%)                                       | [DC offset](dc-offset.md)                         |

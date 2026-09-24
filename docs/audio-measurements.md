@@ -3,6 +3,7 @@
 This page is retained for existing links. The individual measurement pages are now separate so that method, interpretation, limits and fixtures stay next to the result they describe.
 
 - [Stereo polarity](stereo-polarity.md)
+- [Local and frequency-band phase](local-phase.md)
 - [Stereo balance](stereo-balance.md)
 - [High-frequency stereo narrowing](high-frequency-stereo.md)
 - [DC offset](dc-offset.md)

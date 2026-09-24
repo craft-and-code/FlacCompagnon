@@ -11,7 +11,7 @@
 // means the natural/drag order, which is what the table opens in.
 
 import type { FileAnalysis } from "../types";
-import { dcOffsetMagnitude, detectionLabels, stereoLabel } from "../format";
+import { dcOffsetMagnitude, detectionLabels, localPhaseMinimum, stereoLabel } from "../format";
 
 export type SortColumn =
   | "file"
@@ -32,6 +32,8 @@ export type SortColumn =
   | "balance"
   | "hfStereo"
   | "dcOffset"
+  | "localPhase"
+  | "bandPhase"
   | "clicks"
   | "dropouts"
   | "clipping"
@@ -132,6 +134,9 @@ function sortValue(f: FileAnalysis, col: SortColumn): string | number | null {
     }
     case "dcOffset":
       return dcOffsetMagnitude(f.dc_offset);
+    case "localPhase":
+    case "bandPhase":
+      return localPhaseMinimum(f.local_phase, col === "localPhase" ? "local" : "bands");
     case "clipping":
       return f.clipping.clipped ? f.clipping.clip_events : 0;
     case "clicks":

@@ -65,6 +65,7 @@ Click **Generate spectrograms** to render a spectrogram image for every track us
 
 - **Spectral cutoff** — measures the highest frequency with appreciable averaged spectral content, plus the sharpness of the transition and the level above it. It is descriptive information, not a transcoding verdict.
 - **Channel relationship** — flags exact or near dual-mono as **Fake stereo**; reports whole-track L/R correlation and a likely polarity inversion at correlation ≤ −0.95; reports unweighted RMS balance (`L +x.x dB`, `R +x.x dB`, or a silent channel); and measures high-frequency Side/Mid width as **HF Stereo**. This experimental cue measures 6–20 kHz (limited by Nyquist) against 1.5–5 kHz. Persistent narrowing can result from intensity stereo, but does not identify a codec or prove a defect. These measurements are available for two-channel material and describe the signal; they do not determine artistic intent.
+- **Local and frequency-band phase** — reports minimum short-window L/R correlation in **Local phase** and across four frequency bands in **Band phase**. Hover for aggregate correlations, minimum locations, eligible coverage and opposed-window shares. These measurements reveal opposition hidden by a positive whole-track average. See [local phase](docs/local-phase.md) for the method and reproducible test audio.
 - **Clipping** — counts full-scale sample runs (each _event_ = ≥3 consecutive samples at the normalized full-scale threshold) and reports the sample peak in dBFS. It is independent of whether the file is lossless.
 - **DC offset** — measures the whole-file mean independently on each decoded channel. **DC (%)** shows the largest absolute mean as a percentage of full scale, with signed channel values on hover. Silence measures zero; short excerpts and incomplete low-frequency cycles can have a nonzero mean. See [DC offset](docs/dc-offset.md) for interpretation and test fixtures.
 - **True peak** — reports the inter-sample peak in dBTP through 4× oversampling with a 48-tap polyphase FIR. A file can have clean stored samples yet reconstruct above 0 dBTP.
@@ -79,7 +80,7 @@ See the [analysis guide](docs/README.md) for one page per measurement, including
 
 Analysis never writes anything by itself. When you want to keep the results, click **Save…** and pick a name and location — nothing is dropped into your music folders unless you ask for it. One dialog pick writes **two files, same stem, same folder**:
 
-- a spreadsheet-friendly **`.csv`** — status, authenticity findings, lattice score, cutoff, bit depth, channel relationship, HF Stereo, DC offset, clipping, true peak, LUFS, LRA, dynamics, balance, suspected impulses/dropouts and their retained locations, FLAC MD5, codec, bitrate, modification time, and the two file fingerprints. The size is a raw byte count, so a spreadsheet can sum and sort it;
+- a spreadsheet-friendly **`.csv`** — status, authenticity findings, lattice score, cutoff, bit depth, channel relationship, local and band phase evidence, HF Stereo, DC offset, clipping, true peak, LUFS, LRA, dynamics, balance, suspected impulses/dropouts and their retained locations, FLAC MD5, codec, bitrate, modification time, and the two file fingerprints. The size is a raw byte count, so a spreadsheet can sum and sort it;
 - a **`.json`** that round-trips the _entire_ analysis — every field, including the nested per-detection detail — so it can be reloaded later.
 
 **Both files follow the table's row order**, including a manual drag-reorder. Beyond that the two behave differently on purpose:
@@ -194,7 +195,7 @@ flowchart LR
             fft["FFT spectrum<br/>▸ cut-off"]
             mdct["MDCT long + short<br/>▸ AAC re-quantization grid"]
             bits["Effective bit depth"]
-            levels["Clipping · true peak · DR · DC offset<br/>stereo · HF width · LUFS/LRA · discontinuities"]
+            levels["Clipping · true peak · DR · DC offset<br/>stereo · local/band phase · HF width · LUFS/LRA · discontinuities"]
         end
 
         verdict{{"Upscaling · Upsampling · Transcoding"}}

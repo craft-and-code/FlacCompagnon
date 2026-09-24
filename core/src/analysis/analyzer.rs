@@ -32,6 +32,7 @@ use rustfft::{num_complex::Complex, Fft, FftPlanner};
 use super::dc_offset::{DcOffset, DcOffsetMeter};
 use super::discontinuities::{DiscontinuityAnalysis, DiscontinuityDetector};
 use super::intensity_stereo::{HighFrequencyStereo, HighFrequencyStereoMeter};
+use super::local_phase::{LocalPhase, LocalPhaseMeter};
 use super::mdct::{Mdct, AAC_N};
 use super::truepeak::TruePeak;
 use super::{bitdepth, clipping, loudness::LoudnessMeter, spectrum};
@@ -89,6 +90,8 @@ pub struct AnalysisSummary {
     pub high_frequency_stereo: Option<HighFrequencyStereo>,
     /// Whole-stream mean measured independently on each channel.
     pub dc_offset: Option<DcOffset>,
+    /// Time-local correlation and frequency-band evidence for stereo streams.
+    pub local_phase: Option<LocalPhase>,
     /// The bit depth actually used by the samples, when it could be
     /// determined from an integer PCM source (`None` for float sources).
     pub real_bit_depth: Option<u32>,
@@ -151,6 +154,7 @@ pub struct StreamAnalyzer {
     discontinuities: Option<DiscontinuityDetector>,
     high_frequency_stereo: Option<HighFrequencyStereoMeter>,
     dc_offset: Option<DcOffsetMeter>,
+    local_phase: Option<LocalPhaseMeter>,
 
     // --- stereo relationship ---
     diff_energy: f64,
@@ -205,6 +209,7 @@ impl StreamAnalyzer {
             discontinuities: DiscontinuityDetector::new(sample_rate, channels),
             high_frequency_stereo: HighFrequencyStereoMeter::new(sample_rate, channels),
             dc_offset: DcOffsetMeter::new(channels),
+            local_phase: LocalPhaseMeter::new(sample_rate, channels),
             diff_energy: 0.0,
             l_energy: 0.0,
             r_energy: 0.0,
@@ -232,6 +237,9 @@ impl StreamAnalyzer {
     /// optionally accompanied by the raw integer sample values for the same
     /// frame (used for effective bit-depth estimation).
     pub fn push_frame(&mut self, samples: &[f32], int_samples: Option<&[i32]>) {
+        if let Some(phase) = &mut self.local_phase {
+            phase.push_frame(samples);
+        }
         if let Some(dc_offset) = &mut self.dc_offset {
             dc_offset.push_frame(samples);
         }
@@ -487,6 +495,7 @@ impl StreamAnalyzer {
             },
             high_frequency_stereo,
             dc_offset: self.dc_offset.take().and_then(DcOffsetMeter::finish),
+            local_phase: self.local_phase.take().and_then(LocalPhaseMeter::finish),
             real_bit_depth,
             bit_depth_evidence,
             dr_db,

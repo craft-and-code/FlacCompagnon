@@ -34,6 +34,7 @@ fn sample_file() -> FileAnalysis {
         stereo_balance: None,
         high_frequency_stereo: None,
         dc_offset: None,
+        local_phase: None,
         badge: None,
         clipping: ClippingInfo {
             clipped_samples: 0,
@@ -325,6 +326,7 @@ fn the_json_carries_every_analysis_field() {
         "stereo_balance",
         "high_frequency_stereo",
         "dc_offset",
+        "local_phase",
         "badge",
         "clipping",
         "dr_db",

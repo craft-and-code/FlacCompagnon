@@ -45,6 +45,7 @@ fn summ(
         stereo_balance: None,
         high_frequency_stereo: None,
         dc_offset: None,
+        local_phase: None,
         real_bit_depth: None,
         bit_depth_evidence: None,
         dr_db: None,

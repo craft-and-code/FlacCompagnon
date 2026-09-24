@@ -70,6 +70,7 @@ pub(super) fn analyze(path: &Path, opts: &ScanOptions, result: &mut FileAnalysis
                 result.high_frequency_stereo = summary.high_frequency_stereo;
                 // Keep the summary available for the spectral checks below.
                 result.dc_offset = summary.dc_offset.clone();
+                result.local_phase = summary.local_phase;
                 // Leave discontinuities unmeasured: DSD-to-PCM filtering
                 // changes impulse shapes and exact-zero runs on which these
                 // conservative PCM heuristics depend.
