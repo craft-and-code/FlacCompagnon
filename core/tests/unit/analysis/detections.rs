@@ -43,6 +43,7 @@ fn summ(
         phase_correlation: None,
         phase_inverted: false,
         stereo_balance: None,
+        high_frequency_stereo: None,
         real_bit_depth: None,
         bit_depth_evidence: None,
         dr_db: None,

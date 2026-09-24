@@ -172,6 +172,7 @@ fn apply_outcome(
     // the complete summary below.
     result.discontinuities = summary.discontinuities.clone();
     result.stereo_balance = summary.stereo_balance;
+    result.high_frequency_stereo = summary.high_frequency_stereo;
     result.bit_depth_evidence = summary.bit_depth_evidence;
 
     if outcome.channels >= 2 {

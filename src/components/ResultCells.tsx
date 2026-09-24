@@ -54,7 +54,7 @@ export function LoudnessCell({ value, mode, duration }: { value: number | null |
     : "Integrated loudness measured across the whole track using ITU-R BS.1770-5 / EBU R 128 K-weighting and gates. This is a level measurement, not a quality verdict or a target for every release.";
   return (
     <td className="has-tip" title={title + (unstable ? " Under 60 s: this LRA may not be stable; track boundaries can noticeably affect the result." : "")}>
-      {unstable ? "≈" : ""}{value.toFixed(1)} {isRange ? "LU" : "LUFS"}
+      {unstable ? "≈" : ""}{value.toFixed(1)}{isRange ? " LU" : ""}
     </td>
   );
 }

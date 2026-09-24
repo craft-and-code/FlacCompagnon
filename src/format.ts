@@ -343,6 +343,9 @@ export function fileSearchFields(f: FileAnalysis, tag?: TagSet | null): string[]
     `${f.channels}ch`,
     `${stereoLabel(f)}${f.fake_stereo ? " fake stereo" : ""}${f.phase_inverted ? " inverted polarity phase" : ""}`,
     f.stereo_balance ? `${stereoBalanceLabel(f.stereo_balance)} balance` : "",
+    f.high_frequency_stereo
+      ? `${f.high_frequency_stereo.side_to_mid_db.toFixed(1)} dB high frequency hf stereo${f.high_frequency_stereo.narrowed ? " narrowed intensity" : ""}`
+      : "",
     f.discontinuities?.clicks.count ? `${f.discontinuities.clicks.count} impulses` : "",
     f.discontinuities?.dropouts.count ? `${f.discontinuities.dropouts.count} dropouts` : "",
     f.clipping.clipped ? `${f.clipping.clip_events} clip events clipping` : "no clipping",

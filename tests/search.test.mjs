@@ -54,6 +54,16 @@ test("balance is searchable by direction, amount and silent channel", () => {
   assert.equal(matchesSearch(fileSearchFields(sampleFile), "balance"), false);
 });
 
+test("high-frequency stereo readings are searchable without matching old reports", () => {
+  const fields = fileSearchFields({ ...sampleFile, high_frequency_stereo: {
+    side_to_mid_db: -31.3, reference_side_to_mid_db: -4, narrowed_block_fraction: 0.8, narrowed: true,
+  } });
+  assert.equal(matchesSearch(fields, "-31.3 dB"), true);
+  assert.equal(matchesSearch(fields, "hf stereo"), true);
+  assert.equal(matchesSearch(fields, "intensity"), true);
+  assert.equal(matchesSearch(fileSearchFields(sampleFile), "hf stereo"), false);
+});
+
 test("suspected discontinuities are searchable without flagging old or clear reports", () => {
   const fields = fileSearchFields({ ...sampleFile, discontinuities: {
     clicks: { count: 1, events: [] }, dropouts: { count: 2, events: [] },

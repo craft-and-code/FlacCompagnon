@@ -30,6 +30,7 @@ export type SortColumn =
   | "channels"
   | "stereo"
   | "balance"
+  | "hfStereo"
   | "clicks"
   | "dropouts"
   | "clipping"
@@ -121,6 +122,12 @@ function sortValue(f: FileAnalysis, col: SortColumn): string | number | null {
       if (balance.state === "LeftSilent") return Number.MAX_VALUE;
       if (balance.state === "RightSilent") return -Number.MAX_VALUE;
       return Number.isFinite(balance.right_minus_left_db) ? balance.right_minus_left_db : null;
+    }
+    case "hfStereo": {
+      const measurement = f.high_frequency_stereo;
+      return measurement && Number.isFinite(measurement.side_to_mid_db)
+        ? measurement.side_to_mid_db
+        : null;
     }
     case "clipping":
       return f.clipping.clipped ? f.clipping.clip_events : 0;

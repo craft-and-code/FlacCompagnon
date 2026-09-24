@@ -6,13 +6,14 @@
 
 **A cross-platform desktop tool that checks whether your "lossless" audio is actually lossless.**
 
-> [!NOTE] **Transcoding detection.** My sincere thanks to Olivier Derrien for agreeing to release his original MATLAB implementation of the transcoding detector as open source: [craft-and-code/lac-transcoded](https://github.com/craft-and-code/lac-transcoded). It has been fully reimplemented in Rust and integrated into FlacCompagnon. In current comparisons, FlacCompagnon identifies the files reported as transcoded by Lossless Audio Checker, as well as additional candidates. The two implementations are not identical, however, and their remaining differences and calibration are being reviewed with Olivier. A transcoding result is statistical evidence, not proof of a file's origin.
+> [!NOTE]
+> **Transcoding detection.** My sincere thanks to Olivier Derrien for agreeing to release his original MATLAB implementation of the transcoding detector as open source: [craft-and-code/lac-transcoded](https://github.com/craft-and-code/lac-transcoded). It has been fully reimplemented in Rust and integrated into FlacCompagnon. In current comparisons, FlacCompagnon identifies the files reported as transcoded by Lossless Audio Checker, as well as additional candidates. The two implementations are not identical, however, and their remaining differences and calibration are being reviewed with Olivier. A transcoding result is statistical evidence, not proof of a file's origin.
 >
 > The **Upscaling** detector (shown as **Upscaled** in the app) currently appears consistent with Lossless Audio Checker, but still needs broader validation on real-world material. The **Upsampling** detector also needs further work and validation. Audio engineers with Rust experience are warmly invited to contribute; help testing the algorithms against well-documented source material would be especially valuable.
 
 > **About this project.** FlacCompagnon was built with an AI assistant, as an experiment: how far can AI-assisted development go on a real, non-trivial piece of software — signal processing, a native desktop app, tests, CI, documentation? It also serves as a working case study on how to use AI effectively: every detection algorithm was validated against independently computed ground truth (reference encoders, real files, bit-exact replicas) before being trusted, and the limitations that remain are documented rather than hidden. The transcoding detection implements the re-quantization method published by Olivier Derrien (JAES 67(3), 2019), who also shared his reference MATLAB implementation for this port; the wider tool it belongs to is described in _"Lossless Audio Checker: A Software for the Detection of Upscaling, Upsampling, and Transcoding in Lossless Musical Tracks"_ by Julien Lacroix, Yann Prime, Alexandre Remy and Olivier Derrien (AES 139th Convention, Paper 9416, 2015).
 
-FlacCompagnon is a from-scratch, open-source successor to the discontinued _Lossless Audio Checker_. Drop a folder **or a single audio file** onto the window and it runs the same three independent detections as the original — **Upscaling**, **Upsampling**, and **Transcoding** (including the **AAC re-quantization** test, which catches AAC sources at every bitrate) — verifies **FLAC MD5** signatures, flags **fake stereo** files, detects **clipping**, and can render a **spectrogram** for each track.
+FlacCompagnon is a from-scratch, open-source successor to the discontinued _Lossless Audio Checker_. Drop a folder **or a single audio file** onto the window and it runs three independent authenticity detections — **Upscaling**, **Upsampling**, and **Transcoding** — verifies **FLAC MD5** signatures, measures spectrum, channel relationships, clipping, true peak, dynamics and loudness, and records suspected impulses and digital dropouts. It can also render a **spectrogram** for each track. The [analysis guide](docs/README.md) documents every result, its thresholds and its limits.
 
 Beyond checking, it also **edits tags and cover art** (single files or whole selections at once, with an optional **MusicBrainz/Discogs** lookup) and **exports M3U playlists** in whatever order you arrange the table.
 
@@ -60,19 +61,24 @@ The **MD5** column only appears when the analysis actually includes FLAC files, 
 
 Click **Generate spectrograms** to render a spectrogram image for every track using **ffmpeg** installed on your system (resolved automatically at runtime — see prerequisites). The default **Small Size** uses a 900 × 470 spectrum canvas; **Large Size** in the **Spectrograms** menu uses 1800 × 940. The PNG is larger than the canvas because ffmpeg adds a legend. The menu only saves the preferred size; generation starts when you click the button. For each folder that contains audio, a `spectrograms/` sub-folder is created next to the files, and one PNG is written per track. The image includes a labelled **frequency axis** (its top equals Nyquist = sample-rate ÷ 2) and a caption spelling out the **sample rate**, bit depth, channel count, and format — so the cutoff and the sampling are visible at a glance.
 
-### 5. Extra integrity checks
+### 5. Audio quality, channel and restoration checks
 
-- **Fake stereo** — detects "stereo" files that are really dual-mono (both channels identical).
-- **Clipping** — counts full-scale sample runs (each _event_ = ≥3 consecutive samples at 0 dBFS) and reports the peak level in dBFS. This flags an over-loud master; it is independent of whether the file is lossless.
-- **True peak** — a separate column reporting the **true peak in dBTP** (ITU-R BS.1770-style: the audio is 4×-oversampled through a 48-tap polyphase FIR, revealing **inter-sample peaks** — places where the waveform a DAC reconstructs overshoots full scale _between_ stored samples). It is shown for every track, clipped or not: a track can read −0.6 dBTP with a perfectly clean sample-domain signal (safe headroom, no problem) or read −0.2 dBFS sample peak yet **+1 dBTP** true peak — an "inter-sample over" that the classic clipping counter never sees because no single stored sample hits full scale. The colour follows the delivery specs rather than the arithmetic: **green at or below −1 dBTP** (the EBU R128 ceiling that Spotify, Apple Music and Tidal adopted), neutral up to 0, **amber up to +1** (real overs, but small — nearly every modern master is here), and **red only above +1 dBTP**, where a lossy encoder's own added overshoot can push the result into audible distortion.
-- **Dynamics (DR)** — a DR-meter-style estimate of each track's dynamic range: the peak level against the RMS of the loudest 20% of ~3 s blocks (the crest factor of the loud passages). High values (≥ 12 dB, shown green) indicate a dynamic master such as a Full Dynamic Range edition; low values (< 8 dB, shown amber) betray a loudness-war master. Like clipping, this is independent of losslessness.
+- **Spectral cutoff** — measures the highest frequency with appreciable averaged spectral content, plus the sharpness of the transition and the level above it. It is descriptive information, not a transcoding verdict.
+- **Channel relationship** — flags exact or near dual-mono as **Fake stereo**; reports whole-track L/R correlation and a likely polarity inversion at correlation ≤ −0.95; reports unweighted RMS balance (`L +x.x dB`, `R +x.x dB`, or a silent channel); and measures high-frequency Side/Mid width as **HF Stereo**. This experimental cue measures 6–20 kHz (limited by Nyquist) against 1.5–5 kHz. Persistent narrowing can result from intensity stereo, but does not identify a codec or prove a defect. These measurements are available for two-channel material and describe the signal; they do not determine artistic intent.
+- **Clipping** — counts full-scale sample runs (each _event_ = ≥3 consecutive samples at the normalized full-scale threshold) and reports the sample peak in dBFS. It is independent of whether the file is lossless.
+- **True peak** — reports the inter-sample peak in dBTP through 4× oversampling with a 48-tap polyphase FIR. A file can have clean stored samples yet reconstruct above 0 dBTP.
+- **Dynamics (DR)** — estimates peak level against the RMS of the loudest 20% of sustained blocks. It describes crest factor in loud passages and is independent of losslessness.
+- **Integrated loudness and LRA** — reports EBU R128-style integrated loudness in LUFS and loudness range in LU for valid mono or stereo streams. Silence, very short files and unsupported layouts have no reading.
+- **Impulses and dropouts** — counts conservative candidates for short click-like pulses and exact-zero gaps, with channel, timestamp and duration available on hover. These results point to places to audition; they are not corruption verdicts.
 - **File size** — read straight from the filesystem by the Rust core, never derived from bitrate × duration, so it matches what your file manager reports for the same file. Displayed with **decimal** units (1 kB = 1000 bytes, as macOS Finder and most Linux file managers do); hovering the cell shows the exact byte count. Note that Windows Explorer labels _binary_ units "KB"/"MB", so it will show a slightly smaller number for the same file.
+
+See the [analysis guide](docs/README.md) for one page per measurement, including formulas, thresholds, limitations, automated checks and manual fixtures.
 
 ### 6. Save & reload (on demand)
 
 Analysis never writes anything by itself. When you want to keep the results, click **Save…** and pick a name and location — nothing is dropped into your music folders unless you ask for it. One dialog pick writes **two files, same stem, same folder**:
 
-- a spreadsheet-friendly **`.csv`** — status, upscaling, upsampling, transcoding, lattice score, cutoff, bit depth, file size, clipping, true peak, dynamics, FLAC MD5, codec, bitrate, modification time, and the two file fingerprints. The size is a raw byte count, so a spreadsheet can sum and sort it;
+- a spreadsheet-friendly **`.csv`** — status, authenticity findings, lattice score, cutoff, bit depth, channel relationship, HF Stereo, clipping, true peak, LUFS, LRA, dynamics, balance, suspected impulses/dropouts and their retained locations, FLAC MD5, codec, bitrate, modification time, and the two file fingerprints. The size is a raw byte count, so a spreadsheet can sum and sort it;
 - a **`.json`** that round-trips the _entire_ analysis — every field, including the nested per-detection detail — so it can be reloaded later.
 
 **Both files follow the table's row order**, including a manual drag-reorder. Beyond that the two behave differently on purpose:
@@ -187,7 +193,7 @@ flowchart LR
             fft["FFT spectrum<br/>▸ cut-off"]
             mdct["MDCT long + short<br/>▸ AAC re-quantization grid"]
             bits["Effective bit depth"]
-            levels["Clipping · true peak<br/>dynamics · fake stereo"]
+            levels["Clipping · true peak · DR<br/>stereo · HF width · LUFS/LRA · discontinuities"]
         end
 
         verdict{{"Upscaling · Upsampling · Transcoding"}}
@@ -453,7 +459,7 @@ Requests carry a descriptive `User-Agent` (as MusicBrainz's usage policy require
 
 ## Roadmap ideas
 
-Easy future additions (the analyzer is modular): per-channel spectral analysis, ReplayGain scanning, and reporting **intensity-stereo damage** as a quality indicator. Note that the transcode detector is already _robust to_ joint-stereo coding — it tests the L, R, M and S representations, so an M/S-coded (or intensity-stereo) transcode is still caught. What is missing is the separate measurement of the harm that coding leaves behind: a Side channel that collapses above the intensity cutoff, and the stereo image narrowing with it.
+Easy future additions (the analyzer is modular): per-channel spectral analysis and ReplayGain scanning. The separate **HF Stereo** measurement now reports a high-band Side/Mid collapse when the upper-mid reference remains wide. It is still an experimental quality indicator until it has been measured against a labelled corpus of real music. The transcode detector is already _robust to_ joint-stereo coding — it tests the L, R, M and S representations, so an M/S-coded transcode is still caught; HF Stereo describes the resulting stereo width rather than codec provenance.
 
 On the tagging side: **AcoustID/Chromaprint audio fingerprinting** so a track can be identified from its sound rather than its metadata — the way MusicBrainz Picard does. Fingerprinting needs an extra native dependency and an AcoustID API key, so it is deliberately out of scope for now.
 

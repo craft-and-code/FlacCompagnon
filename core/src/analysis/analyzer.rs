@@ -29,8 +29,9 @@ use std::sync::Arc;
 
 use rustfft::{num_complex::Complex, Fft, FftPlanner};
 
-use super::mdct::{Mdct, AAC_N};
 use super::discontinuities::{DiscontinuityAnalysis, DiscontinuityDetector};
+use super::intensity_stereo::{HighFrequencyStereo, HighFrequencyStereoMeter};
+use super::mdct::{Mdct, AAC_N};
 use super::truepeak::TruePeak;
 use super::{bitdepth, clipping, loudness::LoudnessMeter, spectrum};
 use crate::ClippingInfo;
@@ -83,6 +84,8 @@ pub struct AnalysisSummary {
     pub phase_inverted: bool,
     /// Unweighted RMS balance, available only for two-channel streams.
     pub stereo_balance: Option<super::stereo::StereoBalance>,
+    /// High-frequency Side/Mid measurement for qualifying stereo streams.
+    pub high_frequency_stereo: Option<HighFrequencyStereo>,
     /// The bit depth actually used by the samples, when it could be
     /// determined from an integer PCM source (`None` for float sources).
     pub real_bit_depth: Option<u32>,
@@ -143,6 +146,7 @@ pub struct StreamAnalyzer {
     true_peak: TruePeak,
     loudness: Option<LoudnessMeter>,
     discontinuities: Option<DiscontinuityDetector>,
+    high_frequency_stereo: Option<HighFrequencyStereoMeter>,
 
     // --- stereo relationship ---
     diff_energy: f64,
@@ -195,6 +199,7 @@ impl StreamAnalyzer {
             true_peak: TruePeak::new(channels.max(1)),
             loudness: LoudnessMeter::new(sample_rate, channels),
             discontinuities: DiscontinuityDetector::new(sample_rate, channels),
+            high_frequency_stereo: HighFrequencyStereoMeter::new(sample_rate, channels),
             diff_energy: 0.0,
             l_energy: 0.0,
             r_energy: 0.0,
@@ -242,6 +247,9 @@ impl StreamAnalyzer {
         }
         if let Some(discontinuities) = &mut self.discontinuities {
             discontinuities.push_frame(samples);
+        }
+        if let Some(high_frequency_stereo) = &mut self.high_frequency_stereo {
+            high_frequency_stereo.push_frame(samples);
         }
         if self.dyn_block_frames == DYN_BLOCK_FRAMES {
             self.dyn_blocks
@@ -419,6 +427,10 @@ impl StreamAnalyzer {
             false
         };
         let phase = super::stereo::analyze_phase(self.l_energy, self.r_energy, self.cross_energy);
+        let high_frequency_stereo = self
+            .high_frequency_stereo
+            .take()
+            .and_then(HighFrequencyStereoMeter::finish);
 
         let measured_depth = self.bit_depth.finish(declared_bits);
         let real_bit_depth = measured_depth.map(|(bits, _)| bits);
@@ -441,8 +453,14 @@ impl StreamAnalyzer {
 
         // Compute programme loudness before the LRA meter appends 1.5 s of
         // analysis-only silence for its centred 3 s tail windows.
-        let integrated_lufs = self.loudness.as_ref().and_then(LoudnessMeter::integrated_lufs);
-        let loudness_range_lu = self.loudness.take().and_then(LoudnessMeter::loudness_range_lu);
+        let integrated_lufs = self
+            .loudness
+            .as_ref()
+            .and_then(LoudnessMeter::integrated_lufs);
+        let loudness_range_lu = self
+            .loudness
+            .take()
+            .and_then(LoudnessMeter::loudness_range_lu);
 
         AnalysisSummary {
             cutoff_hz,
@@ -459,12 +477,16 @@ impl StreamAnalyzer {
             } else {
                 None
             },
+            high_frequency_stereo,
             real_bit_depth,
             bit_depth_evidence,
             dr_db,
             integrated_lufs,
             loudness_range_lu,
-            discontinuities: self.discontinuities.take().and_then(DiscontinuityDetector::finish),
+            discontinuities: self
+                .discontinuities
+                .take()
+                .and_then(DiscontinuityDetector::finish),
             mdct_cutoff_ratio,
             mdct_dead_db,
             mdct_dead_fraction,

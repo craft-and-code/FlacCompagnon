@@ -32,6 +32,7 @@ fn sample_file() -> FileAnalysis {
         phase_correlation: Some(0.8),
         phase_inverted: Some(false),
         stereo_balance: None,
+        high_frequency_stereo: None,
         badge: None,
         clipping: ClippingInfo {
             clipped_samples: 0,
@@ -120,6 +121,42 @@ fn older_json_without_balance_still_loads() {
     json["report"]["files"][0].as_object_mut().unwrap().remove("stereo_balance");
     let read = parse_json(&serde_json::to_string(&json).unwrap()).unwrap();
     assert_eq!(read.files[0].stereo_balance, None);
+}
+
+#[test]
+fn high_frequency_stereo_round_trips_and_exports_its_numeric_evidence() {
+    use crate::analysis::intensity_stereo::HighFrequencyStereo;
+    let mut file = sample_file();
+    file.high_frequency_stereo = Some(HighFrequencyStereo {
+        side_to_mid_db: -31.25,
+        reference_side_to_mid_db: -4.0,
+        narrowed_block_fraction: 0.8,
+        narrowed: true,
+    });
+    let report = FolderReport { root: "/music".into(), files: vec![file], has_flac: true };
+    let json = build_json(&report).unwrap();
+    assert_eq!(parse_json(&json).unwrap().files[0].high_frequency_stereo, report.files[0].high_frequency_stereo);
+    let csv = build_csv(&report);
+    let mut lines = csv.lines();
+    let header: Vec<_> = lines.next().unwrap().split(',').collect();
+    let row: Vec<_> = lines.next().unwrap().split(',').collect();
+    for (column, value) in [
+        ("hf_side_to_mid_db", "-31.25"),
+        ("hf_reference_side_to_mid_db", "-4.00"),
+        ("hf_narrowed_block_fraction", "0.800"),
+        ("hf_stereo_narrowed", "true"),
+    ] {
+        let at = header.iter().position(|&name| name == column).unwrap();
+        assert_eq!(row[at], value);
+    }
+}
+
+#[test]
+fn older_json_without_high_frequency_stereo_still_loads() {
+    let report = FolderReport { root: "/music".into(), files: vec![sample_file()], has_flac: true };
+    let mut json: serde_json::Value = serde_json::from_str(&build_json(&report).unwrap()).unwrap();
+    json["report"]["files"][0].as_object_mut().unwrap().remove("high_frequency_stereo");
+    assert_eq!(parse_json(&serde_json::to_string(&json).unwrap()).unwrap().files[0].high_frequency_stereo, None);
 }
 
 #[test]
@@ -256,6 +293,7 @@ fn the_json_carries_every_analysis_field() {
         "phase_correlation",
         "phase_inverted",
         "stereo_balance",
+        "high_frequency_stereo",
         "badge",
         "clipping",
         "dr_db",

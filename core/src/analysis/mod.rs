@@ -38,6 +38,7 @@ pub mod bitdepth;
 pub mod clipping;
 pub mod detections;
 pub mod discontinuities;
+pub mod intensity_stereo;
 pub mod loudness;
 pub mod mdct;
 pub mod requant;

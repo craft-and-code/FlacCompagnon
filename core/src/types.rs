@@ -150,6 +150,10 @@ pub struct FileAnalysis {
     /// silence, unsupported layouts, invalid samples and older saved reports.
     #[serde(default)]
     pub stereo_balance: Option<crate::analysis::stereo::StereoBalance>,
+    /// High-frequency Side/Mid measurement for qualifying stereo streams.
+    /// Missing from mono, unsupported-rate, silent and older reports.
+    #[serde(default)]
+    pub high_frequency_stereo: Option<crate::analysis::intensity_stereo::HighFrequencyStereo>,
     /// Verified quality badge: `Some("Hi-Res")` for > 48 kHz or > 16-bit PCM,
     /// `Some("DSD64")` etc. for DSD — granted only when no detection
     /// invalidates the claim (no upscaling/upsampling/transcoding).

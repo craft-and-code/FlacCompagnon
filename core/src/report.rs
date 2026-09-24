@@ -60,7 +60,7 @@ pub fn build_csv(report: &FolderReport) -> String {
         "file,format,codec,badge,bitrate_kbps,sample_rate,declared_bits,real_bit_depth,\
          duration_s,size_bytes,status,upscaling,upsampling,transcoding,lattice_score,cutoff_hz,\
          cutoff_ratio,channels,fake_stereo,phase_correlation,phase_inverted,clipped,clip_events,peak_dbfs,true_peak_dbtp,integrated_lufs,loudness_range_lu,dr_db,\
-         md5,bit_depth_method,stored_bits,balance_right_minus_left_db,balance_silent_channel,suspected_clicks,suspected_dropouts,click_locations,dropout_locations,modified_unix,file_md5,file_crc32\n",
+         md5,bit_depth_method,stored_bits,balance_right_minus_left_db,balance_silent_channel,hf_side_to_mid_db,hf_reference_side_to_mid_db,hf_narrowed_block_fraction,hf_stereo_narrowed,suspected_clicks,suspected_dropouts,click_locations,dropout_locations,modified_unix,file_md5,file_crc32\n",
     );
     for f in &report.files {
         let md5 = f
@@ -76,51 +76,81 @@ pub fn build_csv(report: &FolderReport) -> String {
             .unwrap_or("");
         use crate::analysis::stereo::StereoBalance;
         let (balance_db, silent_channel) = match f.stereo_balance {
-            Some(StereoBalance::Measured { right_minus_left_db }) => (format!("{right_minus_left_db:.2}"), ""),
+            Some(StereoBalance::Measured {
+                right_minus_left_db,
+            }) => (format!("{right_minus_left_db:.2}"), ""),
             Some(StereoBalance::LeftSilent) => (String::new(), "left"),
             Some(StereoBalance::RightSilent) => (String::new(), "right"),
             None => (String::new(), ""),
         };
-        out.push_str(&format!(
-            "{},{},{},{},{},{},{},{},{:.3},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.2},{:.2},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
+        let (
+            hf_side_to_mid_db,
+            hf_reference_side_to_mid_db,
+            hf_narrowed_block_fraction,
+            hf_stereo_narrowed,
+        ) = match f.high_frequency_stereo {
+            Some(measurement) => (
+                format!("{:.2}", measurement.side_to_mid_db),
+                format!("{:.2}", measurement.reference_side_to_mid_db),
+                format!("{:.3}", measurement.narrowed_block_fraction),
+                measurement.narrowed.to_string(),
+            ),
+            None => (String::new(), String::new(), String::new(), String::new()),
+        };
+        let row = [
             csv_escape(&f.file_name),
-            f.format,
+            f.format.clone(),
             f.codec.clone().unwrap_or_default(),
             f.badge.clone().unwrap_or_default(),
             opt(f.bitrate_kbps),
-            f.sample_rate,
+            f.sample_rate.to_string(),
             opt(f.declared_bits),
             opt(f.real_bit_depth),
-            f.duration_secs,
-            // Raw byte count, not a human-readable string: a spreadsheet can
-            // then sum/sort it, and the reader picks their own unit convention.
-            f.size_bytes,
-            f.detections.summary,
-            f.detections.upscaling,
-            f.detections.upsampling,
-            f.detections.transcoding,
-            f.lattice_score.map(|v| format!("{v:.4}")).unwrap_or_default(),
+            format!("{:.3}", f.duration_secs),
+            f.size_bytes.to_string(),
+            f.detections.summary.clone(),
+            f.detections.upscaling.to_string(),
+            f.detections.upsampling.to_string(),
+            f.detections.transcoding.to_string(),
+            f.lattice_score
+                .map(|v| format!("{v:.4}"))
+                .unwrap_or_default(),
             f.cutoff_hz.map(|v| format!("{v:.0}")).unwrap_or_default(),
-            f.cutoff_ratio.map(|v| format!("{v:.3}")).unwrap_or_default(),
-            f.channels,
+            f.cutoff_ratio
+                .map(|v| format!("{v:.3}"))
+                .unwrap_or_default(),
+            f.channels.to_string(),
             opt_bool(f.fake_stereo),
-            f.phase_correlation.map(|v| format!("{v:.3}")).unwrap_or_default(),
+            f.phase_correlation
+                .map(|v| format!("{v:.3}"))
+                .unwrap_or_default(),
             opt_bool(f.phase_inverted),
-            f.clipping.clipped,
-            f.clipping.clip_events,
-            f.clipping.peak_dbfs,
-            f.clipping.true_peak_dbtp,
-            f.integrated_lufs.map(|v| format!("{v:.1}")).unwrap_or_default(),
-            f.loudness_range_lu.map(|v| format!("{v:.1}")).unwrap_or_default(),
+            f.clipping.clipped.to_string(),
+            f.clipping.clip_events.to_string(),
+            format!("{:.2}", f.clipping.peak_dbfs),
+            format!("{:.2}", f.clipping.true_peak_dbtp),
+            f.integrated_lufs
+                .map(|v| format!("{v:.1}"))
+                .unwrap_or_default(),
+            f.loudness_range_lu
+                .map(|v| format!("{v:.1}"))
+                .unwrap_or_default(),
             f.dr_db.map(|v| format!("{v:.1}")).unwrap_or_default(),
-            md5,
-            f.bit_depth_evidence.map(|e| match e.method {
-                crate::analysis::bitdepth::BitDepthMethod::Stored => "Stored",
-                crate::analysis::bitdepth::BitDepthMethod::NarrowGrid => "NarrowGrid",
-            }).unwrap_or(""),
+            md5.to_string(),
+            f.bit_depth_evidence
+                .map(|e| match e.method {
+                    crate::analysis::bitdepth::BitDepthMethod::Stored => "Stored",
+                    crate::analysis::bitdepth::BitDepthMethod::NarrowGrid => "NarrowGrid",
+                })
+                .unwrap_or("")
+                .to_string(),
             opt(f.bit_depth_evidence.map(|e| e.stored_bits)),
             balance_db,
-            silent_channel,
+            silent_channel.to_string(),
+            hf_side_to_mid_db,
+            hf_reference_side_to_mid_db,
+            hf_narrowed_block_fraction,
+            hf_stereo_narrowed,
             opt(f.discontinuities.as_ref().map(|d| d.clicks.count)),
             opt(f.discontinuities.as_ref().map(|d| d.dropouts.count)),
             discontinuity_locations(f.discontinuities.as_ref().map(|d| &d.clicks)),
@@ -128,15 +158,30 @@ pub fn build_csv(report: &FolderReport) -> String {
             opt(f.modified_unix),
             f.file_md5.clone().unwrap_or_default(),
             f.file_crc32.clone().unwrap_or_default(),
-        ));
+        ];
+        out.push_str(&row.join(","));
+        out.push('\n');
     }
     out
 }
 
-fn discontinuity_locations(summary: Option<&crate::analysis::discontinuities::EventSummary>) -> String {
-    summary.map(|s| s.events.iter().map(|event| {
-        format!("ch{}@{:.6}s/{:.6}s", event.channel, event.start_secs, event.duration_secs)
-    }).collect::<Vec<_>>().join(";")).unwrap_or_default()
+fn discontinuity_locations(
+    summary: Option<&crate::analysis::discontinuities::EventSummary>,
+) -> String {
+    summary
+        .map(|s| {
+            s.events
+                .iter()
+                .map(|event| {
+                    format!(
+                        "ch{}@{:.6}s/{:.6}s",
+                        event.channel, event.start_secs, event.duration_secs
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(";")
+        })
+        .unwrap_or_default()
 }
 
 /// Write the CSV report to `dest`.

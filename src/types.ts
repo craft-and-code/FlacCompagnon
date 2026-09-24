@@ -37,6 +37,15 @@ export type StereoBalance =
   | { state: "LeftSilent" }
   | { state: "RightSilent" };
 
+export interface HighFrequencyStereo {
+  // Side/Mid energy ratios in dB. More negative means less high-band stereo width.
+  side_to_mid_db: number;
+  reference_side_to_mid_db: number;
+  narrowed_block_fraction: number;
+  // A conservative high-frequency narrowing cue, not a codec verdict.
+  narrowed: boolean;
+}
+
 export interface DiscontinuityEvent {
   channel: number;
   start_secs: number;
@@ -89,6 +98,7 @@ export interface FileAnalysis {
   phase_correlation?: number | null;
   phase_inverted?: boolean | null;
   stereo_balance?: StereoBalance | null;
+  high_frequency_stereo?: HighFrequencyStereo | null;
   badge: string | null;
   clipping: ClippingInfo;
   dr_db: number | null;

@@ -36,11 +36,32 @@ test("balance sorts from left to right, with absent results last in both directi
   assert.match(render("balance", files[0]), />—</);
 });
 
+test("HF stereo shows the high-band ratio and sorts missing readings last", () => {
+  const files = [
+    { file_name: "old" },
+    { file_name: "wide", high_frequency_stereo: { side_to_mid_db: -8, reference_side_to_mid_db: -4, narrowed_block_fraction: 0, narrowed: false } },
+    { file_name: "narrow", high_frequency_stereo: { side_to_mid_db: -31.3, reference_side_to_mid_db: -4, narrowed_block_fraction: 0.8, narrowed: true } },
+  ];
+  const names = (direction) => sortFiles(files, { column: "hfStereo", direction }).map((f) => f.file_name);
+  assert.deepEqual(names("asc"), ["narrow", "wide", "old"]);
+  assert.deepEqual(names("desc"), ["wide", "narrow", "old"]);
+  assert.match(render("hfStereo", files[2]), />-31\.3 dB</);
+  assert.match(render("hfStereo", files[2]), /intensity stereo/);
+  assert.match(render("hfStereo", files[2]), /6–20 kHz/);
+  assert.match(render("hfStereo", files[2]), /Experimental/);
+  assert.match(render("hfStereo", { high_frequency_stereo: {
+    side_to_mid_db: -120, reference_side_to_mid_db: -120, narrowed_block_fraction: 0, narrowed: false,
+  } }), /reporting floor/);
+  assert.match(render("hfStereo", files[0]), />—</);
+});
+
 test("short LRA readings are visibly approximate and explained", () => {
   assert.match(render("lra", { loudness_range_lu: 10, duration_secs: 40 }), /≈10\.0 LU/);
   assert.match(render("lra", { loudness_range_lu: 10, duration_secs: 40 }), /Under 60 s/);
   assert.doesNotMatch(render("lra", { loudness_range_lu: 10, duration_secs: 60 }), /≈|Under 60 s/);
   assert.match(render("lra", { duration_secs: 60 }), />—</);
+  assert.match(render("loudness", { integrated_lufs: -23, duration_secs: 5 }), />-23\.0</);
+  assert.doesNotMatch(render("loudness", { integrated_lufs: -23, duration_secs: 5 }), />-23\.0 LUFS</);
   assert.doesNotMatch(render("loudness", { integrated_lufs: -23, duration_secs: 5 }), /≈/);
 });
 

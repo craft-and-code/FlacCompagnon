@@ -24,6 +24,7 @@
 import type { ReactNode } from "react";
 import type { FileAnalysis, TagSet } from "../types";
 import type { SortColumn } from "./tableSort";
+import { HighFrequencyStereoCell } from "./HighFrequencyStereoCell";
 import { DiscontinuityCell } from "./DiscontinuityCell";
 import { fmtBitrate, fmtCutoff, fmtDuration, fmtModified, fmtSize } from "../format";
 import {
@@ -56,6 +57,7 @@ export type ColumnKey =
   | "channels"
   | "stereo"
   | "balance"
+  | "hfStereo"
   | "clicks"
   | "dropouts"
   | "clipping"
@@ -224,6 +226,13 @@ export const ALL_COLUMNS: ColumnDef[] = [
     sort: "balance",
     defaultVisible: true,
     render: (f) => <StereoBalanceCell f={f} />,
+  },
+  {
+    key: "hfStereo",
+    label: "HF Stereo",
+    sort: "hfStereo",
+    defaultVisible: true,
+    render: (f) => <HighFrequencyStereoCell f={f} />,
   },
   {
     key: "clicks",
