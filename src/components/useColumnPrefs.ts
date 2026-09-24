@@ -47,16 +47,17 @@ function load(): StoredPrefs {
 
 /// Reconciles a saved (possibly stale) preference against the columns this
 /// version of the app actually knows about: drops keys that no longer exist,
-/// appends newly-introduced ones at the end, and applies each new column's
+/// inserts new columns at their requested neighbour (or the end), and applies each new column's
 /// own `defaultVisible` since a saved `hidden` list from before it existed
 /// obviously never mentions it either way.
-function reconcile(stored: StoredPrefs): State {
+export function reconcile(stored: StoredPrefs): State {
   const order = stored.order.filter(isColumnKey);
   const seen = new Set(order);
   const hidden = new Set(stored.hidden.filter(isColumnKey));
   for (const col of ALL_COLUMNS) {
     if (!seen.has(col.key)) {
-      order.push(col.key);
+      const anchor = col.initialAfter ? order.indexOf(col.initialAfter) : -1;
+      order.splice(anchor < 0 ? order.length : anchor + 1, 0, col.key);
       if (!col.defaultVisible) hidden.add(col.key);
     }
   }

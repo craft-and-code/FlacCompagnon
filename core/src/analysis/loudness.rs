@@ -1,9 +1,11 @@
-//! Integrated loudness and loudness range for mono and stereo audio.
+//! Shared K-weighted power for integrated loudness, LRA and M/S maxima.
 //!
 //! The meter keeps 400 ms and 3 s of K-weighted power and sampled gate values.
 //! It does not retain decoded samples. Channel positions are required
 //! for a correct multichannel measurement, so unsupported layouts yield no
 //! value rather than incorrectly weighted loudness measurements.
+
+use super::loudness_peaks::{LoudnessPeaks, LoudnessPeaksMeter};
 
 /// ITU-R BS.1770-5, Annex 1, Tables 1 and 2 (48 kHz reference filters).
 const SHELF_48K: ([f64; 3], [f64; 3]) = (
@@ -99,7 +101,7 @@ impl ChannelFilter {
     }
 }
 
-/// Streaming EBU R 128 integrated-loudness and Tech 3342 range meter.
+/// Streaming K-weighted integrated loudness, M/S maxima and Tech 3342 range.
 pub struct LoudnessMeter {
     filters: Vec<ChannelFilter>,
     power_ring: Vec<f64>,
@@ -114,6 +116,7 @@ pub struct LoudnessMeter {
     short_powers: Vec<f64>,
     short_valid: bool,
     valid: bool,
+    peaks: LoudnessPeaksMeter,
 }
 
 impl LoudnessMeter {
@@ -130,6 +133,7 @@ impl LoudnessMeter {
         // update rate even at 11025 Hz. At common rates both lengths are exact.
         let block_frames = (sample_rate as f64 * 0.4).round() as usize;
         let step_frames = (sample_rate / 10) as u64;
+        let short_frames = sample_rate as usize * 3;
         Some(Self {
             filters: (0..channels)
                 .map(|_| ChannelFilter::new(sample_rate))
@@ -140,12 +144,13 @@ impl LoudnessMeter {
             frames: 0,
             step_frames,
             block_powers: Vec::new(),
-            short_ring: vec![0.0; sample_rate as usize * 3],
+            short_ring: vec![0.0; short_frames],
             short_ring_at: 0,
             short_window_power: 0.0,
             short_powers: Vec::new(),
             short_valid: true,
             valid: true,
+            peaks: LoudnessPeaksMeter::new(sample_rate, block_frames, short_frames),
         })
     }
 
@@ -173,7 +178,7 @@ impl LoudnessMeter {
         // supported rate; the running sum and final gates remain f64.
         // Float PCM can contain enormous finite samples. If their squared
         // power exceeds f32, the compact ring cannot represent the signal;
-        // withhold LRA instead of exporting an infinite or fabricated value.
+        // withhold S/LRA instead of exporting an infinite or fabricated value.
         if !power.is_finite() || power > f32::MAX as f64 {
             self.short_valid = false;
         }
@@ -182,6 +187,8 @@ impl LoudnessMeter {
         self.short_ring[self.short_ring_at] = short_power;
         self.short_ring_at = (self.short_ring_at + 1) % self.short_ring.len();
         self.frames += 1;
+        self.peaks
+            .push(self.window_power, self.short_window_power, self.frames);
 
         let block_frames = self.power_ring.len() as u64;
         if self.frames >= block_frames
@@ -227,7 +234,13 @@ impl LoudnessMeter {
         if count == 0 {
             return None;
         }
-        Some((LOUDNESS_OFFSET + 10.0 * (sum / count as f64).log10()) as f32)
+        power_to_lufs(sum / count as f64)
+    }
+
+    /// Ungated M/S maxima over complete real-audio windows. Call before LRA
+    /// consumes the meter and adds analysis-only silence to its tail.
+    pub fn peaks(&self) -> Option<LoudnessPeaks> {
+        self.peaks.result(self.valid, self.short_valid)
     }
 
     /// EBU Tech 3342 loudness range in LU. Consumes the meter because the
@@ -268,6 +281,11 @@ impl LoudnessMeter {
         let high = gated[percentile(LRA_HIGH_PERCENTILE)];
         Some((10.0 * (high / low).log10()) as f32)
     }
+}
+
+/// BS.1770-5 Annex 1, equation 2, after channel-weighted mean powers are summed.
+pub(super) fn power_to_lufs(power: f64) -> Option<f32> {
+    (power.is_finite() && power > 0.0).then(|| (LOUDNESS_OFFSET + 10.0 * power.log10()) as f32)
 }
 
 #[cfg(test)]

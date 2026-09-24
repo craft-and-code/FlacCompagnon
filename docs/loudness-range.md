@@ -1,6 +1,6 @@
 # Loudness range (LRA)
 
-The LRA column measures how much short-term loudness varies across a programme. It follows EBU Tech 3342 and is expressed in LU. It is complementary to integrated LUFS: two tracks can have the same integrated loudness and very different loudness variation.
+The LRA column measures how much short-term loudness varies across a programme. It follows EBU Tech 3342 and is expressed in LU. It is complementary to integrated LUFS: two tracks can have the same integrated loudness and very different loudness variation. [LUFS-S max](short-term-loudness.md) exposes the highest ungated short-term reading separately, before LRA's artificial tail is added.
 
 ## Calculation
 

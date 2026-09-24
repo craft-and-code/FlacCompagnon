@@ -42,6 +42,7 @@ pub mod detections;
 pub mod discontinuities;
 pub mod intensity_stereo;
 pub mod loudness;
+pub mod loudness_peaks;
 pub mod mdct;
 pub mod requant;
 pub mod spectrum;

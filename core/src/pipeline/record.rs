@@ -63,6 +63,7 @@ pub(super) fn skeleton(path: &Path) -> FileAnalysis {
         clipping: ClippingInfo::unmeasured(),
         dr_db: None,
         integrated_lufs: None,
+        loudness_peaks: None,
         loudness_range_lu: None,
         discontinuities: None,
         flac_md5: None,

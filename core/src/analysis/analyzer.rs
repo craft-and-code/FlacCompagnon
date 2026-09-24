@@ -33,6 +33,7 @@ use super::dc_offset::{DcOffset, DcOffsetMeter};
 use super::discontinuities::{DiscontinuityAnalysis, DiscontinuityDetector};
 use super::intensity_stereo::{HighFrequencyStereo, HighFrequencyStereoMeter};
 use super::local_phase::{LocalPhase, LocalPhaseMeter};
+use super::loudness_peaks::LoudnessPeaks;
 use super::mdct::{Mdct, AAC_N};
 use super::truepeak::TruePeak;
 use super::{bitdepth, clipping, loudness::LoudnessMeter, spectrum};
@@ -105,6 +106,8 @@ pub struct AnalysisSummary {
     pub dr_db: Option<f32>,
     /// EBU R 128 integrated loudness, in LUFS; absent when unmeasurable.
     pub integrated_lufs: Option<f32>,
+    /// Maximum momentary and short-term loudness over real-audio windows.
+    pub loudness_peaks: Option<LoudnessPeaks>,
     /// EBU Tech 3342 loudness range, in LU; absent when unmeasurable.
     pub loudness_range_lu: Option<f32>,
     /// Suspected short pulses and digital dropouts; absent if unmeasurable.
@@ -237,6 +240,9 @@ impl StreamAnalyzer {
     /// optionally accompanied by the raw integer sample values for the same
     /// frame (used for effective bit-depth estimation).
     pub fn push_frame(&mut self, samples: &[f32], int_samples: Option<&[i32]>) {
+        if let Some(loudness) = &mut self.loudness {
+            loudness.push_frame(samples);
+        }
         if let Some(phase) = &mut self.local_phase {
             phase.push_frame(samples);
         }
@@ -258,9 +264,6 @@ impl StreamAnalyzer {
         self.dyn_block_sumsq += frame_sumsq / samples.len() as f64;
         self.dyn_block_frames += 1;
         self.true_peak.push_frame(samples);
-        if let Some(loudness) = &mut self.loudness {
-            loudness.push_frame(samples);
-        }
         if let Some(discontinuities) = &mut self.discontinuities {
             discontinuities.push_frame(samples);
         }
@@ -467,12 +470,13 @@ impl StreamAnalyzer {
             (None, None, None)
         };
 
-        // Compute programme loudness before the LRA meter appends 1.5 s of
+        // Capture programme loudness and M/S maxima before LRA appends 1.5 s of
         // analysis-only silence for its centred 3 s tail windows.
         let integrated_lufs = self
             .loudness
             .as_ref()
             .and_then(LoudnessMeter::integrated_lufs);
+        let loudness_peaks = self.loudness.as_ref().and_then(LoudnessMeter::peaks);
         let loudness_range_lu = self
             .loudness
             .take()
@@ -500,6 +504,7 @@ impl StreamAnalyzer {
             bit_depth_evidence,
             dr_db,
             integrated_lufs,
+            loudness_peaks,
             loudness_range_lu,
             discontinuities: self
                 .discontinuities

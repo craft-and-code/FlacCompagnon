@@ -1,6 +1,6 @@
 # Integrated loudness (LUFS)
 
-The LUFS column measures programme loudness according to the gated, K-weighted integrated-loudness method of ITU-R BS.1770 and EBU R 128. It is the measurement to use for broad level comparison between programmes, rather than peak or RMS alone.
+The LUFS column measures programme loudness according to the gated, K-weighted integrated-loudness method of ITU-R BS.1770 and EBU R 128. It is the measurement to use for broad level comparison between programmes, rather than peak or RMS alone. The following columns, [LUFS-M max](momentary-loudness.md) and [LUFS-S max](short-term-loudness.md), report the loudest 400 ms and 3-second windows separately.
 
 ## Calculation
 

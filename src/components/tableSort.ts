@@ -11,7 +11,7 @@
 // means the natural/drag order, which is what the table opens in.
 
 import type { FileAnalysis } from "../types";
-import { dcOffsetMagnitude, detectionLabels, localPhaseMinimum, stereoLabel } from "../format";
+import { dcOffsetMagnitude, detectionLabels, localPhaseMinimum, loudnessPeakValue, stereoLabel } from "../format";
 
 export type SortColumn =
   | "file"
@@ -42,6 +42,8 @@ export type SortColumn =
   | "fileCrc32"
   | "dynamics"
   | "loudness"
+  | "momentary"
+  | "shortTerm"
   | "lra"
   | "md5";
 
@@ -148,6 +150,10 @@ function sortValue(f: FileAnalysis, col: SortColumn): string | number | null {
       return f.dr_db;
     case "loudness":
       return f.integrated_lufs ?? null;
+    case "momentary":
+      return loudnessPeakValue(f.loudness_peaks?.momentary);
+    case "shortTerm":
+      return loudnessPeakValue(f.loudness_peaks?.short_term);
     case "lra":
       return f.loudness_range_lu ?? null;
     case "md5":

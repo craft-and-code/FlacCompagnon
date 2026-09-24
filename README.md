@@ -71,6 +71,7 @@ Click **Generate spectrograms** to render a spectrogram image for every track us
 - **True peak** — reports the inter-sample peak in dBTP through 4× oversampling with a 48-tap polyphase FIR. A file can have clean stored samples yet reconstruct above 0 dBTP.
 - **Dynamics (DR)** — estimates peak level against the RMS of the loudest 20% of sustained blocks. It describes crest factor in loud passages and is independent of losslessness.
 - **Integrated loudness and LRA** — reports EBU R128-style integrated loudness in LUFS and loudness range in LU for valid mono or stereo streams. Silence, very short files and unsupported layouts have no reading.
+- **Momentary and short-term loudness** — **LUFS-M max** and **LUFS-S max**, immediately after LUFS, show the loudest complete 400 ms and 3-second windows. Hover for their locations. Both reuse K-weighted power without gating and check every decoded frame. See [momentary loudness](docs/momentary-loudness.md) and [short-term loudness](docs/short-term-loudness.md) for calculations and test audio.
 - **Impulses and dropouts** — counts conservative candidates for short click-like pulses and exact-zero gaps, with channel, timestamp and duration available on hover. These results point to places to audition; they are not corruption verdicts.
 - **File size** — read straight from the filesystem by the Rust core, never derived from bitrate × duration, so it matches what your file manager reports for the same file. Displayed with **decimal** units (1 kB = 1000 bytes, as macOS Finder and most Linux file managers do); hovering the cell shows the exact byte count. Note that Windows Explorer labels _binary_ units "KB"/"MB", so it will show a slightly smaller number for the same file.
 
@@ -80,7 +81,7 @@ See the [analysis guide](docs/README.md) for one page per measurement, including
 
 Analysis never writes anything by itself. When you want to keep the results, click **Save…** and pick a name and location — nothing is dropped into your music folders unless you ask for it. One dialog pick writes **two files, same stem, same folder**:
 
-- a spreadsheet-friendly **`.csv`** — status, authenticity findings, lattice score, cutoff, bit depth, channel relationship, local and band phase evidence, HF Stereo, DC offset, clipping, true peak, LUFS, LRA, dynamics, balance, suspected impulses/dropouts and their retained locations, FLAC MD5, codec, bitrate, modification time, and the two file fingerprints. The size is a raw byte count, so a spreadsheet can sum and sort it;
+- a spreadsheet-friendly **`.csv`** — status, authenticity findings, lattice score, cutoff, bit depth, channel relationship, local and band phase evidence, HF Stereo, DC offset, clipping, true peak, LUFS, momentary/short-term maxima and their locations, LRA, dynamics, balance, suspected impulses/dropouts and their retained locations, FLAC MD5, codec, bitrate, modification time, and the two file fingerprints. The size is a raw byte count, so a spreadsheet can sum and sort it;
 - a **`.json`** that round-trips the _entire_ analysis — every field, including the nested per-detection detail — so it can be reloaded later.
 
 **Both files follow the table's row order**, including a manual drag-reorder. Beyond that the two behave differently on purpose:
@@ -195,7 +196,7 @@ flowchart LR
             fft["FFT spectrum<br/>▸ cut-off"]
             mdct["MDCT long + short<br/>▸ AAC re-quantization grid"]
             bits["Effective bit depth"]
-            levels["Clipping · true peak · DR · DC offset<br/>stereo · local/band phase · HF width · LUFS/LRA · discontinuities"]
+            levels["Clipping · true peak · DR · DC offset<br/>stereo · local/band phase · HF width<br/>LUFS · M/S maxima · LRA · discontinuities"]
         end
 
         verdict{{"Upscaling · Upsampling · Transcoding"}}

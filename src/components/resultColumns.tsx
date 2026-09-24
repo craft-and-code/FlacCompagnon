@@ -28,6 +28,7 @@ import { HighFrequencyStereoCell } from "./HighFrequencyStereoCell";
 import { DiscontinuityCell } from "./DiscontinuityCell";
 import { DcOffsetCell } from "./DcOffsetCell";
 import { LocalPhaseCell } from "./LocalPhaseCell";
+import { LoudnessPeakCell } from "./LoudnessPeakCell";
 import { fmtBitrate, fmtCutoff, fmtDuration, fmtModified, fmtSize } from "../format";
 import {
   ClippingCell,
@@ -71,6 +72,8 @@ export type ColumnKey =
   | "fileCrc32"
   | "dynamics"
   | "loudness"
+  | "momentary"
+  | "shortTerm"
   | "lra"
   | "artist"
   | "album"
@@ -90,6 +93,8 @@ export interface ColumnDef {
   /// Whether a fresh install, or a genuinely new column an existing install
   /// has never seen before, starts with this column shown.
   defaultVisible: boolean;
+  /// Position a newly introduced column after this neighbour; later user moves persist.
+  initialAfter?: ColumnKey;
   /// Quality/MD5 only: an extra, data-driven condition ResultsTable applies
   /// on top of the user's own visibility choice — see the module doc
   /// comment. `undefined` for every other column, which is shown/hidden by
@@ -294,6 +299,22 @@ export const ALL_COLUMNS: ColumnDef[] = [
     sort: "loudness",
     defaultVisible: true,
     render: (f) => <LoudnessCell value={f.integrated_lufs} mode="integrated" />,
+  },
+  {
+    key: "momentary",
+    label: "LUFS-M max",
+    sort: "momentary",
+    defaultVisible: true,
+    initialAfter: "loudness",
+    render: (f) => <LoudnessPeakCell peak={f.loudness_peaks?.momentary} mode="momentary" />,
+  },
+  {
+    key: "shortTerm",
+    label: "LUFS-S max",
+    sort: "shortTerm",
+    defaultVisible: true,
+    initialAfter: "momentary",
+    render: (f) => <LoudnessPeakCell peak={f.loudness_peaks?.short_term} mode="short-term" />,
   },
   {
     key: "lra",

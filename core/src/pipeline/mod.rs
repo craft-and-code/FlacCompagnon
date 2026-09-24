@@ -167,6 +167,7 @@ fn apply_outcome(
     result.clipping = summary.clipping.clone();
     result.dr_db = summary.dr_db;
     result.integrated_lufs = summary.integrated_lufs;
+    result.loudness_peaks = summary.loudness_peaks;
     result.loudness_range_lu = summary.loudness_range_lu;
     // Bounded event lists are cheap to copy; classification still borrows
     // the complete summary below.

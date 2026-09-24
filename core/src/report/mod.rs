@@ -61,7 +61,7 @@ pub fn build_csv(report: &FolderReport) -> String {
     out.push_str(
         "file,format,codec,badge,bitrate_kbps,sample_rate,declared_bits,real_bit_depth,\
          duration_s,size_bytes,status,upscaling,upsampling,transcoding,lattice_score,cutoff_hz,\
-         cutoff_ratio,channels,fake_stereo,phase_correlation,phase_inverted,clipped,clip_events,peak_dbfs,true_peak_dbtp,integrated_lufs,loudness_range_lu,dr_db,\
+         cutoff_ratio,channels,fake_stereo,phase_correlation,phase_inverted,clipped,clip_events,peak_dbfs,true_peak_dbtp,integrated_lufs,max_momentary_lufs,momentary_max_start_s,max_short_term_lufs,short_term_max_start_s,loudness_range_lu,dr_db,\
          md5,bit_depth_method,stored_bits,balance_right_minus_left_db,balance_silent_channel,hf_side_to_mid_db,hf_reference_side_to_mid_db,hf_narrowed_block_fraction,hf_stereo_narrowed,suspected_clicks,suspected_dropouts,click_locations,dropout_locations,modified_unix,dc_offset_max_abs,dc_offset_channel_means,",
     );
     out.push_str(&phase::headers().join(","));
@@ -136,6 +136,10 @@ pub fn build_csv(report: &FolderReport) -> String {
             f.integrated_lufs
                 .map(|v| format!("{v:.1}"))
                 .unwrap_or_default(),
+            opt(f.loudness_peaks.and_then(|p| p.momentary).map(|p| p.lufs)),
+            opt(f.loudness_peaks.and_then(|p| p.momentary).map(|p| p.start_secs)),
+            opt(f.loudness_peaks.and_then(|p| p.short_term).map(|p| p.lufs)),
+            opt(f.loudness_peaks.and_then(|p| p.short_term).map(|p| p.start_secs)),
             f.loudness_range_lu
                 .map(|v| format!("{v:.1}"))
                 .unwrap_or_default(),

@@ -66,6 +66,26 @@ fn mixed_frequency_loudness_matches_ffmpeg_for_mono_and_stereo() {
                     .expect("FFmpeg summary field")
             };
             let integrated = meter.integrated_lufs().unwrap();
+            let peaks = meter.peaks().unwrap();
+            let reference_max = |label: &str| -> f32 {
+                stderr
+                    .lines()
+                    .filter_map(|line| {
+                        line.split_once(label)?
+                            .1
+                            .split_whitespace()
+                            .next()?
+                            .parse::<f32>()
+                            .ok()
+                    })
+                    .filter(|value| value.is_finite())
+                    .reduce(f32::max)
+                    .expect("FFmpeg M/S updates")
+            };
+            let momentary = peaks.momentary.unwrap().lufs;
+            let short_term = peaks.short_term.unwrap().lufs;
+            let reference_m = reference_max(" M:");
+            let reference_s = reference_max(" S:");
             let range = meter.loudness_range_lu().unwrap();
             let reference_integrated = reading("I:");
             let reference_range = reading("LRA:");
@@ -74,6 +94,17 @@ fn mixed_frequency_loudness_matches_ffmpeg_for_mono_and_stereo() {
             // alignment and histogram resolution differ between meters.
             assert!((integrated - reference_integrated).abs() <= 0.1);
             assert!((range - reference_range).abs() <= 1.0);
+            // These sustained levels have many complete windows at their maxima.
+            // FFmpeg logs at 10 Hz; our peak hold checks every decoded frame.
+            assert!(
+                (momentary - reference_m).abs() <= 0.1,
+                "Max M: {momentary} vs {reference_m}"
+            );
+            assert!(
+                (short_term - reference_s).abs() <= 0.1,
+                "Max S: {short_term} vs {reference_s}"
+            );
+            println!("Max M {momentary:.3} vs {reference_m:.1}; Max S {short_term:.3} vs {reference_s:.1} LUFS");
         }
     }
 }

@@ -177,6 +177,9 @@ pub struct FileAnalysis {
     /// files, unsupported channel layouts and older saved reports.
     #[serde(default)]
     pub integrated_lufs: Option<f32>,
+    /// Ungated maximum momentary/short-term loudness and real-window positions.
+    #[serde(default)]
+    pub loudness_peaks: Option<crate::analysis::loudness_peaks::LoudnessPeaks>,
     /// EBU Tech 3342 loudness range in LU. Absent for silence, very short
     /// files, unsupported channel layouts and older saved reports.
     #[serde(default)]

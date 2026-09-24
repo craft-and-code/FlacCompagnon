@@ -7,6 +7,7 @@ const { outputFiles } = await build({
   stdin: {
     contents: `export { ALL_COLUMNS } from "./src/components/resultColumns";
       export { sortFiles } from "./src/components/tableSort";
+      export { reconcile } from "./src/components/useColumnPrefs";
       export { renderToStaticMarkup } from "react-dom/server";`,
     resolveDir: process.cwd(),
   },
@@ -15,10 +16,48 @@ const { outputFiles } = await build({
   // React's server renderer uses node built-ins via require.
   banner: { js: 'import { createRequire } from "node:module"; const require = createRequire(process.cwd() + "/package.json");' },
 });
-const { ALL_COLUMNS, sortFiles, renderToStaticMarkup } = await import(
+const { ALL_COLUMNS, sortFiles, renderToStaticMarkup, reconcile } = await import(
   `data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString("base64")}`
 );
 const render = (key, file) => renderToStaticMarkup(ALL_COLUMNS.find((c) => c.key === key).render(file, null));
+
+test("loudness maxima are inserted after LUFS even with existing preferences, then stay movable", () => {
+  const keys = ALL_COLUMNS.map((c) => c.key);
+  const at = keys.indexOf("loudness");
+  assert.deepEqual(keys.slice(at, at + 4), ["loudness", "momentary", "shortTerm", "lra"]);
+  const old = [...keys.filter((key) => !["momentary", "shortTerm", "loudness"].includes(key)), "loudness"];
+  const state = reconcile({ order: old, hidden: ["lra"] });
+  assert.deepEqual(state.order, [...old, "momentary", "shortTerm"]);
+  assert.equal(state.hidden.has("momentary"), false);
+  assert.equal(state.hidden.has("shortTerm"), false);
+  assert.equal(state.hidden.has("lra"), true);
+  const moved = ["shortTerm", ...state.order.filter((key) => key !== "shortTerm")];
+  assert.deepEqual(reconcile({ order: moved, hidden: ["momentary"] }).order, moved);
+  assert.equal(reconcile({ order: moved, hidden: ["momentary"] }).hidden.has("momentary"), true);
+});
+
+test("loudness maxima show numeric LUFS and window locations with independent availability", () => {
+  const files = [
+    { file_name: "old" },
+    { file_name: "quiet", loudness_peaks: { momentary: { lufs: -80, start_secs: 0.5 }, short_term: null } },
+    { file_name: "loud", loudness_peaks: { momentary: { lufs: -10, start_secs: 1 }, short_term: { lufs: -17, start_secs: 2 } } },
+    { file_name: "zero", loudness_peaks: { momentary: { lufs: 0, start_secs: 0 }, short_term: { lufs: 0, start_secs: 0 } } },
+  ];
+  for (const column of ["momentary", "shortTerm"]) {
+    assert.match(render(column, files[0]), />—</);
+    assert.match(render(column, files[3]), />0\.0</);
+  }
+  assert.match(render("momentary", files[1]), />-80\.0</);
+  assert.match(render("momentary", files[1]), /0\.500–0\.900 s/);
+  assert.match(render("momentary", files[1]), /ungated/);
+  assert.match(render("shortTerm", files[1]), />—</);
+  assert.match(render("shortTerm", files[2]), /2\.000–5\.000 s/);
+  const names = (column, direction) => sortFiles(files, { column, direction }).map((f) => f.file_name);
+  assert.deepEqual(names("momentary", "asc"), ["quiet", "loud", "zero", "old"]);
+  assert.deepEqual(names("momentary", "desc"), ["zero", "loud", "quiet", "old"]);
+  assert.deepEqual(names("shortTerm", "asc"), ["loud", "zero", "old", "quiet"]);
+  assert.deepEqual(names("shortTerm", "desc"), ["zero", "loud", "old", "quiet"]);
+});
 
 test("local and band phase expose distinct signed minima, locations and coverage", () => {
   const summary = (minimum) => ({ correlation: 0.4, minimum_correlation: minimum, minimum_start_secs: 2.5, opposed_fraction: 0.25, eligible_windows: 12 });

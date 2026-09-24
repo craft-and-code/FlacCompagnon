@@ -60,6 +60,16 @@ export interface PhaseSummary {
   eligible_windows: number;
 }
 
+export interface LoudnessPeak {
+  lufs: number;
+  start_secs: number;
+}
+
+export interface LoudnessPeaks {
+  momentary: LoudnessPeak | null;
+  short_term: LoudnessPeak | null;
+}
+
 export interface BandPhase {
   low_hz: number;
   high_hz: number;
@@ -134,6 +144,7 @@ export interface FileAnalysis {
   dr_db: number | null;
   // Older JSON reports omit this measurement.
   integrated_lufs?: number | null;
+  loudness_peaks?: LoudnessPeaks | null;
   loudness_range_lu?: number | null;
   discontinuities?: DiscontinuityAnalysis | null;
   flac_md5: FlacMd5Status | null;

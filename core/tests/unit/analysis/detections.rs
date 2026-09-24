@@ -50,6 +50,7 @@ fn summ(
         bit_depth_evidence: None,
         dr_db: None,
         integrated_lufs: None,
+        loudness_peaks: None,
         loudness_range_lu: None,
         discontinuities: None,
         mdct_cutoff_ratio: mcr,

@@ -219,6 +219,11 @@ export function phaseCorrelationLabel(value: number): string {
   return Number(value.toFixed(3)).toFixed(3);
 }
 
+/// Shared availability for loudness maximum cells, numeric sorting and search.
+export function loudnessPeakValue(peak: { lufs: number; start_secs: number } | null | undefined): number | null {
+  return peak && Number.isFinite(peak.lufs) && Number.isFinite(peak.start_secs) && peak.start_secs >= 0 ? peak.lufs : null;
+}
+
 /// The table already identifies the metric in its header; cells need only the count.
 export function discontinuityCount(summary: { count: number } | null | undefined): string {
   return summary ? String(summary.count) : "—";
@@ -356,6 +361,8 @@ export function fileSearchFields(f: FileAnalysis, tag?: TagSet | null): string[]
   const dc = dcOffsetMagnitude(f.dc_offset);
   const localPhase = localPhaseMinimum(f.local_phase, "local");
   const bandPhase = localPhaseMinimum(f.local_phase, "bands");
+  const momentary = loudnessPeakValue(f.loudness_peaks?.momentary);
+  const shortTerm = loudnessPeakValue(f.loudness_peaks?.short_term);
   const parts = [
     f.file_name,
     f.format,
@@ -370,6 +377,8 @@ export function fileSearchFields(f: FileAnalysis, tag?: TagSet | null): string[]
     `${stereoLabel(f)}${f.fake_stereo ? " fake stereo" : ""}${f.phase_inverted ? " inverted polarity phase" : ""}`,
     localPhase == null ? "" : `${phaseCorrelationLabel(localPhase)} local phase`,
     bandPhase == null ? "" : `${phaseCorrelationLabel(bandPhase)} band phase`,
+    momentary == null ? "" : `${momentary.toFixed(1)} LUFS-M max momentary loudness`,
+    shortTerm == null ? "" : `${shortTerm.toFixed(1)} LUFS-S max short-term loudness`,
     f.stereo_balance ? `${stereoBalanceLabel(f.stereo_balance)} balance` : "",
     dc != null ? `${dcOffsetPercent(dc)}% dc offset` : "",
     f.high_frequency_stereo

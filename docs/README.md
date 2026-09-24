@@ -20,6 +20,8 @@ The app decodes a file once and feeds the decoded frames to streaming measuremen
 | Level                  | Inter-sample peak             | True peak in dBTP                            | [True peak](true-peak.md)                         |
 | Dynamics               | Loud-passage crest factor     | DR                                           | [Dynamic range](dynamic-range.md)                 |
 | Loudness               | Programme loudness            | Integrated LUFS                              | [Integrated loudness](integrated-loudness.md)     |
+| Loudness               | Maximum momentary loudness    | LUFS-M max                                   | [Momentary loudness](momentary-loudness.md)       |
+| Loudness               | Maximum short-term loudness   | LUFS-S max                                   | [Short-term loudness](short-term-loudness.md)     |
 | Loudness               | Loudness variation            | LRA in LU                                    | [Loudness range](loudness-range.md)               |
 | Restoration cue        | Short discontinuities         | Impulses count and locations                 | [Impulses](impulses.md)                           |
 | Restoration cue        | Exact-zero gaps               | Dropouts count and locations                 | [Dropouts](dropouts.md)                           |

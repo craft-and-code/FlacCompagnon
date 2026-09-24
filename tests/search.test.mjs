@@ -46,6 +46,17 @@ test("integrated loudness is searchable, while older reports remain usable", () 
   assert.equal(matchesSearch(fileSearchFields(sampleFile), "lufs"), false);
 });
 
+test("momentary and short-term loudness maxima are searchable independently", () => {
+  const fields = fileSearchFields({ ...sampleFile, loudness_peaks: {
+    momentary: { lufs: -9.4, start_secs: 2 }, short_term: { lufs: -17, start_secs: 1 },
+  } });
+  assert.equal(matchesSearch(fields, "-9.4 LUFS-M max"), true);
+  assert.equal(matchesSearch(fields, "-17.0 LUFS-S max"), true);
+  assert.equal(matchesSearch(fields, "momentary"), true);
+  assert.equal(matchesSearch(fields, "short-term"), true);
+  assert.equal(matchesSearch(fileSearchFields(sampleFile), "LUFS-M"), false);
+});
+
 test("DC offset is searchable in displayed percent while old reports stay absent", () => {
   const fields = fileSearchFields({ ...sampleFile, dc_offset: { channel_means: [0.001, -0.002], max_abs: 0.002 } });
   assert.equal(matchesSearch(fields, "0.200%"), true);
