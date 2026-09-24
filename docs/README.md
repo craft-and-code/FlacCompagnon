@@ -14,6 +14,7 @@ The app decodes a file once and feeds the decoded frames to streaming measuremen
 | Channel relationship   | L/R polarity                  | Correlation and polarity indication          | [Stereo polarity](stereo-polarity.md)             |
 | Channel relationship   | L/R level                     | Balance                                      | [Stereo balance](stereo-balance.md)               |
 | Channel relationship   | High-frequency stereo width   | HF Stereo                                    | [High-frequency stereo](high-frequency-stereo.md) |
+| Level                  | Mean displacement from zero   | DC (%)                                       | [DC offset](dc-offset.md)                         |
 | Level                  | Full-scale clipping           | Clip events and clipped samples              | [Clipping](clipping.md)                           |
 | Level                  | Inter-sample peak             | True peak in dBTP                            | [True peak](true-peak.md)                         |
 | Dynamics               | Loud-passage crest factor     | DR                                           | [Dynamic range](dynamic-range.md)                 |

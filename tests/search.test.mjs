@@ -46,6 +46,14 @@ test("integrated loudness is searchable, while older reports remain usable", () 
   assert.equal(matchesSearch(fileSearchFields(sampleFile), "lufs"), false);
 });
 
+test("DC offset is searchable in displayed percent while old reports stay absent", () => {
+  const fields = fileSearchFields({ ...sampleFile, dc_offset: { channel_means: [0.001, -0.002], max_abs: 0.002 } });
+  assert.equal(matchesSearch(fields, "0.200%"), true);
+  assert.equal(matchesSearch(fields, "dc offset"), true);
+  assert.equal(matchesSearch(fileSearchFields(sampleFile), "dc offset"), false);
+  assert.equal(matchesSearch(fileSearchFields({ ...sampleFile, dc_offset: { channel_means: [0], max_abs: 0 } }), "0.000%"), true);
+});
+
 test("balance is searchable by direction, amount and silent channel", () => {
   const fields = fileSearchFields({ ...sampleFile, stereo_balance: { state: "Measured", right_minus_left_db: -6.0206 } });
   assert.equal(matchesSearch(fields, "L +6.0 dB"), true);

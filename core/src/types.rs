@@ -154,6 +154,10 @@ pub struct FileAnalysis {
     /// Missing from mono, unsupported-rate, silent and older reports.
     #[serde(default)]
     pub high_frequency_stereo: Option<crate::analysis::intensity_stereo::HighFrequencyStereo>,
+    /// Whole-stream means per decoded channel, including silence. Absent for
+    /// empty/invalid/unsupported streams, decode failures and older reports.
+    #[serde(default)]
+    pub dc_offset: Option<crate::analysis::dc_offset::DcOffset>,
     /// Verified quality badge: `Some("Hi-Res")` for > 48 kHz or > 16-bit PCM,
     /// `Some("DSD64")` etc. for DSD — granted only when no detection
     /// invalidates the claim (no upscaling/upsampling/transcoding).

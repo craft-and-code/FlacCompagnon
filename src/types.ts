@@ -46,6 +46,12 @@ export interface HighFrequencyStereo {
   narrowed: boolean;
 }
 
+export interface DcOffset {
+  // Normalized amplitude means in decoded channel order; multiply by 100 for %.
+  channel_means: number[];
+  max_abs: number;
+}
+
 export interface DiscontinuityEvent {
   channel: number;
   start_secs: number;
@@ -99,6 +105,7 @@ export interface FileAnalysis {
   phase_inverted?: boolean | null;
   stereo_balance?: StereoBalance | null;
   high_frequency_stereo?: HighFrequencyStereo | null;
+  dc_offset?: DcOffset | null;
   badge: string | null;
   clipping: ClippingInfo;
   dr_db: number | null;

@@ -29,6 +29,7 @@ use std::sync::Arc;
 
 use rustfft::{num_complex::Complex, Fft, FftPlanner};
 
+use super::dc_offset::{DcOffset, DcOffsetMeter};
 use super::discontinuities::{DiscontinuityAnalysis, DiscontinuityDetector};
 use super::intensity_stereo::{HighFrequencyStereo, HighFrequencyStereoMeter};
 use super::mdct::{Mdct, AAC_N};
@@ -86,6 +87,8 @@ pub struct AnalysisSummary {
     pub stereo_balance: Option<super::stereo::StereoBalance>,
     /// High-frequency Side/Mid measurement for qualifying stereo streams.
     pub high_frequency_stereo: Option<HighFrequencyStereo>,
+    /// Whole-stream mean measured independently on each channel.
+    pub dc_offset: Option<DcOffset>,
     /// The bit depth actually used by the samples, when it could be
     /// determined from an integer PCM source (`None` for float sources).
     pub real_bit_depth: Option<u32>,
@@ -147,6 +150,7 @@ pub struct StreamAnalyzer {
     loudness: Option<LoudnessMeter>,
     discontinuities: Option<DiscontinuityDetector>,
     high_frequency_stereo: Option<HighFrequencyStereoMeter>,
+    dc_offset: Option<DcOffsetMeter>,
 
     // --- stereo relationship ---
     diff_energy: f64,
@@ -200,6 +204,7 @@ impl StreamAnalyzer {
             loudness: LoudnessMeter::new(sample_rate, channels),
             discontinuities: DiscontinuityDetector::new(sample_rate, channels),
             high_frequency_stereo: HighFrequencyStereoMeter::new(sample_rate, channels),
+            dc_offset: DcOffsetMeter::new(channels),
             diff_energy: 0.0,
             l_energy: 0.0,
             r_energy: 0.0,
@@ -227,6 +232,9 @@ impl StreamAnalyzer {
     /// optionally accompanied by the raw integer sample values for the same
     /// frame (used for effective bit-depth estimation).
     pub fn push_frame(&mut self, samples: &[f32], int_samples: Option<&[i32]>) {
+        if let Some(dc_offset) = &mut self.dc_offset {
+            dc_offset.push_frame(samples);
+        }
         if samples.is_empty() {
             return;
         }
@@ -478,6 +486,7 @@ impl StreamAnalyzer {
                 None
             },
             high_frequency_stereo,
+            dc_offset: self.dc_offset.take().and_then(DcOffsetMeter::finish),
             real_bit_depth,
             bit_depth_evidence,
             dr_db,

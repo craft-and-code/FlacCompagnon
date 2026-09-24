@@ -20,6 +20,25 @@ const { ALL_COLUMNS, sortFiles, renderToStaticMarkup } = await import(
 );
 const render = (key, file) => renderToStaticMarkup(ALL_COLUMNS.find((c) => c.key === key).render(file, null));
 
+test("DC means retain channel signs while the column sorts absolute magnitudes", () => {
+  const files = [
+    { file_name: "old" },
+    { file_name: "small", dc_offset: { channel_means: [0.001, -0.002], max_abs: 0.002 } },
+    { file_name: "large", dc_offset: { channel_means: [-0.1], max_abs: 0.1 } },
+    { file_name: "zero", dc_offset: { channel_means: [0, 0], max_abs: 0 } },
+  ];
+  const names = (direction) => sortFiles(files, { column: "dcOffset", direction }).map((f) => f.file_name);
+  assert.deepEqual(names("asc"), ["zero", "small", "large", "old"]);
+  assert.deepEqual(names("desc"), ["large", "small", "zero", "old"]);
+  assert.equal(ALL_COLUMNS.find((c) => c.key === "dcOffset").label, "DC (%)");
+  assert.match(render("dcOffset", files[1]), />0\.200</);
+  assert.match(render("dcOffset", files[1]), /Ch 1: \+0\.100%/);
+  assert.match(render("dcOffset", files[1]), /Ch 2: -0\.200%/);
+  assert.match(render("dcOffset", files[3]), />0\.000</);
+  assert.match(render("dcOffset", files[0]), />—</);
+  assert.doesNotMatch(render("dcOffset", { dc_offset: { channel_means: [-1e-10], max_abs: 1e-10 } }), /-0\.000/);
+});
+
 test("balance sorts from left to right, with absent results last in both directions", () => {
   const files = [
     { file_name: "old" },

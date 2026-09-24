@@ -196,6 +196,17 @@ export function stereoBalanceLabel(balance: FileAnalysis["stereo_balance"]): str
   return magnitude === "0.0" ? "0.0 dB" : `${difference < 0 ? "L" : "R"} +${magnitude} dB`;
 }
 
+/// Missing measurements stay unranked in the table and absent from search.
+export function dcOffsetMagnitude(dc: FileAnalysis["dc_offset"]): number | null {
+  return dc && Number.isFinite(dc.max_abs) && dc.max_abs >= 0 ? dc.max_abs : null;
+}
+
+/// Shared percent precision for cells, tooltips and search; suppress negative zero.
+export function dcOffsetPercent(value: number, signed = false): string {
+  const rounded = Number((value * 100).toFixed(3));
+  return `${signed && rounded > 0 ? "+" : ""}${rounded.toFixed(3)}`;
+}
+
 /// The table already identifies the metric in its header; cells need only the count.
 export function discontinuityCount(summary: { count: number } | null | undefined): string {
   return summary ? String(summary.count) : "—";
@@ -330,6 +341,7 @@ function tagSearchFields(tag: TagSet | null | undefined): string[] {
 /// Searchable row values and embedded tags, kept as individual fields. A row
 /// is searchable by its analysis data while its tags load, then by both.
 export function fileSearchFields(f: FileAnalysis, tag?: TagSet | null): string[] {
+  const dc = dcOffsetMagnitude(f.dc_offset);
   const parts = [
     f.file_name,
     f.format,
@@ -343,6 +355,7 @@ export function fileSearchFields(f: FileAnalysis, tag?: TagSet | null): string[]
     `${f.channels}ch`,
     `${stereoLabel(f)}${f.fake_stereo ? " fake stereo" : ""}${f.phase_inverted ? " inverted polarity phase" : ""}`,
     f.stereo_balance ? `${stereoBalanceLabel(f.stereo_balance)} balance` : "",
+    dc != null ? `${dcOffsetPercent(dc)}% dc offset` : "",
     f.high_frequency_stereo
       ? `${f.high_frequency_stereo.side_to_mid_db.toFixed(1)} dB high frequency hf stereo${f.high_frequency_stereo.narrowed ? " narrowed intensity" : ""}`
       : "",

@@ -33,6 +33,7 @@ fn sample_file() -> FileAnalysis {
         phase_inverted: Some(false),
         stereo_balance: None,
         high_frequency_stereo: None,
+        dc_offset: None,
         badge: None,
         clipping: ClippingInfo {
             clipped_samples: 0,
@@ -191,6 +192,35 @@ fn csv_has_header_and_row() {
 }
 
 #[test]
+fn dc_offset_exports_normalized_signed_means_and_loads_older_reports() {
+    use crate::analysis::dc_offset::DcOffset;
+    let mut file = sample_file();
+    file.dc_offset = Some(DcOffset {
+        channel_means: vec![0.125, -0.25, 0.0], max_abs: 0.25,
+    });
+    file.channels = 3;
+    let report = FolderReport { root: "/music".into(), files: vec![file], has_flac: true };
+    let json = build_json(&report).unwrap();
+    assert_eq!(parse_json(&json).unwrap().files[0].dc_offset, report.files[0].dc_offset);
+    let csv = build_csv(&report);
+    let header: Vec<_> = csv.lines().next().unwrap().split(',').collect();
+    let row: Vec<_> = csv.lines().nth(1).unwrap().split(',').collect();
+    assert_eq!(header.len(), row.len());
+    for (column, value) in [("dc_offset_max_abs", "0.25"), ("dc_offset_channel_means", "0.125;-0.25;0")] {
+        assert_eq!(row[header.iter().position(|&key| key == column).unwrap()], value);
+    }
+    let mut old: serde_json::Value = serde_json::from_str(&json).unwrap();
+    old["report"]["files"][0].as_object_mut().unwrap().remove("dc_offset");
+    let restored = parse_json(&serde_json::to_string(&old).unwrap()).unwrap();
+    assert!(restored.files[0].dc_offset.is_none());
+    let old_csv = build_csv(&restored);
+    let old_row: Vec<_> = old_csv.lines().nth(1).unwrap().split(',').collect();
+    for column in ["dc_offset_max_abs", "dc_offset_channel_means"] {
+        assert_eq!(old_row[header.iter().position(|&key| key == column).unwrap()], "");
+    }
+}
+
+#[test]
 fn csv_exports_phase_measurements_in_their_own_columns() {
     let mut file = sample_file();
     file.phase_correlation = Some(-1.0);
@@ -294,6 +324,7 @@ fn the_json_carries_every_analysis_field() {
         "phase_inverted",
         "stereo_balance",
         "high_frequency_stereo",
+        "dc_offset",
         "badge",
         "clipping",
         "dr_db",

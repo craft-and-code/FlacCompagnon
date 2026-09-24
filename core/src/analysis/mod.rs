@@ -36,6 +36,7 @@
 pub mod analyzer;
 pub mod bitdepth;
 pub mod clipping;
+pub mod dc_offset;
 pub mod detections;
 pub mod discontinuities;
 pub mod intensity_stereo;

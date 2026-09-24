@@ -26,6 +26,7 @@ import type { FileAnalysis, TagSet } from "../types";
 import type { SortColumn } from "./tableSort";
 import { HighFrequencyStereoCell } from "./HighFrequencyStereoCell";
 import { DiscontinuityCell } from "./DiscontinuityCell";
+import { DcOffsetCell } from "./DcOffsetCell";
 import { fmtBitrate, fmtCutoff, fmtDuration, fmtModified, fmtSize } from "../format";
 import {
   ClippingCell,
@@ -58,6 +59,7 @@ export type ColumnKey =
   | "stereo"
   | "balance"
   | "hfStereo"
+  | "dcOffset"
   | "clicks"
   | "dropouts"
   | "clipping"
@@ -233,6 +235,13 @@ export const ALL_COLUMNS: ColumnDef[] = [
     sort: "hfStereo",
     defaultVisible: true,
     render: (f) => <HighFrequencyStereoCell f={f} />,
+  },
+  {
+    key: "dcOffset",
+    label: "DC (%)",
+    sort: "dcOffset",
+    defaultVisible: true,
+    render: (f) => <DcOffsetCell f={f} />,
   },
   {
     key: "clicks",
