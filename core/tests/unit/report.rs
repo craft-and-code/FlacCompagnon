@@ -59,55 +59,104 @@ fn sample_file() -> FileAnalysis {
 
 #[test]
 fn discontinuity_counts_and_locations_survive_json_and_csv() {
-    use crate::analysis::discontinuities::{DiscontinuityAnalysis, DiscontinuityEvent, EventSummary};
+    use crate::analysis::discontinuities::{
+        DiscontinuityAnalysis, DiscontinuityEvent, EventSummary,
+    };
     let mut file = sample_file();
     file.discontinuities = Some(DiscontinuityAnalysis {
-        clicks: EventSummary { count: 35, events: vec![DiscontinuityEvent {
-            channel: 2, start_secs: 1.25, duration_secs: 0.0001,
-        }] },
+        clicks: EventSummary {
+            count: 35,
+            events: vec![DiscontinuityEvent {
+                channel: 2,
+                start_secs: 1.25,
+                duration_secs: 0.0001,
+            }],
+        },
         dropouts: EventSummary::default(),
     });
-    let report = FolderReport { root: "/music".into(), files: vec![file], has_flac: true };
+    let report = FolderReport {
+        root: "/music".into(),
+        files: vec![file],
+        has_flac: true,
+    };
     let json = build_json(&report).unwrap();
     let read = parse_json(&json).unwrap();
-    assert_eq!(read.files[0].discontinuities, report.files[0].discontinuities);
+    assert_eq!(
+        read.files[0].discontinuities,
+        report.files[0].discontinuities
+    );
     let csv = build_csv(&report);
     let lines: Vec<_> = csv.lines().collect();
     let header: Vec<_> = lines[0].split(',').collect();
     let row: Vec<_> = lines[1].split(',').collect();
     assert_eq!(header.len(), row.len());
-    for (name, expected) in [("suspected_clicks", "35"), ("suspected_dropouts", "0"),
-        ("click_locations", "ch2@1.250000s/0.000100s"), ("dropout_locations", "")] {
-        assert_eq!(row[header.iter().position(|&value| value == name).unwrap()], expected);
+    for (name, expected) in [
+        ("suspected_clicks", "35"),
+        ("suspected_dropouts", "0"),
+        ("click_locations", "ch2@1.250000s/0.000100s"),
+        ("dropout_locations", ""),
+    ] {
+        assert_eq!(
+            row[header.iter().position(|&value| value == name).unwrap()],
+            expected
+        );
     }
     let mut old: serde_json::Value = serde_json::from_str(&json).unwrap();
-    old["report"]["files"][0].as_object_mut().unwrap().remove("discontinuities");
+    old["report"]["files"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("discontinuities");
     let old = parse_json(&serde_json::to_string(&old).unwrap()).unwrap();
     assert_eq!(old.files[0].discontinuities, None);
     let old_csv = build_csv(&old);
     let old_row: Vec<_> = old_csv.lines().nth(1).unwrap().split(',').collect();
-    assert_eq!(old_row[header.iter().position(|&v| v == "suspected_clicks").unwrap()], "");
+    assert_eq!(
+        old_row[header
+            .iter()
+            .position(|&v| v == "suspected_clicks")
+            .unwrap()],
+        ""
+    );
 }
 
 #[test]
 fn balance_exports_preserve_direction_and_silence_without_infinite_numbers() {
     use crate::analysis::stereo::StereoBalance;
     for (balance, db, silent) in [
-        (Some(StereoBalance::Measured { right_minus_left_db: -6.0206 }), "-6.02", ""),
-        (Some(StereoBalance::Measured { right_minus_left_db: 6.0206 }), "6.02", ""),
+        (
+            Some(StereoBalance::Measured {
+                right_minus_left_db: -6.0206,
+            }),
+            "-6.02",
+            "",
+        ),
+        (
+            Some(StereoBalance::Measured {
+                right_minus_left_db: 6.0206,
+            }),
+            "6.02",
+            "",
+        ),
         (Some(StereoBalance::LeftSilent), "", "left"),
         (Some(StereoBalance::RightSilent), "", "right"),
         (None, "", ""),
     ] {
         let mut file = sample_file();
         file.stereo_balance = balance;
-        let report = FolderReport { root: "/music".into(), files: vec![file], has_flac: true };
+        let report = FolderReport {
+            root: "/music".into(),
+            files: vec![file],
+            has_flac: true,
+        };
         let csv = build_csv(&report);
         let lines: Vec<_> = csv.lines().collect();
         let header: Vec<_> = lines[0].split(',').collect();
         let row: Vec<_> = lines[1].split(',').collect();
         assert_eq!(header.len(), row.len());
-        for (column, expected) in [("balance_right_minus_left_db", db), ("balance_silent_channel", silent)] {
+        for (column, expected) in [
+            ("balance_right_minus_left_db", db),
+            ("balance_silent_channel", silent),
+        ] {
             let index = header.iter().position(|&name| name == column).unwrap();
             assert_eq!(row[index], expected);
         }
@@ -119,9 +168,16 @@ fn balance_exports_preserve_direction_and_silence_without_infinite_numbers() {
 
 #[test]
 fn older_json_without_balance_still_loads() {
-    let report = FolderReport { root: "/music".into(), files: vec![sample_file()], has_flac: true };
+    let report = FolderReport {
+        root: "/music".into(),
+        files: vec![sample_file()],
+        has_flac: true,
+    };
     let mut json: serde_json::Value = serde_json::from_str(&build_json(&report).unwrap()).unwrap();
-    json["report"]["files"][0].as_object_mut().unwrap().remove("stereo_balance");
+    json["report"]["files"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("stereo_balance");
     let read = parse_json(&serde_json::to_string(&json).unwrap()).unwrap();
     assert_eq!(read.files[0].stereo_balance, None);
 }
@@ -136,9 +192,16 @@ fn high_frequency_stereo_round_trips_and_exports_its_numeric_evidence() {
         narrowed_block_fraction: 0.8,
         narrowed: true,
     });
-    let report = FolderReport { root: "/music".into(), files: vec![file], has_flac: true };
+    let report = FolderReport {
+        root: "/music".into(),
+        files: vec![file],
+        has_flac: true,
+    };
     let json = build_json(&report).unwrap();
-    assert_eq!(parse_json(&json).unwrap().files[0].high_frequency_stereo, report.files[0].high_frequency_stereo);
+    assert_eq!(
+        parse_json(&json).unwrap().files[0].high_frequency_stereo,
+        report.files[0].high_frequency_stereo
+    );
     let csv = build_csv(&report);
     let mut lines = csv.lines();
     let header: Vec<_> = lines.next().unwrap().split(',').collect();
@@ -156,10 +219,23 @@ fn high_frequency_stereo_round_trips_and_exports_its_numeric_evidence() {
 
 #[test]
 fn older_json_without_high_frequency_stereo_still_loads() {
-    let report = FolderReport { root: "/music".into(), files: vec![sample_file()], has_flac: true };
+    let report = FolderReport {
+        root: "/music".into(),
+        files: vec![sample_file()],
+        has_flac: true,
+    };
     let mut json: serde_json::Value = serde_json::from_str(&build_json(&report).unwrap()).unwrap();
-    json["report"]["files"][0].as_object_mut().unwrap().remove("high_frequency_stereo");
-    assert_eq!(parse_json(&serde_json::to_string(&json).unwrap()).unwrap().files[0].high_frequency_stereo, None);
+    json["report"]["files"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("high_frequency_stereo");
+    assert_eq!(
+        parse_json(&serde_json::to_string(&json).unwrap())
+            .unwrap()
+            .files[0]
+            .high_frequency_stereo,
+        None
+    );
 }
 
 #[test]
@@ -198,27 +274,47 @@ fn dc_offset_exports_normalized_signed_means_and_loads_older_reports() {
     use crate::analysis::dc_offset::DcOffset;
     let mut file = sample_file();
     file.dc_offset = Some(DcOffset {
-        channel_means: vec![0.125, -0.25, 0.0], max_abs: 0.25,
+        channel_means: vec![0.125, -0.25, 0.0],
+        max_abs: 0.25,
     });
     file.channels = 3;
-    let report = FolderReport { root: "/music".into(), files: vec![file], has_flac: true };
+    let report = FolderReport {
+        root: "/music".into(),
+        files: vec![file],
+        has_flac: true,
+    };
     let json = build_json(&report).unwrap();
-    assert_eq!(parse_json(&json).unwrap().files[0].dc_offset, report.files[0].dc_offset);
+    assert_eq!(
+        parse_json(&json).unwrap().files[0].dc_offset,
+        report.files[0].dc_offset
+    );
     let csv = build_csv(&report);
     let header: Vec<_> = csv.lines().next().unwrap().split(',').collect();
     let row: Vec<_> = csv.lines().nth(1).unwrap().split(',').collect();
     assert_eq!(header.len(), row.len());
-    for (column, value) in [("dc_offset_max_abs", "0.25"), ("dc_offset_channel_means", "0.125;-0.25;0")] {
-        assert_eq!(row[header.iter().position(|&key| key == column).unwrap()], value);
+    for (column, value) in [
+        ("dc_offset_max_abs", "0.25"),
+        ("dc_offset_channel_means", "0.125;-0.25;0"),
+    ] {
+        assert_eq!(
+            row[header.iter().position(|&key| key == column).unwrap()],
+            value
+        );
     }
     let mut old: serde_json::Value = serde_json::from_str(&json).unwrap();
-    old["report"]["files"][0].as_object_mut().unwrap().remove("dc_offset");
+    old["report"]["files"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("dc_offset");
     let restored = parse_json(&serde_json::to_string(&old).unwrap()).unwrap();
     assert!(restored.files[0].dc_offset.is_none());
     let old_csv = build_csv(&restored);
     let old_row: Vec<_> = old_csv.lines().nth(1).unwrap().split(',').collect();
     for column in ["dc_offset_max_abs", "dc_offset_channel_means"] {
-        assert_eq!(old_row[header.iter().position(|&key| key == column).unwrap()], "");
+        assert_eq!(
+            old_row[header.iter().position(|&key| key == column).unwrap()],
+            ""
+        );
     }
 }
 
@@ -254,9 +350,15 @@ fn csv_exports_integrated_loudness_without_a_unit_suffix() {
     let mut lines = csv.lines();
     let header: Vec<_> = lines.next().expect("header").split(',').collect();
     let row: Vec<_> = lines.next().expect("file row").split(',').collect();
-    let at = header.iter().position(|&name| name == "integrated_lufs").expect("LUFS column");
+    let at = header
+        .iter()
+        .position(|&name| name == "integrated_lufs")
+        .expect("LUFS column");
     assert_eq!(row[at], "-23.0");
-    let at = header.iter().position(|&name| name == "loudness_range_lu").expect("LRA column");
+    let at = header
+        .iter()
+        .position(|&name| name == "loudness_range_lu")
+        .expect("LRA column");
     assert_eq!(row[at], "10.0");
 }
 
@@ -377,7 +479,10 @@ fn older_json_without_integrated_lufs_still_loads() {
         has_flac: true,
     };
     let mut json: serde_json::Value = serde_json::from_str(&build_json(&report).unwrap()).unwrap();
-    json["report"]["files"][0].as_object_mut().unwrap().remove("integrated_lufs");
+    json["report"]["files"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("integrated_lufs");
     let read = parse_json(&serde_json::to_string(&json).unwrap()).unwrap();
     assert_eq!(read.files[0].integrated_lufs, None);
 }
@@ -390,7 +495,10 @@ fn older_json_without_loudness_range_still_loads() {
         has_flac: true,
     };
     let mut json: serde_json::Value = serde_json::from_str(&build_json(&report).unwrap()).unwrap();
-    json["report"]["files"][0].as_object_mut().unwrap().remove("loudness_range_lu");
+    json["report"]["files"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("loudness_range_lu");
     let read = parse_json(&serde_json::to_string(&json).unwrap()).unwrap();
     assert_eq!(read.files[0].loudness_range_lu, None);
 }

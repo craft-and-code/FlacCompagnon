@@ -137,9 +137,15 @@ pub fn build_csv(report: &FolderReport) -> String {
                 .map(|v| format!("{v:.1}"))
                 .unwrap_or_default(),
             opt(f.loudness_peaks.and_then(|p| p.momentary).map(|p| p.lufs)),
-            opt(f.loudness_peaks.and_then(|p| p.momentary).map(|p| p.start_secs)),
+            opt(f
+                .loudness_peaks
+                .and_then(|p| p.momentary)
+                .map(|p| p.start_secs)),
             opt(f.loudness_peaks.and_then(|p| p.short_term).map(|p| p.lufs)),
-            opt(f.loudness_peaks.and_then(|p| p.short_term).map(|p| p.start_secs)),
+            opt(f
+                .loudness_peaks
+                .and_then(|p| p.short_term)
+                .map(|p| p.start_secs)),
             f.loudness_range_lu
                 .map(|v| format!("{v:.1}"))
                 .unwrap_or_default(),
@@ -164,10 +170,20 @@ pub fn build_csv(report: &FolderReport) -> String {
             discontinuity_locations(f.discontinuities.as_ref().map(|d| &d.clicks)),
             discontinuity_locations(f.discontinuities.as_ref().map(|d| &d.dropouts)),
             opt(f.modified_unix),
-            f.dc_offset.as_ref().map(|dc| dc.max_abs.to_string()).unwrap_or_default(),
-            f.dc_offset.as_ref().map(|dc| {
-                dc.channel_means.iter().map(ToString::to_string).collect::<Vec<_>>().join(";")
-            }).unwrap_or_default(),
+            f.dc_offset
+                .as_ref()
+                .map(|dc| dc.max_abs.to_string())
+                .unwrap_or_default(),
+            f.dc_offset
+                .as_ref()
+                .map(|dc| {
+                    dc.channel_means
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(";")
+                })
+                .unwrap_or_default(),
         ];
         row.extend(phase::values(f.local_phase.as_ref()));
         row.push(f.file_md5.clone().unwrap_or_default());
@@ -208,7 +224,7 @@ pub fn write_csv(dest: &Path, report: &FolderReport) -> std::io::Result<()> {
 ///
 /// # Complete, always
 ///
-/// Unlike the CSV, this is a full serialization of every [`FileAnalysis`]
+/// Unlike the CSV, this is a full serialization of every [`crate::FileAnalysis`]
 /// field, in the order the files are given (which is the table's display
 /// order — the frontend hands them over already sorted). **What the user has
 /// chosen to show or hide in the table has no effect here**: a hidden column's

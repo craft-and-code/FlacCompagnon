@@ -16,7 +16,10 @@ fn invalid_tail_does_not_report_loudness_of_only_the_valid_prefix() {
 fn lra_samples_at_least_ten_times_per_second_at_11025_hz() {
     let mut meter = LoudnessMeter::new(11_025, 2).unwrap();
     push_tone(&mut meter, 11_025, 4.0, -23.0, 0);
-    assert!(meter.short_powers.len() >= 11, "one initial window plus ten updates");
+    assert!(
+        meter.short_powers.len() >= 11,
+        "one initial window plus ten updates"
+    );
 }
 
 // EBU Tech 3341, Table 1: its test tones are a stereo 1 kHz sine with the

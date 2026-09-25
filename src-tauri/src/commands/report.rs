@@ -57,16 +57,16 @@ pub async fn save_report_json(dest: String, report: FolderReport) -> Result<Stri
 #[tauri::command]
 pub async fn save_playlist(
     dest: String,
-    entries: Vec<core::playlist::PlaylistEntry>,
-    format: core::playlist::PlaylistFormat,
+    entries: Vec<flaccompagnon_services::playlist::PlaylistEntry>,
+    format: flaccompagnon_services::playlist::PlaylistFormat,
 ) -> Result<String, String> {
     let ext = match format {
-        core::playlist::PlaylistFormat::Extended => "m3u8",
-        core::playlist::PlaylistFormat::Simple => "m3u",
+        flaccompagnon_services::playlist::PlaylistFormat::Extended => "m3u8",
+        flaccompagnon_services::playlist::PlaylistFormat::Simple => "m3u",
     };
     let out_path = stem_with_ext(&dest, ext)?;
 
-    let content = core::playlist::build_playlist(&entries, format);
+    let content = flaccompagnon_services::playlist::build_playlist(&entries, format);
     let written = out_path.to_string_lossy().to_string();
     tauri::async_runtime::spawn_blocking(move || {
         std::fs::write(&out_path, content).map_err(|e| e.to_string())

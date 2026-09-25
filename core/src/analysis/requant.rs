@@ -90,9 +90,15 @@ const SBAND_LO: usize = 5;
 const SBAND_HI: usize = 14;
 /// τ(s) for the analyzed short bands (same eq. 8, P = 0.005; K = 8/12/16).
 const TAU_SHORT: [f64; 9] = [
-    1.343215761580e-01, 1.343215761580e-01, 1.343215761580e-01,
-    3.358790501266e-01, 3.358790501266e-01, 3.358790501266e-01,
-    5.654492211732e-01, 5.654492211732e-01, 5.654492211732e-01,
+    1.343215761580e-01,
+    1.343215761580e-01,
+    1.343215761580e-01,
+    3.358790501266e-01,
+    3.358790501266e-01,
+    3.358790501266e-01,
+    5.654492211732e-01,
+    5.654492211732e-01,
+    5.654492211732e-01,
 ];
 
 /// Band range analyzed: skips the ten K=4 micro-bands (4 coefficients carry no
@@ -105,16 +111,45 @@ const BAND_HI: usize = 49;
 /// rounding-error energy dips below τ. Precomputed (they depend only on the
 /// fixed band widths K of the 44.1/48 kHz long-window scale-factor table).
 const TAU: [f64; 39] = [
-    1.343215761580e-01, 1.343215761580e-01, 1.343215761580e-01, 1.343215761580e-01,
-    1.343215761580e-01, 1.343215761580e-01, 1.343215761580e-01, 3.358790501266e-01,
-    3.358790501266e-01, 3.358790501266e-01, 3.358790501266e-01, 5.654492211732e-01,
-    5.654492211732e-01, 8.080635066858e-01, 8.080635066858e-01, 1.059440669626e+00,
-    1.059440669626e+00, 1.317412600469e+00, 1.317412600469e+00, 1.580601675300e+00,
-    1.580601675300e+00, 1.580601675300e+00, 1.580601675300e+00, 1.580601675300e+00,
-    1.580601675300e+00, 1.580601675300e+00, 1.580601675300e+00, 1.580601675300e+00,
-    1.580601675300e+00, 1.580601675300e+00, 1.580601675300e+00, 1.580601675300e+00,
-    1.580601675300e+00, 1.580601675300e+00, 1.580601675300e+00, 1.580601675300e+00,
-    1.580601675300e+00, 1.580601675300e+00, 6.118880248218e+00,
+    1.343215761580e-01,
+    1.343215761580e-01,
+    1.343215761580e-01,
+    1.343215761580e-01,
+    1.343215761580e-01,
+    1.343215761580e-01,
+    1.343215761580e-01,
+    3.358790501266e-01,
+    3.358790501266e-01,
+    3.358790501266e-01,
+    3.358790501266e-01,
+    5.654492211732e-01,
+    5.654492211732e-01,
+    8.080635066858e-01,
+    8.080635066858e-01,
+    1.059440669626e+00,
+    1.059440669626e+00,
+    1.317412600469e+00,
+    1.317412600469e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    1.580601675300e+00,
+    6.118880248218e+00,
 ];
 
 /// Scalefactor sweep: candidate count and relative bounds (fraction of the
@@ -417,9 +452,12 @@ fn short_frame_likelihood(
                     abs_band[i] = a;
                     y34_band[i] = a.powf(0.75);
                 }
-                if let Some(hit) =
-                    band_hit(&abs_band[..k], &y34_band[..k], TAU_SHORT[b - SBAND_LO], ybuf)
-                {
+                if let Some(hit) = band_hit(
+                    &abs_band[..k],
+                    &y34_band[..k],
+                    TAU_SHORT[b - SBAND_LO],
+                    ybuf,
+                ) {
                     scored += 1;
                     if hit {
                         hits += 1;
@@ -512,15 +550,15 @@ pub fn analyze_segment(left: &[f64], right: Option<&[f64]>) -> Option<RequantRes
         for &m in &COARSE_FRAMES {
             for (onset, best_l) in per_onset.iter_mut().enumerate() {
                 let start = onset + m * N;
-                let l = frame_likelihood(&mdct, win, &chans, start, &mut coefs, &mut ybuf)
-                    .max(short_frame_likelihood(&mdct_s, win_s, &chans, start, &mut coefs_s, &mut ybuf));
+                let l = frame_likelihood(&mdct, win, &chans, start, &mut coefs, &mut ybuf).max(
+                    short_frame_likelihood(&mdct_s, win_s, &chans, start, &mut coefs_s, &mut ybuf),
+                );
                 if l > *best_l {
                     *best_l = l;
                 }
             }
         }
-        let mut candidates: Vec<(f64, usize)> =
-            per_onset.iter().cloned().zip(0..N).collect();
+        let mut candidates: Vec<(f64, usize)> = per_onset.iter().cloned().zip(0..N).collect();
         candidates.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
         candidates.truncate(TOP_CANDIDATES);
 
@@ -533,8 +571,16 @@ pub fn analyze_segment(left: &[f64], right: Option<&[f64]>) -> Option<RequantRes
                 .filter(|&&m| onset + m * N + L <= chans[0].len())
                 .map(|&m| {
                     let start = onset + m * N;
-                    frame_likelihood(&mdct, win, &chans, start, &mut coefs, &mut ybuf)
-                        .max(short_frame_likelihood(&mdct_s, win_s, &chans, start, &mut coefs_s, &mut ybuf))
+                    frame_likelihood(&mdct, win, &chans, start, &mut coefs, &mut ybuf).max(
+                        short_frame_likelihood(
+                            &mdct_s,
+                            win_s,
+                            &chans,
+                            start,
+                            &mut coefs_s,
+                            &mut ybuf,
+                        ),
+                    )
                 })
                 .collect();
             if scores.len() < 3 {

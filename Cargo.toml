@@ -1,9 +1,11 @@
 # Cargo workspace for FlacCompagnon.
 #
 # `core`      -> pure Rust analysis library (no Tauri dependency, fully unit-testable)
+# `services`  -> editing, conversion, playlists, and relocation
+# `cli`       -> standalone analysis command
 # `src-tauri` -> the Tauri desktop application that wraps `core`
 [workspace]
-members = ["core", "src-tauri"]
+members = ["core", "services", "cli", "src-tauri"]
 resolver = "2"
 
 [workspace.package]

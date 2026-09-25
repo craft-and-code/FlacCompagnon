@@ -15,7 +15,7 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use flaccompagnon_core::convert::{self, ConvertSettings};
+use flaccompagnon_services::convert::{self, ConvertSettings};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 

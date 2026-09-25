@@ -13,8 +13,10 @@ A cross-platform desktop app (Rust + Tauri v2) that detects fake "lossless" audi
 core/                     Pure Rust analysis library. No Tauri dependency, fully unit-testable.
   src/decode/             One module per decode path (generic, FLAC+MD5, DSD, playback).
   src/dsd/                DSD container parsing + the spectral heuristics, kept apart.
+services/                 Tag editing, conversion, playlists, and relocation.
   src/tags/               Tag read/write; cover art in its own file.
-src-tauri/                The Tauri v2 desktop app wrapping `core`.
+cli/                      Standalone `flaccompagnon` analysis executable.
+src-tauri/                The Tauri v2 desktop app wrapping `core` and `services`.
   src/lib.rs              Wiring only: modules, run(), generate_handler!.
   src/commands/           One file per command domain.
   src/lookup/             Online tag lookup, one file per provider.
@@ -25,7 +27,7 @@ index.html                App shell only — see "index.html" below.
 site/                     The GitHub Pages marketing site (unrelated to the app build).
 ```
 
-The split is deliberate: anything that can be tested without a GUI belongs in `core`, so the analysis algorithms stay verifiable with `cargo test` alone.
+The split is deliberate: analysis and report types belong in `core`, while editing and conversion belong in `services`. Both remain verifiable with `cargo test` alone.
 
 ## Factor out shared behaviour, not just shared lines
 
@@ -114,7 +116,7 @@ What this rule is _not_: an instruction to unify things that merely look alike t
 - Every detection algorithm needs a unit test with independently derived ground truth (a reference encoder, a bit-exact replica, a known-good file) — never a test that just asserts whatever the implementation currently returns.
 - Every parser needs a malformed-input test. "It rejects garbage without panicking" is a behaviour, and it is the one that breaks first on real files.
 - A bug fixed is a test added, named after the symptom.
-- Keep test bodies out of `src/` files. Put a module's unit tests in the matching path under `core/tests/unit/` or `src-tauri/tests/unit/`, included with a `#[cfg(test)]` and `#[path = "..."] mod tests;` declaration in the source module. This keeps access to private code without mixing tests into production files. Cross-module ground-truth suites remain directly under `core/tests/`; frontend tests live in the root `tests/` directory.
+- Keep test bodies out of `src/` files. Put a module's unit tests in the matching path under that crate's `tests/unit/` directory, included with a `#[cfg(test)]` and `#[path = "..."] mod tests;` declaration in the source module. This keeps access to private code without mixing tests into production files. Cross-module ground-truth suites remain directly under `core/tests/`; frontend tests live in the root `tests/` directory.
 
 ## Testing and verification
 

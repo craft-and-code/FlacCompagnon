@@ -7,7 +7,7 @@
 
 use std::path::PathBuf;
 
-use flaccompagnon_core as core;
+use flaccompagnon_services as core;
 use serde::Serialize;
 
 use super::file_name;

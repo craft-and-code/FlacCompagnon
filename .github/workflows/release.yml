@@ -169,8 +169,64 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  cli:
+    name: CLI (${{ matrix.label }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            label: macOS-AppleSilicon
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            label: Linux-x86_64
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            label: Windows-x64
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+      - name: Build the standalone CLI
+        run: cargo build --release -p flaccompagnon-cli --target ${{ matrix.target }}
+      - name: Package the CLI
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          LABEL: ${{ matrix.label }}
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, tarfile, zipfile
+          target = os.environ["TARGET"]
+          label = os.environ["LABEL"]
+          binary = pathlib.Path("target") / target / "release" / ("flaccompagnon.exe" if label.startswith("Windows") else "flaccompagnon")
+          output = pathlib.Path("dist-cli")
+          output.mkdir(exist_ok=True)
+          version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+          stem = f"flaccompagnon_{version}_{label}"
+          if label.startswith("Windows"):
+              with zipfile.ZipFile(output / f"{stem}.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+                  archive.write(binary, binary.name)
+          else:
+              with tarfile.open(output / f"{stem}.tar.gz", "w:gz") as archive:
+                  archive.add(binary, arcname=binary.name)
+          PY
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.label }}
+          path: dist-cli/*
+          if-no-files-found: error
+          retention-days: 1
+
   publish:
-    needs: release
+    needs: [release, cli]
     runs-on: ubuntu-22.04
     steps:
       # Needed for the changelog step below: it walks the commit range since
@@ -180,7 +236,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Collect every platform's installers
+      - name: Collect every platform's installers and CLI archives
         uses: actions/download-artifact@v4
         with:
           path: dist-release
@@ -232,6 +288,9 @@ jobs:
           | **macOS** (Apple Silicon: M1/M2/M3/M4) | `..._macOS-AppleSilicon.dmg` — the installer |
           | **Linux** (any distro, 64-bit) | `..._Linux-x86_64.AppImage` — portable, just make it executable |
           | **Linux** (Debian / Ubuntu) | `..._Linux-x86_64.deb` — system package |
+
+          Each platform also has a standalone `flaccompagnon_<version>_<Platform>.tar.gz`
+          (or `.zip` on Windows). Extract it and run `flaccompagnon --help`.
 
           The macOS `.app.tar.gz` is the same app as the `.dmg`, just archived —
           use the `.dmg` unless you specifically want the raw bundle.

@@ -11,18 +11,35 @@ fn stereo_wav_balance_survives_decoding_with_correct_channel_direction() {
     use flaccompagnon_core::analysis::stereo::StereoBalance;
     let dir = tempfile::tempdir().unwrap();
     for (channels, left_gain, right_gain, expected) in [
-        (2, 2, 1, Some(StereoBalance::Measured { right_minus_left_db: -6.0206 })),
-        (2, 1, 2, Some(StereoBalance::Measured { right_minus_left_db: 6.0206 })),
+        (
+            2,
+            2,
+            1,
+            Some(StereoBalance::Measured {
+                right_minus_left_db: -6.0206,
+            }),
+        ),
+        (
+            2,
+            1,
+            2,
+            Some(StereoBalance::Measured {
+                right_minus_left_db: 6.0206,
+            }),
+        ),
         (2, 1, 0, Some(StereoBalance::RightSilent)),
         (2, 0, 1, Some(StereoBalance::LeftSilent)),
         (2, 0, 0, None),
         (1, 1, 1, None),
         (3, 1, 2, None),
     ] {
-        let path = dir.path().join(format!("balance-{channels}-{left_gain}-{right_gain}.wav"));
+        let path = dir
+            .path()
+            .join(format!("balance-{channels}-{left_gain}-{right_gain}.wav"));
         let mut samples = Vec::new();
         for n in 0..8_000 {
-            let sample = (8_000.0 * (2.0 * std::f64::consts::PI * 317.0 * n as f64 / 8_000.0).sin()) as i16;
+            let sample =
+                (8_000.0 * (2.0 * std::f64::consts::PI * 317.0 * n as f64 / 8_000.0).sin()) as i16;
             for channel in 0..channels {
                 samples.push(sample * if channel == 0 { left_gain } else { right_gain });
             }
@@ -31,7 +48,14 @@ fn stereo_wav_balance_survives_decoding_with_correct_channel_direction() {
         let result = analyze_file(&path, &ScanOptions::default());
         assert!(result.error.is_none(), "{:?}", result.error);
         match (result.stereo_balance, expected) {
-            (Some(StereoBalance::Measured { right_minus_left_db: actual }), Some(StereoBalance::Measured { right_minus_left_db: expected })) => {
+            (
+                Some(StereoBalance::Measured {
+                    right_minus_left_db: actual,
+                }),
+                Some(StereoBalance::Measured {
+                    right_minus_left_db: expected,
+                }),
+            ) => {
                 assert!((actual - expected).abs() < 0.001);
             }
             (actual, expected) => assert_eq!(actual, expected),
@@ -46,7 +70,13 @@ fn stereo_wav_balance_survives_decoding_with_correct_channel_direction() {
 /// around -140 dBFS — far below the detector floor — leaving a clean dead zone
 /// (16-bit noise would sit right at the threshold and mask it).
 fn band_limited_noise(n: usize, sr: u32, cutoff_hz: f32, seed: u64) -> Vec<i32> {
-    let mut spec = vec![Complex { re: 0.0f32, im: 0.0 }; n];
+    let mut spec = vec![
+        Complex {
+            re: 0.0f32,
+            im: 0.0
+        };
+        n
+    ];
     let cutoff_bin = ((cutoff_hz as f64 * n as f64 / sr as f64) as usize).min(n / 2);
     let mut rng = Lcg(seed);
     for k in 1..cutoff_bin {
@@ -55,7 +85,9 @@ fn band_limited_noise(n: usize, sr: u32, cutoff_hz: f32, seed: u64) -> Vec<i32> 
         spec[k] = Complex { re, im };
         spec[n - k] = Complex { re, im: -im }; // conjugate symmetry -> real output
     }
-    FftPlanner::<f32>::new().plan_fft_inverse(n).process(&mut spec);
+    FftPlanner::<f32>::new()
+        .plan_fft_inverse(n)
+        .process(&mut spec);
     let time: Vec<f32> = spec.iter().map(|c| c.re).collect();
     let peak = time.iter().fold(0f32, |m, &v| m.max(v.abs())).max(1e-6);
     let scale = 8_000_000.0 / peak; // ~ -0.4 dBFS in the 24-bit range
@@ -76,7 +108,13 @@ fn band_limited_noise(n: usize, sr: u32, cutoff_hz: f32, seed: u64) -> Vec<i32> 
 /// Quiet, but present. That is the signal the removal of the spectral
 /// heuristics was meant to stop accusing.
 fn dark_master_noise(n: usize, sr: u32, knee_hz: f32, seed: u64) -> Vec<i32> {
-    let mut spec = vec![Complex { re: 0.0f32, im: 0.0 }; n];
+    let mut spec = vec![
+        Complex {
+            re: 0.0f32,
+            im: 0.0
+        };
+        n
+    ];
     let mut rng = Lcg(seed);
     for k in 1..n / 2 {
         let hz = k as f32 * sr as f32 / n as f32;
@@ -91,7 +129,9 @@ fn dark_master_noise(n: usize, sr: u32, knee_hz: f32, seed: u64) -> Vec<i32> {
         spec[k] = Complex { re, im };
         spec[n - k] = Complex { re, im: -im };
     }
-    FftPlanner::<f32>::new().plan_fft_inverse(n).process(&mut spec);
+    FftPlanner::<f32>::new()
+        .plan_fft_inverse(n)
+        .process(&mut spec);
     let time: Vec<f32> = spec.iter().map(|c| c.re).collect();
     let peak = time.iter().fold(0f32, |m, &v| m.max(v.abs())).max(1e-6);
     let scale = 8_000_000.0 / peak;
@@ -146,9 +186,7 @@ fn full_band_noise_is_clean() {
     let sr = 44_100;
     let n = sr as usize * 2;
     let mut rng = Lcg(12345);
-    let samples: Vec<i16> = (0..n)
-        .map(|_| (rng.next_f32() * 30_000.0) as i16)
-        .collect();
+    let samples: Vec<i16> = (0..n).map(|_| (rng.next_f32() * 30_000.0) as i16).collect();
     let path = tmp("clean.wav");
     write_wav_i16(&path, sr, 1, &samples);
 
@@ -258,9 +296,7 @@ fn a_dark_master_is_not_accused_of_transcoding() {
     assert!(
         !r.detections.transcoding,
         "cutoff {:?} ratio {:?} detail {}",
-        r.cutoff_hz,
-        r.cutoff_ratio,
-        r.detections.detail
+        r.cutoff_hz, r.cutoff_ratio, r.detections.detail
     );
     // The cut-off is still *measured* and still reported — it stopped being a
     // verdict, it did not stop being information.
@@ -315,11 +351,7 @@ fn fake_24bit_is_detected() {
     let r = analyze_file(&path, &ScanOptions::default());
     assert!(r.error.is_none(), "error: {:?}", r.error);
     assert_eq!(r.declared_bits, Some(24));
-    assert!(
-        r.detections.upscaling,
-        "real bits {:?}",
-        r.real_bit_depth
-    );
+    assert!(r.detections.upscaling, "real bits {:?}", r.real_bit_depth);
     std::fs::remove_file(&path).ok();
 }
 

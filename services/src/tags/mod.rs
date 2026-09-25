@@ -38,8 +38,8 @@
 //! [`cover`], which `read_tags`/`write_tags` call into rather than handling
 //! inline. The extended-tags pop-in's "+" picker — its curated key list and
 //! the resolution against a file's tag type — lives in [`addable`]. Both are
-//! re-exported here so existing callers (`core::tags::CoverArt`,
-//! `core::tags::AddableTag`, etc.) don't need to know the split exists.
+//! re-exported here so callers can use `services::tags::CoverArt` and
+//! `services::tags::AddableTag` without importing the private submodules.
 //!
 //! What's left — [`TagSet`]/[`FieldEdit`]/[`TagEdits`] and [`read_tags`]/
 //! [`write_tags`] — is kept as one file rather than split further: it's one

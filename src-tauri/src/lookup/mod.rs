@@ -26,7 +26,7 @@ mod http;
 pub mod discogs;
 pub mod musicbrainz;
 
-use flaccompagnon_core::tags::CoverArt;
+use flaccompagnon_services::tags::CoverArt;
 use serde::Serialize;
 
 pub use discogs::{discogs_detail, discogs_search};
@@ -69,7 +69,9 @@ pub struct LookupRelease {
 /// hence the `is_ascii_digit` check rather than a bare length test.
 pub(crate) fn year_prefix(date: &str) -> Option<String> {
     let head = date.get(..4)?;
-    head.bytes().all(|b| b.is_ascii_digit()).then(|| head.to_string())
+    head.bytes()
+        .all(|b| b.is_ascii_digit())
+        .then(|| head.to_string())
 }
 
 #[cfg(test)]

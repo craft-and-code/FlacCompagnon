@@ -31,7 +31,11 @@ use std::path::{Path, PathBuf};
 /// propagated: this runs while unwinding a cancelled batch, where a file that
 /// can't be deleted (permissions, a lock, something removed it already) is
 /// worth neither failing the cancellation over nor reporting on top of it.
-pub fn undo_batch(planned: &[PathBuf], preexisting: &HashSet<PathBuf>, output_root: &Path) -> usize {
+pub fn undo_batch(
+    planned: &[PathBuf],
+    preexisting: &HashSet<PathBuf>,
+    output_root: &Path,
+) -> usize {
     let mut removed = 0usize;
     let mut parents: HashSet<PathBuf> = HashSet::new();
 

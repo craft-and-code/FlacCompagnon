@@ -28,39 +28,8 @@ serde_json = "1"
 thiserror = "1"
 # Recursive folder walking
 walkdir = "2"
-# Reading/writing tags (title, artist, cover art, ...) across FLAC, MP3,
-# MP4/M4A, WAV and Ogg/Opus with a single API. Not used for DSD, which lofty
-# doesn't have a resolver for; tags::read_tags/write_tags return a named error
-# for those instead of panicking.
-lofty = "0.24"
-# Cover art is transported to/from the frontend as a data-URL-ready base64
-# string rather than a raw byte array (much cheaper over the Tauri IPC bridge).
-base64 = "0.22"
-# Conversion targets (core::convert). One crate per format, each wrapping a
-# different underlying codec — see convert/mod.rs's doc comment for why none
-# of them needed a license before being added here.
-flacenc = "0.5"          # pure Rust FLAC encoder, no C toolchain required.
-                          # Pinned at >=0.5, not 0.4: 0.4.0 has a real bug
-                          # where a source shorter than one block (or any
-                          # file whose last block is a partial one — i.e.
-                          # nearly every real track) gets its final block
-                          # padded up to the full block size instead of
-                          # written at its true length, corrupting the tail
-                          # on decode. Confirmed via a failing round-trip
-                          # test here (decoded sample count came back as a
-                          # multiple of the block size instead of the true
-                          # source length) and matches an upstream regression
-                          # test only present from 0.5 onward.
-hound = "3"               # WAV writer — moved here from dev-dependencies,
-                           # now used by convert::wav, not just test fixtures
-audiopus = "0.2"          # Opus encoder; vendors libopus via audiopus_sys,
-                           # no system library needed
-ogg = "0.9"                # Ogg container muxing for convert::opus — audiopus
-                           # only produces raw codec packets, not a playable
-                           # .opus file; pure Rust, BSD-3-Clause
-mp3lame-encoder = "0.2"   # MP3 (LAME) encoder; vendors LAME via mp3lame-sys,
-                           # same reasoning as audiopus above
-
 [dev-dependencies]
 rustfft = "6"     # synthesize truly band-limited test signals (inverse FFT)
-tempfile = "3"    # scratch files for the tag read/write round-trip tests
+tempfile = "3"    # scratch files for audio fixtures
+flacenc = "0.5"   # reference encoder for FLAC decoder tests
+hound = "3"      # independent WAV fixtures for decoder tests

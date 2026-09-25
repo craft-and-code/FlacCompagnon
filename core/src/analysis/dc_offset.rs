@@ -2,7 +2,7 @@
 //!
 //! DC is the arithmetic sample mean (no weighting, gating or high-pass).
 //! Measuring channels before any downmix preserves opposite signed offsets.
-//! See https://manual.audacityteam.org/man/dc_offset.html for the convention.
+//! See <https://manual.audacityteam.org/man/dc_offset.html> for the convention.
 
 use serde::{Deserialize, Serialize};
 

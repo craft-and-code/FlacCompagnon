@@ -26,8 +26,8 @@ pub(super) fn encode(pcm: &PcmAudio, dest: &Path) -> Result<(), ConvertError> {
         bits_per_sample: BIT_DEPTH as u16,
         sample_format: hound::SampleFormat::Int,
     };
-    let mut writer =
-        hound::WavWriter::create(dest, spec).map_err(|e| ConvertError::Encode(name(), e.to_string()))?;
+    let mut writer = hound::WavWriter::create(dest, spec)
+        .map_err(|e| ConvertError::Encode(name(), e.to_string()))?;
 
     let ints = super::f32_to_ints(&pcm.samples, BIT_DEPTH);
     for s in ints {

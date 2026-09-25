@@ -97,7 +97,8 @@ impl Mdct {
         for (b, (x, p)) in self.buf.iter_mut().zip(input.iter().zip(&self.pre)) {
             *b = p * *x;
         }
-        self.fft.process_with_scratch(&mut self.buf, &mut self.scratch);
+        self.fft
+            .process_with_scratch(&mut self.buf, &mut self.scratch);
         for (o, (b, p)) in out.iter_mut().zip(self.buf.iter().zip(&self.post)) {
             *o = (b * p).re;
         }

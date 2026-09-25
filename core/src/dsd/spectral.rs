@@ -101,13 +101,7 @@ pub fn dsd_heritage_check(spectrum_db: &[f32], sample_rate: u32, fft_size: usize
     let bin_hz = sample_rate as f64 / fft_size as f64;
 
     let valley = mean_band(spectrum_db, bin_hz, 22_000.0, 30_000.0, 3)?;
-    let ramp = mean_band(
-        spectrum_db,
-        bin_hz,
-        36_000.0,
-        (0.92 * nyq).min(75_000.0),
-        3,
-    )?;
+    let ramp = mean_band(spectrum_db, bin_hz, 36_000.0, (0.92 * nyq).min(75_000.0), 3)?;
     let rise = ramp - valley;
     (rise >= DSD_RAMP_DB && ramp > -75.0).then_some(rise)
 }

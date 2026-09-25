@@ -3,6 +3,8 @@
 //! Analysis never modifies the files it scans — they are opened read-only, in
 //! `core`, and nothing here writes anything.
 
+use std::path::Path;
+
 use flaccompagnon_core::{self as core, FolderReport, ScanOptions};
 use tauri::{AppHandle, Emitter};
 
@@ -57,12 +59,7 @@ pub async fn analyze_paths(app: AppHandle, targets: Vec<String>) -> Result<Folde
             },
         )?;
 
-        let has_flac = files.iter().any(|f| f.flac_md5.is_some());
-        Some(FolderReport {
-            root: root_str,
-            files,
-            has_flac,
-        })
+        Some(core::folder_report(Path::new(&root_str), files))
     })
     .await
     .map_err(|e| e.to_string())?;

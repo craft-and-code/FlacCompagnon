@@ -64,7 +64,8 @@ impl Pqmf {
         let mut modulation = Vec::with_capacity(PQMF_BANDS * 64);
         for i in 0..PQMF_BANDS {
             for k in 0..64 {
-                let angle = (2.0 * i as f64 + 1.0) * (k as f64 - 16.0) * std::f64::consts::PI / 64.0;
+                let angle =
+                    (2.0 * i as f64 + 1.0) * (k as f64 - 16.0) * std::f64::consts::PI / 64.0;
                 modulation.push(angle.cos());
             }
         }

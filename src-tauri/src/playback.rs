@@ -254,7 +254,9 @@ pub fn stop() -> Result<(), String> {
         .map_err(|_| "Playback engine is not running.".to_string())
 }
 
-fn round_trip(cmd_of_reply: impl FnOnce(mpsc::Sender<Result<(), String>>) -> Cmd) -> Result<(), String> {
+fn round_trip(
+    cmd_of_reply: impl FnOnce(mpsc::Sender<Result<(), String>>) -> Cmd,
+) -> Result<(), String> {
     let sender = SENDER.get().ok_or("Playback engine not started.")?;
     let (reply_tx, reply_rx) = mpsc::channel();
     sender
@@ -357,7 +359,10 @@ struct StreamBuffer {
 /// Decode `path` on a new background thread, appending each packet's samples
 /// to `buf` as they're ready. Stops early if `buf.cancel` is set (the track
 /// was stopped or superseded before reaching the end on its own).
-fn spawn_decode_thread(mut decoder: flaccompagnon_core::decode::PcmStreamDecoder, buf: Arc<StreamBuffer>) {
+fn spawn_decode_thread(
+    mut decoder: flaccompagnon_core::decode::PcmStreamDecoder,
+    buf: Arc<StreamBuffer>,
+) {
     thread::spawn(move || {
         loop {
             if buf.cancel.load(Ordering::SeqCst) {

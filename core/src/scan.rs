@@ -55,7 +55,7 @@ pub fn is_supported_audio(path: &Path) -> bool {
 }
 
 /// List every supported audio file under `root`, sorted, skipping any file that
-/// lives inside a generated spectrogram folder (see [`GENERATED_DIRS`]).
+/// lives inside a generated spectrogram folder (see `GENERATED_DIRS`).
 pub fn list_audio_files(root: &Path, recursive: bool) -> Vec<PathBuf> {
     let depth = if recursive { usize::MAX } else { 1 };
     let mut paths: Vec<PathBuf> = walkdir::WalkDir::new(root)
@@ -76,17 +76,53 @@ pub fn list_audio_files(root: &Path, recursive: bool) -> Vec<PathBuf> {
     paths
 }
 
+/// Expand files and folders into one sorted, deduplicated list of supported audio.
+pub fn gather_targets(targets: &[String], recursive: bool) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    for target in targets {
+        let path = Path::new(target);
+        if path.is_file() {
+            if is_supported_audio(path) {
+                paths.push(path.to_path_buf());
+            }
+        } else if path.is_dir() {
+            paths.extend(list_audio_files(path, recursive));
+        }
+    }
+    paths.sort();
+    paths.dedup();
+    paths
+}
+
+/// Report root for a folder or the first individual file's parent.
+pub fn display_root(targets: &[String]) -> String {
+    let Some(first) = targets.first() else {
+        return String::new();
+    };
+    let path = Path::new(first);
+    let root = if path.is_dir() {
+        path
+    } else {
+        path.parent().unwrap_or(path)
+    };
+    root.to_string_lossy().to_string()
+}
+
+/// Assemble files already analyzed by any client into a standard report.
+pub fn folder_report(root: &Path, files: Vec<FileAnalysis>) -> FolderReport {
+    let has_flac = files.iter().any(|file| file.flac_md5.is_some());
+    FolderReport {
+        root: root.to_string_lossy().to_string(),
+        files,
+        has_flac,
+    }
+}
+
 /// Analyze every supported audio file under `root`.
 pub fn analyze_folder(root: &Path, opts: &ScanOptions) -> Result<FolderReport, AnalysisError> {
     let paths = list_audio_files(root, opts.recursive);
     let files: Vec<FileAnalysis> = paths.iter().map(|p| analyze_file(p, opts)).collect();
-    let has_flac = files.iter().any(|f| f.flac_md5.is_some());
-
-    Ok(FolderReport {
-        root: root.to_string_lossy().to_string(),
-        files,
-        has_flac,
-    })
+    Ok(folder_report(root, files))
 }
 
 #[cfg(test)]

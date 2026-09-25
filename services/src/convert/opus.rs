@@ -52,14 +52,19 @@ pub(super) fn encode(pcm: &PcmAudio, dest: &Path, bitrate_kbps: u32) -> Result<(
     let resampled = if pcm.sample_rate == OPUS_SAMPLE_RATE {
         pcm.samples.clone()
     } else {
-        super::resample_linear(&pcm.samples, pcm.channels, pcm.sample_rate, OPUS_SAMPLE_RATE)
+        super::resample_linear(
+            &pcm.samples,
+            pcm.channels,
+            pcm.sample_rate,
+            OPUS_SAMPLE_RATE,
+        )
     };
 
     let mut encoder = Encoder::new(SampleRate::Hz48000, channels_enum, Application::Audio)
         .map_err(|e| ConvertError::Encode(name(), e.to_string()))?;
     encoder
         .set_bitrate(Bitrate::BitsPerSecond(
-            bitrate_kbps.saturating_mul(1000) as i32,
+            bitrate_kbps.saturating_mul(1000) as i32
         ))
         .map_err(|e| ConvertError::Encode(name(), e.to_string()))?;
     // Opus's own algorithmic delay — folded into the granule position so a

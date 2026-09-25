@@ -51,7 +51,11 @@ pub fn detect_cutoff(spectrum_db: &[f32], sample_rate: u32, fft_size: usize) -> 
     }
 
     let cutoff_hz = (cutoff_bin as f64 * bin_hz).min(nyquist);
-    let cutoff_ratio = if nyquist > 0.0 { cutoff_hz / nyquist } else { 0.0 };
+    let cutoff_ratio = if nyquist > 0.0 {
+        cutoff_hz / nyquist
+    } else {
+        0.0
+    };
     (cutoff_hz, cutoff_ratio)
 }
 
@@ -100,7 +104,13 @@ pub fn cutoff_context(
 
 /// Mean of the finite dB values in the `[f_lo, f_hi]` band. `NEG_INFINITY` if
 /// the band spans no bins.
-fn band_mean_db(spectrum_db: &[f32], sample_rate: u32, fft_size: usize, f_lo: f64, f_hi: f64) -> f32 {
+fn band_mean_db(
+    spectrum_db: &[f32],
+    sample_rate: u32,
+    fft_size: usize,
+    f_lo: f64,
+    f_hi: f64,
+) -> f32 {
     let n = spectrum_db.len();
     let to_bin = |f: f64| ((f * fft_size as f64 / sample_rate as f64).round() as usize).min(n - 1);
     let lo = to_bin(f_lo);

@@ -96,7 +96,10 @@ mod tests;
 /// decides what to do with the pairs, and the user still has to save the
 /// report for the new paths to outlive the session.
 #[tauri::command]
-pub fn relocate_paths(missing: Vec<String>, root: String) -> Vec<core::Relocation> {
+pub fn relocate_paths(
+    missing: Vec<String>,
+    root: String,
+) -> Vec<flaccompagnon_services::Relocation> {
     let candidates = core::list_audio_files(Path::new(&root), true);
-    core::match_moved_files(&missing, &candidates)
+    flaccompagnon_services::match_moved_files(&missing, &candidates)
 }

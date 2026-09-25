@@ -4,7 +4,10 @@ use super::*;
 fn balance_matches_rms_gain_ratio_and_channel_order() {
     // Halving amplitude quarters energy: 20 log10(1/2) = -6.0205999 dB.
     for (left, right, expected) in [(4.0, 1.0, -6.0206), (1.0, 4.0, 6.0206), (4.0, 4.0, 0.0)] {
-        let Some(StereoBalance::Measured { right_minus_left_db }) = analyze_balance(left, right) else {
+        let Some(StereoBalance::Measured {
+            right_minus_left_db,
+        }) = analyze_balance(left, right)
+        else {
             panic!("both channels contain signal");
         };
         assert!((right_minus_left_db - expected).abs() < 0.0001);
@@ -17,7 +20,10 @@ fn balance_distinguishes_one_silent_channel_from_two() {
     assert_eq!(analyze_balance(1.0, 0.0), Some(StereoBalance::RightSilent));
     assert_eq!(analyze_balance(0.0, 0.0), None);
     // A tiny non-zero float signal is not digital silence.
-    assert!(matches!(analyze_balance(1e-40, 1e-40), Some(StereoBalance::Measured { .. })));
+    assert!(matches!(
+        analyze_balance(1e-40, 1e-40),
+        Some(StereoBalance::Measured { .. })
+    ));
 }
 
 #[test]

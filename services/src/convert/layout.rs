@@ -57,7 +57,10 @@ pub fn plan_batch(
         .iter()
         .map(|s| {
             let rel: &Path = s.path.strip_prefix(&s.base).unwrap_or_else(|_| {
-                s.path.file_name().map(Path::new).unwrap_or(s.path.as_path())
+                s.path
+                    .file_name()
+                    .map(Path::new)
+                    .unwrap_or(s.path.as_path())
             });
             output_root.join(rel).with_extension(format.extension())
         })

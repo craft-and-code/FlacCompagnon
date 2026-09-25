@@ -81,5 +81,5 @@ jobs:
       - name: Table window regression tests
         run: npm run test:table
 
-      - name: Compile the whole workspace (core + Tauri app)
+      - name: Compile the whole workspace (core, services, CLI, desktop)
         run: cargo build --workspace

@@ -43,7 +43,9 @@ fn deinterleave(samples: &[f32], channels: usize) -> Vec<Vec<f64>> {
 
 fn main() {
     let Some(arg) = std::env::args().nth(1) else {
-        eprintln!("usage: cargo run --release -p flaccompagnon-core --example probe -- <audio file>");
+        eprintln!(
+            "usage: cargo run --release -p flaccompagnon-core --example probe -- <audio file>"
+        );
         std::process::exit(2);
     };
     let path = PathBuf::from(arg);
@@ -106,9 +108,9 @@ fn main() {
             ),
             // Not "clean": the detector never ran. An untabulated sample rate
             // (anything but 32/44.1/48 kHz) or a file too short lands here.
-            None => println!(
-                "{name:4}: no answer — unsupported rate or file too short  [{secs:.1} s]"
-            ),
+            None => {
+                println!("{name:4}: no answer — unsupported rate or file too short  [{secs:.1} s]")
+            }
         }
     };
     show("AAC", a, aac_params.significance, aac_secs);

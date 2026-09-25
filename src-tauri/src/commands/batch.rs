@@ -6,12 +6,12 @@
 //! `analysis` would make `spectrograms` import from a sibling for no reason
 //! other than history.
 
-use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::OnceLock;
 
-use flaccompagnon_core as core;
 use serde::Serialize;
+
+pub(crate) use flaccompagnon_core::{display_root, gather_targets};
 
 /// Set when the user requests cancellation of the in-progress batch. Only one
 /// long-running operation runs at a time (the UI enforces this), so a single
@@ -41,50 +41,6 @@ pub(crate) struct Progress {
 #[tauri::command]
 pub fn cancel_task() {
     CANCEL.store(true, Ordering::SeqCst);
-}
-
-/// Collect the audio files implied by a dropped/selected `target`, which may be
-/// either a single audio file or a folder.
-fn collect_paths(target: &Path, recursive: bool) -> Vec<PathBuf> {
-    if target.is_file() {
-        if core::is_supported_audio(target) {
-            vec![target.to_path_buf()]
-        } else {
-            Vec::new()
-        }
-    } else {
-        core::list_audio_files(target, recursive)
-    }
-}
-
-/// Gather, de-duplicate and sort the audio files implied by a set of dropped or
-/// selected `targets` (any mix of files and folders).
-pub(crate) fn gather_targets(targets: &[String], recursive: bool) -> Vec<PathBuf> {
-    let mut paths: Vec<PathBuf> = Vec::new();
-    for t in targets {
-        let tp = PathBuf::from(t);
-        if tp.exists() {
-            paths.extend(collect_paths(&tp, recursive));
-        }
-    }
-    paths.sort();
-    paths.dedup();
-    paths
-}
-
-/// The folder shown as the report "root": the folder itself for a single dropped
-/// folder, otherwise the parent folder of the first item.
-pub(crate) fn display_root(targets: &[String]) -> String {
-    let Some(first) = targets.first() else {
-        return String::new();
-    };
-    let p = PathBuf::from(first);
-    let root = if p.is_dir() {
-        p
-    } else {
-        p.parent().map(Path::to_path_buf).unwrap_or(p)
-    };
-    root.to_string_lossy().to_string()
 }
 
 /// How many worker threads to run over `total` items: one per CPU core minus

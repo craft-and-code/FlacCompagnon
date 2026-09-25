@@ -246,14 +246,20 @@ pub fn convert_file(
     ensure_parent_dir(dest)?;
 
     match settings.format {
-        ConvertFormat::Flac => flac::encode(&pcm, dest, source_bit_depth(src), settings.flac_effort),
+        ConvertFormat::Flac => {
+            flac::encode(&pcm, dest, source_bit_depth(src), settings.flac_effort)
+        }
         ConvertFormat::Wav => wav::encode(&pcm, dest),
-        ConvertFormat::Opus => {
-            opus::encode(&pcm, dest, settings.bitrate_kbps.unwrap_or(DEFAULT_OPUS_KBPS))
-        }
-        ConvertFormat::Mp3 => {
-            mp3::encode(&pcm, dest, settings.bitrate_kbps.unwrap_or(DEFAULT_MP3_KBPS))
-        }
+        ConvertFormat::Opus => opus::encode(
+            &pcm,
+            dest,
+            settings.bitrate_kbps.unwrap_or(DEFAULT_OPUS_KBPS),
+        ),
+        ConvertFormat::Mp3 => mp3::encode(
+            &pcm,
+            dest,
+            settings.bitrate_kbps.unwrap_or(DEFAULT_MP3_KBPS),
+        ),
     }?;
 
     // Deliberately not `?`. By this point the audio is written and correct;
@@ -262,7 +268,9 @@ pub fn convert_file(
     // user looking for a file that is actually sitting there, complete. The
     // problem is still surfaced, just as what it is: a warning about one
     // file's tags, not a failed conversion.
-    let tag_warning = crate::tags::copy_tags(src, dest).err().map(|e| e.to_string());
+    let tag_warning = crate::tags::copy_tags(src, dest)
+        .err()
+        .map(|e| e.to_string());
 
     // After the tags, never before: writing them rewrites the file and would
     // stamp it "now" again, silently undoing this.
@@ -299,7 +307,9 @@ fn lower_ext(path: &Path) -> Option<String> {
 /// music was added — and that is what mtime carries.
 fn copy_modtime(src: &Path, dest: &Path) -> Result<(), ConvertError> {
     let io_err = |e: std::io::Error| ConvertError::Io(dest.display().to_string(), e.to_string());
-    let modified = std::fs::metadata(src).and_then(|m| m.modified()).map_err(io_err)?;
+    let modified = std::fs::metadata(src)
+        .and_then(|m| m.modified())
+        .map_err(io_err)?;
     std::fs::File::open(dest)
         .and_then(|f| f.set_modified(modified))
         .map_err(io_err)

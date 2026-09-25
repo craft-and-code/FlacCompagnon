@@ -1,5 +1,6 @@
 use super::*;
 use std::fs;
+use std::path::{Path, PathBuf};
 
 /// Create an empty file (and any missing parent). Empty is fine: nothing
 /// here decodes anything — `is_supported_audio` only looks at the

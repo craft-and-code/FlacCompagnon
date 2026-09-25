@@ -227,10 +227,25 @@ flowchart LR
 
 <sub>Analysis only ever reads your audio. The CSV/JSON report, the spectrogram PNGs and the M3U playlist are written only when you ask, and never inside your audio files. The tag panel is the single path that writes to a track, and only on its explicit <b>Save</b> — the audio stream itself is never re-encoded. <b>Search online</b> is the only feature that touches the network, and only on an explicit click.</sub>
 
-The project is a Cargo workspace with two crates:
+The project is a Cargo workspace with four crates:
 
-- **`core/`** — a pure-Rust library (`flaccompagnon-core`) containing all the analysis. It has no UI dependency and is fully unit-tested.
-- **`src-tauri/`** — the Tauri desktop app that wraps the core and exposes it to the web frontend.
+- **`core/`** — the reusable Rust analysis engine and the CSV/JSON report format, with no Tauri dependency.
+- **`services/`** — tag editing, conversion, playlists, and file relocation used by the desktop app.
+- **`cli/`** — the standalone `flaccompagnon` command.
+- **`src-tauri/`** — the Tauri desktop app that wraps the engine and services.
+
+### Command line and Aède
+
+The command accepts files, folders, or a mix of both. It prints results in the terminal; `--json` writes the same complete, re-importable JSON format as the desktop app:
+
+```bash
+cargo run --release -p flaccompagnon-cli -- ~/Music/Album --json ~/Music/Album/FlacCompagnon.json
+cargo run --release -p flaccompagnon-cli -- track.flac --analysis loudness --analysis phase
+```
+
+The installed executable is named `flaccompagnon`. `--analysis` selects which measurements to display in the terminal; the engine still computes the complete analysis, and a saved JSON report always includes every result. Use `flaccompagnon --help` for the available names and scan options.
+
+[Aède](https://github.com/craft-and-code/aede) uses this Rust engine directly through `flaccompagnon-core`. Its `aede analyze [folder…] --json` command groups tracks by album and saves one FlacCompagnon report in each album folder. Aède stores the measurements with their FlacCompagnon source attribution; it can also import an existing report with `aede import`.
 
 ---
 
@@ -324,6 +339,8 @@ npm run tauri build
 
 The installer/app bundle is written to `src-tauri/target/release/bundle/`.
 
+Build the standalone command separately with `cargo build --release -p flaccompagnon-cli`. The binary is `target/release/flaccompagnon` (or `.exe` on Windows).
+
 > **Cross-platform note:** native desktop apps are normally built **on** their target OS. Build the Windows app on Windows, the macOS app on macOS, and the Linux app on Linux. The easiest way to produce all three from one place is a CI matrix (e.g. GitHub Actions) that runs `npm run tauri build` on `windows-latest`, `macos-latest`, and `ubuntu-latest`.
 
 ---
@@ -332,9 +349,9 @@ The installer/app bundle is written to `src-tauri/target/release/bundle/`.
 
 Four GitHub Actions workflows are included:
 
-- **CI** (`.github/workflows/ci.yml`) runs on every push and pull request: it runs the `core` test suite, type-checks and bundles the frontend, and compiles the whole Rust workspace on Linux. The badges at the top of this README reflect its status.
+- **CI** (`.github/workflows/ci.yml`) runs on every push and pull request: it tests the entire Rust workspace, type-checks and bundles the frontend, and compiles all four crates on Linux. The badges at the top of this README reflect its status.
 - **Docs** (`.github/workflows/docs.yml`) and **Site** (`.github/workflows/site.yml`) publish, respectively, the rustdoc API reference and the static landing page to the `gh-pages` branch (see [Documentation](#documentation-rustdoc) below for the one-time Pages setup).
-- **Release** (`.github/workflows/release.yml`) builds installers for **macOS (Apple Silicon), Windows and Linux** and publishes them to a GitHub Release. It runs when you push a version tag:
+- **Release** (`.github/workflows/release.yml`) builds the desktop installers and, in a separate job, standalone CLI archives for **macOS (Apple Silicon), Windows and Linux**. It publishes both to one GitHub Release when you push a version tag:
 
   ```bash
   git tag v0.1.0
@@ -351,6 +368,8 @@ Four GitHub Actions workflows are included:
 | macOS (Apple Silicon)      | `FlacCompagnon_<version>_macOS-AppleSilicon.dmg` |
 | Linux (any distro, 64-bit) | `FlacCompagnon_<version>_Linux-x86_64.AppImage`  |
 | Linux (Debian / Ubuntu)    | `FlacCompagnon_<version>_Linux-x86_64.deb`       |
+
+The CLI archives are named `flaccompagnon_<version>_<platform>.tar.gz` (or `.zip` on Windows).
 
 The macOS `.app.tar.gz` is the same application as the `.dmg`, just archived. The release workflow builds with `tauri-action`, renames each artifact with its platform label, then uploads the set as a **draft** release.
 
@@ -374,7 +393,7 @@ All analysis logic lives in the `core` crate and is covered by unit and integrat
 cargo test -p flaccompagnon-core
 ```
 
-Tag reading/writing and playlist building are tested there too — the tag tests write to real temporary files and read them back, so the round trip is exercised end to end rather than mocked. The Tauri crate adds tests for the online lookup's ID validation:
+Tag reading/writing and playlist building are tested in `flaccompagnon-services` — the tag tests write to real temporary files and read them back, so the round trip is exercised end to end rather than mocked. The CLI and Tauri crates have their own tests:
 
 ```bash
 cargo test            # the whole workspace

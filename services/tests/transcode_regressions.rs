@@ -1,9 +1,9 @@
 //! Independent PCM controls and an actual encoder exercise the production sweep.
 use flaccompagnon_core::{
-    convert::{convert_file, ConvertFormat, ConvertSettings},
     decode::decode_to_pcm,
     transcode::{aac, mp3, AacParams, Mp3Params},
 };
+use flaccompagnon_services::convert::{convert_file, ConvertFormat, ConvertSettings};
 
 fn noise(n: usize, mut state: u32) -> Vec<f64> {
     (0..n)

@@ -23,11 +23,7 @@
 //! * [`analysis`] — the whole measuring-and-deciding chain: the streaming
 //!   pass, one module per metric, the AAC-grid search, and the verdict logic.
 //!   Nothing outside the crate reaches into it; what leaves is the result.
-//! * [`convert`] — re-encodes files to another format (FLAC/Opus/MP3/WAV);
-//!   the one place in this crate that writes audio files rather than only
-//!   reading them — see that module's own doc comment for why.
-//! * [`report`] and [`playlist`] — writing results out (CSV/JSON, M3U). They
-//!   sit beside `analysis` rather than inside it: exporting is not measuring.
+//! * [`report`] — exports and re-imports analysis data (CSV/JSON).
 //!
 //! # Example
 //!
@@ -79,16 +75,12 @@
 #![warn(missing_docs)]
 
 pub mod analysis;
-pub mod convert;
 pub mod decode;
 pub mod dsd;
 pub mod hash;
 pub mod pipeline;
-pub mod playlist;
-pub mod relocate;
 pub mod report;
 pub mod scan;
-pub mod tags;
 pub mod transcode;
 pub mod types;
 
@@ -96,6 +88,8 @@ pub use analysis::detections::Detections;
 pub use decode::{probe_info, BasicInfo, FlacMd5Status};
 pub use hash::{file_digest, FileDigest};
 pub use pipeline::{analyze_file, analyze_file_cancellable};
-pub use relocate::{match_moved_files, Relocation};
-pub use scan::{analyze_folder, is_supported_audio, list_audio_files, SUPPORTED_EXTENSIONS};
+pub use scan::{
+    analyze_folder, display_root, folder_report, gather_targets, is_supported_audio,
+    list_audio_files, SUPPORTED_EXTENSIONS,
+};
 pub use types::{AnalysisError, ClippingInfo, FileAnalysis, FolderReport, ScanOptions};

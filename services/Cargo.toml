@@ -1,0 +1,24 @@
+[package]
+name = "flaccompagnon-services"
+description = "Tag editing, conversion, playlists, and relocation for FlacCompagnon."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+flaccompagnon-core = { path = "../core" }
+lofty = "0.24"
+base64 = "0.22"
+serde = { version = "1", features = ["derive"] }
+thiserror = "1"
+flacenc = "0.5"
+hound = "3"
+audiopus = "0.2"
+ogg = "0.9"
+mp3lame-encoder = "0.2"
+walkdir = "2"
+
+[dev-dependencies]
+tempfile = "3"
+claxon = "0.4"

@@ -41,7 +41,10 @@ pub(super) fn encode(pcm: &PcmAudio, dest: &Path, bitrate_kbps: u32) -> Result<(
     if pcm.channels == 0 || pcm.channels > 2 {
         return Err(ConvertError::Unsupported(
             name(),
-            format!("MP3 only supports mono or stereo here (got {} channels)", pcm.channels),
+            format!(
+                "MP3 only supports mono or stereo here (got {} channels)",
+                pcm.channels
+            ),
         ));
     }
 
@@ -53,7 +56,9 @@ pub(super) fn encode(pcm: &PcmAudio, dest: &Path, bitrate_kbps: u32) -> Result<(
     };
 
     let mut encoder = Builder::new()
-        .ok_or_else(|| ConvertError::Encode(name(), "could not allocate the LAME encoder".to_string()))?
+        .ok_or_else(|| {
+            ConvertError::Encode(name(), "could not allocate the LAME encoder".to_string())
+        })?
         .with_num_channels(pcm.channels as u8)
         .map_err(|e| ConvertError::Encode(name(), format!("channel count: {e:?}")))?
         .with_sample_rate(target_rate)

@@ -2,7 +2,7 @@
 //! timeout), the User-Agent both APIs' policies ask for, and the cover-image
 //! download with its size cap.
 
-use flaccompagnon_core::tags::CoverArt;
+use flaccompagnon_services::tags::CoverArt;
 
 /// Every request gets a timeout: without one, an unresponsive server leaves
 /// the search pop-in spinning forever with no way out but restarting the
@@ -80,5 +80,5 @@ pub(super) async fn fetch_cover(client: &reqwest::Client, url: &str) -> Option<C
     if bytes.len() > MAX_COVER_BYTES {
         return None;
     }
-    flaccompagnon_core::tags::cover_from_bytes(bytes.to_vec(), url).ok()
+    flaccompagnon_services::tags::cover_from_bytes(bytes.to_vec(), url).ok()
 }

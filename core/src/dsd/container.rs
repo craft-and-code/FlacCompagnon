@@ -181,9 +181,7 @@ fn parse_dff(head: &[u8]) -> Result<DsdInfo, AnalysisError> {
                 let lbody = p + 12;
                 match lid {
                     b"FS  " => sample_rate = rd_u32_be(head, lbody).unwrap_or(sample_rate),
-                    b"CHNL" => {
-                        channels = rd_u16_be(head, lbody).map_or(channels, |c| c as usize)
-                    }
+                    b"CHNL" => channels = rd_u16_be(head, lbody).map_or(channels, |c| c as usize),
                     b"CMPR" => dst = head.get(lbody..lbody + 4) == Some(b"DST "),
                     _ => {}
                 }

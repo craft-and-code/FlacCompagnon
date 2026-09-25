@@ -73,7 +73,9 @@ pub async fn musicbrainz_search(query: String) -> Result<Vec<LookupCandidate>, S
             .and_then(|v| v.as_str())
             .unwrap_or("Unknown title")
             .to_string();
-        let artist = first_artist_credit(r).unwrap_or("Unknown artist").to_string();
+        let artist = first_artist_credit(r)
+            .unwrap_or("Unknown artist")
+            .to_string();
         let year = r.get("date").and_then(|v| v.as_str()).and_then(year_prefix);
         let track_count = r.get("media").and_then(|v| v.as_array()).map(|media| {
             media
@@ -122,7 +124,10 @@ pub async fn musicbrainz_detail(mbid: String) -> Result<LookupRelease, String> {
     let artist = first_artist_credit(&body)
         .unwrap_or("Unknown artist")
         .to_string();
-    let year = body.get("date").and_then(|v| v.as_str()).and_then(year_prefix);
+    let year = body
+        .get("date")
+        .and_then(|v| v.as_str())
+        .and_then(year_prefix);
 
     let mut tracks = Vec::new();
     for medium in body

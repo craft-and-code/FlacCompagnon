@@ -23,6 +23,7 @@ pub struct ClippingInfo {
     /// Peak absolute sample value observed, normalized to [0, 1].
     pub peak: f32,
     /// Peak in dBFS (0.0 == full scale).
+    #[serde(deserialize_with = "deserialize_decibel_peak")]
     pub peak_dbfs: f32,
     /// True peak (inter-sample peak) magnitude from 4x oversampling
     /// (BS.1770-style). Can exceed 1.0 when the reconstructed waveform
@@ -30,9 +31,19 @@ pub struct ClippingInfo {
     pub true_peak: f32,
     /// True peak in dBTP. Positive values are inter-sample "overs": the DAC's
     /// reconstruction filter will clip even though no stored sample does.
+    #[serde(deserialize_with = "deserialize_decibel_peak")]
     pub true_peak_dbtp: f32,
     /// `true` when at least one clip event was detected.
     pub clipped: bool,
+}
+
+// serde_json writes non-finite floats as null. Silence and decode failures
+// have a genuine -infinity dB peak, so recover that value on report import.
+fn deserialize_decibel_peak<'de, D>(deserializer: D) -> Result<f32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<f32>::deserialize(deserializer)?.unwrap_or(f32::NEG_INFINITY))
 }
 
 impl ClippingInfo {
