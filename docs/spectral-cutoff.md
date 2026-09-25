@@ -34,9 +34,11 @@ The helper functions have synthetic spectral unit tests. Run:
 cargo test -p flaccompagnon-core analysis::spectrum
 ```
 
-For a manual visual check, compare a 48 kHz tone with and without a low-pass filter in the app's spectrum and spectrogram:
+For a manual visual check, compare 48 kHz broadband noise with and without a low-pass filter in the app's spectrum and spectrogram:
 
 ```sh
-ffmpeg -n -f lavfi -i 'sine=frequency=1000:sample_rate=48000:duration=10' -c:a pcm_s24le full-band-fixture.wav
-ffmpeg -n -i full-band-fixture.wav -af 'lowpass=f=8000' -c:a pcm_s24le lowpass-fixture.wav
+ffmpeg -n -f lavfi -i 'anoisesrc=color=white:amplitude=0.2:sample_rate=48000:duration=10:seed=42' -c:a pcm_s24le broadband-fixture.wav
+ffmpeg -n -i broadband-fixture.wav -af 'lowpass=f=8000' -c:a pcm_s24le lowpass-fixture.wav
 ```
+
+The filtered file should show reduced treble, but this filter has a gradual slope: do not expect the measured cutoff to be exactly 8 kHz. A lone 1 kHz sine does not supply a broadband control for this comparison.

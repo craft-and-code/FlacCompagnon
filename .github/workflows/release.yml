@@ -311,6 +311,11 @@ jobs:
           **ffmpeg** is **not** bundled — install it separately for spectrograms
           and DSD content analysis (macOS: `brew install ffmpeg`,
           Debian/Ubuntu: `sudo apt install ffmpeg`, Windows: `choco install ffmpeg`).
+
+          **Licenses.** The desktop application, CLI and services are MIT. The
+          reusable `flaccompagnon-core` analysis engine included in the app and
+          CLI is MPL-2.0. Its corresponding source and license are available at
+          https://github.com/craft-and-code/FlacCompagnon/tree/${{ github.ref_name }}/core.
           EOF
 
       - name: Publish the draft release

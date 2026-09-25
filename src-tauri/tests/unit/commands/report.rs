@@ -28,3 +28,15 @@ fn rejects_a_destination_with_no_file_name() {
     assert!(stem_with_ext("/", "csv").is_err());
     assert!(stem_with_ext("..", "csv").is_err());
 }
+
+#[test]
+fn report_write_error_names_the_report_and_destination() {
+    let path = Path::new("/Users/example/Desktop/Album.json");
+    let error = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+    let message = report_write_error(path, "JSON", &error);
+
+    assert!(message.contains("JSON report"));
+    assert!(message.contains(&path.display().to_string()));
+    #[cfg(target_os = "macos")]
+    assert!(message.contains("Files & Folders"));
+}

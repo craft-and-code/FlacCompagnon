@@ -48,7 +48,7 @@
 //! paper**, not a translation of the author's MATLAB reference. That
 //! distinction is deliberate and it matters: the reference distribution is
 //! marked "personal use or research purpose, commercial use prohibited", which
-//! is incompatible with this project's MIT licence. An algorithm published in
+//! is incompatible with FlacCompagnon's open-source licenses. An algorithm published in
 //! a journal may be implemented freely; a particular implementation of it may
 //! not be copied. Every constant below is traceable either to a numbered
 //! equation in the paper or to the MPEG standard it comes from, and says so.

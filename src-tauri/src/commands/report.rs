@@ -5,7 +5,10 @@
 //! never touch a track. The frontend supplies the rows in display order, so
 //! what gets exported is exactly what is on screen.
 
-use std::path::{Path, PathBuf};
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
 
 use flaccompagnon_core::{self as core, FolderReport};
 
@@ -29,23 +32,51 @@ fn stem_with_ext(dest: &str, ext: &str) -> Result<PathBuf, String> {
         .join(format!("{stem}.{ext}")))
 }
 
+/// Explain an operating-system write refusal at the point where the user chose
+/// the destination. macOS treats Desktop, Documents and Downloads as protected
+/// folders for an installed app, while a development build often inherits the
+/// terminal's existing permission and masks the difference.
+fn report_write_error(path: &Path, format: &str, error: &io::Error) -> String {
+    if error.kind() == io::ErrorKind::PermissionDenied {
+        #[cfg(target_os = "macos")]
+        return format!(
+            "Could not write the {format} report to '{}': macOS denied access. Allow FlacCompagnon in System Settings → Privacy & Security → Files & Folders, then try again.",
+            path.display()
+        );
+    }
+    format!(
+        "Could not write the {format} report to '{}': {error}",
+        path.display()
+    )
+}
+
+/// Write a report selected in the native save dialog, keeping the extension and
+/// operating-system error handling identical for CSV and JSON exports.
+fn save_report(
+    dest: String,
+    report: FolderReport,
+    extension: &str,
+    format: &str,
+    write: fn(&Path, &FolderReport) -> io::Result<()>,
+) -> Result<String, String> {
+    let path = stem_with_ext(&dest, extension)?;
+    write(&path, &report).map_err(|error| report_write_error(&path, format, &error))?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 /// Write only the CSV report for an already-analyzed result — the toolbar's
 /// "Save…" (which calls this and [`save_report_json`] in sequence, see its
 /// frontend doc comment for why) and the menu bar's standalone "Export CSV".
 #[tauri::command]
 pub async fn save_report_csv(dest: String, report: FolderReport) -> Result<String, String> {
-    let path = stem_with_ext(&dest, "csv")?;
-    core::report::write_csv(&path, &report).map_err(|e| e.to_string())?;
-    Ok(path.to_string_lossy().to_string())
+    save_report(dest, report, "csv", "CSV", core::report::write_csv)
 }
 
 /// Write only the JSON report — same shape as [`save_report_csv`], for the
 /// menu bar's standalone "Export JSON" (and the second half of "Save…").
 #[tauri::command]
 pub async fn save_report_json(dest: String, report: FolderReport) -> Result<String, String> {
-    let path = stem_with_ext(&dest, "json")?;
-    core::report::write_json(&path, &report).map_err(|e| e.to_string())?;
-    Ok(path.to_string_lossy().to_string())
+    save_report(dest, report, "json", "JSON", core::report::write_json)
 }
 
 /// Write the table's current order out as a playlist (Simple or Extended

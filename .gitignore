@@ -452,6 +452,7 @@ $RECYCLE.BIN/
 # Node / frontend
 /node_modules
 /dist
+/dist-site
 *.log
 
 # Tauri generated

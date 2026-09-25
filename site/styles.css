@@ -368,3 +368,7 @@ table.results .nosig { font-size: 11px; color: var(--text-4); }
   .parrow::before { content: "↓"; }
   .section { padding: 64px 20px; }
 }
+
+/* Shared accessible entry point on the homepage and documentation. */
+.skip-link { position: fixed; top: -100px; left: 16px; z-index: 100; background: var(--card); padding: 12px; }
+.skip-link:focus { top: 12px; }

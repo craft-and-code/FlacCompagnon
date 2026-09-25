@@ -3,7 +3,9 @@ name = "flaccompagnon-core"
 description = "Lossless audio integrity analysis: upsampling/transcode detection, FLAC MD5 verification, fake-24bit / fake-stereo / clipping checks."
 version.workspace = true
 edition.workspace = true
-license.workspace = true
+# The reusable analysis library has the same file-level copyleft license as
+# Aède so applications can share it without relicensing their own code.
+license = "MPL-2.0"
 authors.workspace = true
 
 [lib]

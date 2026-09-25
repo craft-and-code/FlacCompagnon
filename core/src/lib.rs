@@ -3,6 +3,10 @@
 //! This crate is intentionally free of any Tauri / UI dependency so that every
 //! analysis routine can be unit-tested in isolation with plain `cargo test`.
 //!
+//! This Source Code Form is subject to the terms of the Mozilla Public
+//! License, v. 2.0. If a copy of the MPL was not distributed with this file,
+//! You can obtain one at <https://mozilla.org/MPL/2.0/>.
+//!
 //! Public entry points:
 //! * [`analyze_file`]  — analyze a single audio file.
 //! * [`analyze_folder`] — analyze every supported audio file inside a folder

@@ -1,6 +1,6 @@
 name: Site
 
-# Publishes the static landing page (site/) to the ROOT of the gh-pages branch.
+# Builds the landing page and bilingual guides, then publishes at the root.
 # `keep_files: true` preserves the Rust docs published under gh-pages/doc by the
 # Docs workflow — the two coexist. Both workflows share the `pages` concurrency
 # group so they never push to the branch at the same time.
@@ -10,6 +10,12 @@ on:
     branches: [main, master]
     paths:
       - "site/**"
+      - "docs/**"
+      - "scripts/build-site.mjs"
+      - "scripts/check-site.mjs"
+      - "scripts/site/**"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/site.yml"
   workflow_dispatch:
 
@@ -25,13 +31,19 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      # The self-hosted .woff2 fonts are committed under site/assets/fonts/,
-      # so the deploy needs no network access beyond GitHub itself.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install site build dependencies
+        run: npm ci
+      - name: Build and check the bilingual site
+        run: npm run build:site
       - name: Publish site to gh-pages root
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
+          publish_dir: ./dist-site
           keep_files: true
           # Without this, a run whose content matches gh-pages pushes nothing,
           # so GitHub never starts a new "pages build and deployment" and the

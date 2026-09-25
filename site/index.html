@@ -3,26 +3,36 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>FlacCompagnon — Is your lossless actually lossless?</title>
+    <title>FlacCompagnon — Vérifiez vos fichiers FLAC et détectez les faux lossless</title>
     <meta
       name="description"
-      content="FlacCompagnon detects fake lossless audio: upscaling, upsampling and transcoding (including AAC at every bitrate). Also edits tags and cover art, converts to FLAC, Opus, MP3 or WAV, and exports M3U playlists. A free, open-source, native app for macOS, Windows and Linux."
+      content="FlacCompagnon vérifie l’authenticité de vos fichiers FLAC : faux lossless, upsampling, transcodage, loudness, phase stéréo, dynamique et intégrité. Application gratuite, CLI et moteur Rust."
     />
-    <meta name="keywords" content="FlacCompagnon, FLAC checker, fake lossless, upscaled FLAC, upsampled FLAC, transcoded FLAC, AAC detection, lossless audio checker, spectrogram, DSD, Hi-Res Audio, audio integrity, tag editor, cover art, MusicBrainz, Discogs, M3U playlist, audio converter, FLAC to Opus, FLAC to MP3, batch convert" />
     <meta name="author" content="craft-and-code" />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://craft-and-code.github.io/FlacCompagnon/" />
+    <link rel="alternate" hreflang="fr" href="https://craft-and-code.github.io/FlacCompagnon/" />
+    <link rel="alternate" hreflang="en" href="https://craft-and-code.github.io/FlacCompagnon/en/" />
+    <link
+      rel="alternate"
+      hreflang="x-default"
+      href="https://craft-and-code.github.io/FlacCompagnon/"
+    />
 
     <!-- Open Graph / Facebook / Discord / LinkedIn -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://craft-and-code.github.io/FlacCompagnon/" />
     <meta property="og:site_name" content="FlacCompagnon" />
-    <meta property="og:title" content="FlacCompagnon — Is your lossless actually lossless?" />
+    <meta property="og:title" content="FlacCompagnon — Vérifiez vos fichiers FLAC" />
     <meta
       property="og:description"
-      content="Detects fake lossless audio: upscaling, upsampling and transcoding (including AAC at every bitrate). Plus tag and cover-art editing, MusicBrainz lookup, conversion to FLAC/Opus/MP3/WAV and M3U export. Free, open-source, native app for macOS, Windows and Linux."
+      content="Détectez les faux lossless, analysez le loudness, la phase stéréo, la dynamique et l’intégrité de votre bibliothèque musicale."
     />
-    <meta property="og:image" content="https://craft-and-code.github.io/FlacCompagnon/assets/og-image.png" />
+    <meta
+      property="og:image"
+      content="https://craft-and-code.github.io/FlacCompagnon/assets/og-image.png"
+    />
+    <meta property="og:image:alt" content="FlacCompagnon, outil d’analyse de fichiers audio" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:locale" content="fr_FR" />
@@ -30,12 +40,16 @@
 
     <!-- Twitter / X card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="FlacCompagnon — Is your lossless actually lossless?" />
+    <meta name="twitter:title" content="FlacCompagnon — Vérifiez vos fichiers FLAC" />
     <meta
       name="twitter:description"
-      content="Detects fake lossless audio: upscaling, upsampling and transcoding (including AAC at every bitrate)."
+      content="Détectez les faux lossless et analysez l’authenticité de votre bibliothèque musicale."
     />
-    <meta name="twitter:image" content="https://craft-and-code.github.io/FlacCompagnon/assets/og-image.png" />
+    <meta
+      name="twitter:image"
+      content="https://craft-and-code.github.io/FlacCompagnon/assets/og-image.png"
+    />
+    <meta name="twitter:image:alt" content="FlacCompagnon, outil d’analyse de fichiers audio" />
 
     <meta name="theme-color" content="#0d0e13" />
     <link rel="icon" href="assets/favicon.ico" sizes="any" />
@@ -45,6 +59,8 @@
     <!-- Fonts are self-hosted (see @font-face in styles.css and
          assets/fonts/). No external requests, no third-party calls. -->
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="directory.css" />
+    <link rel="stylesheet" href="home.css" />
 
     <!-- Structured data: helps search engines show FlacCompagnon as a downloadable
          app (price, platforms, rating box) in rich results. -->
@@ -54,9 +70,11 @@
         "@type": "SoftwareApplication",
         "name": "FlacCompagnon",
         "url": "https://craft-and-code.github.io/FlacCompagnon/",
-        "description": "Detects fake lossless audio files: upscaling, upsampling and transcoding, including AAC transcodes at every bitrate. Also a tag and cover-art editor with MusicBrainz/Discogs lookup, a batch converter to FLAC, Opus, MP3 or WAV that mirrors the source folder structure, and M3U playlist export. Free, open-source, native app for macOS, Windows and Linux.",
+        "description": "Audio authenticity checks, loudness, stereo phase, dynamics and integrity measurements. Native desktop app, standalone CLI and reusable Rust analysis library, with tag editing, format conversion and report export.",
         "applicationCategory": "MultimediaApplication",
         "operatingSystem": "macOS, Windows, Linux",
+        "isAccessibleForFree": true,
+        "featureList": "Détection de faux lossless, upscaling, upsampling et transcodage ; loudness LUFS ; phase et balance stéréo ; dynamique, clipping et true peak ; vérification MD5 FLAC ; CLI ; export JSON.",
         "offers": {
           "@type": "Offer",
           "price": "0",
@@ -68,12 +86,21 @@
           "url": "https://github.com/craft-and-code"
         },
         "license": "https://github.com/craft-and-code/FlacCompagnon/blob/main/LICENSE",
+        "additionalProperty": {
+          "@type": "PropertyValue",
+          "name": "Analysis core license",
+          "value": "MPL-2.0",
+          "url": "https://github.com/craft-and-code/FlacCompagnon/blob/main/core/LICENSE"
+        },
         "downloadUrl": "https://github.com/craft-and-code/FlacCompagnon/releases/latest",
-        "softwareVersion": "0.9.4"
+        "softwareVersion": "0.9.5"
       }
     </script>
   </head>
   <body>
+    <a class="skip-link" href="#top" data-fr="Aller au contenu" data-en="Skip to content"
+      >Aller au contenu</a
+    >
     <canvas id="bgc" aria-hidden="true"></canvas>
 
     <!-- Nav -->
@@ -82,18 +109,14 @@
         <img src="assets/logo.png" alt="FlacCompagnon" width="28" height="28" />
         <span>FlacCompagnon</span>
       </a>
-      <nav class="nav-links">
+      <nav class="nav-links" aria-label="Navigation">
         <a href="#apercu" data-i18n="nPrev">Aperçu</a>
-        <a href="#detections" data-i18n="nDet">Détections</a>
-        <a href="#integrite" data-i18n="nInt">Intégrité</a>
-        <a href="#spectrogrammes" data-i18n="nSpec">Spectrogrammes</a>
-        <a href="#tags" data-i18n="nTags">Tags</a>
-        <a href="#conversion" data-i18n="nConv">Conversion</a>
-        <a href="#export" data-i18n="nExp">Export</a>
-        <a href="#pipeline" data-i18n="nPipe">Pipeline</a>
-        <a href="https://craft-and-code.github.io/FlacCompagnon/doc/" target="_blank" rel="noopener" data-i18n="nDoc">Docs</a>
+        <a href="#integrite" data-fr="Analyses" data-en="Analyses">Analyses</a>
+        <a href="#cli">CLI</a>
+        <a href="#ecosysteme">Aède</a>
       </nav>
       <div class="nav-right">
+        <a class="nav-docs" href="docs/fr/index.html" data-doc="index">Docs ↗</a>
         <div class="lang" role="group" aria-label="Language">
           <button id="lang-en" type="button" aria-pressed="false" aria-label="English">EN</button>
           <button id="lang-fr" type="button" aria-pressed="true" aria-label="Français">FR</button>
@@ -113,7 +136,14 @@
         <p class="sub up" data-i18n="sub"></p>
         <div class="hero-cta up">
           <a class="btn btn-grad" href="#telecharger" data-i18n="ctaDl">Télécharger</a>
-          <a class="btn btn-outline" href="https://github.com/craft-and-code/FlacCompagnon" target="_blank" rel="noopener" data-i18n="ctaGh">Voir sur GitHub</a>
+          <a
+            class="btn btn-outline"
+            href="docs/fr/index.html"
+            data-doc="index"
+            data-fr="Comprendre les analyses"
+            data-en="Understand the analyses"
+            >Comprendre les analyses</a
+          >
         </div>
         <p class="note up" data-i18n="note"></p>
         <a class="scroll-cue" href="#apercu" aria-label="scroll">▾</a>
@@ -152,30 +182,62 @@
               </thead>
               <tbody>
                 <tr>
-                  <td class="fname" data-path="/Users/you/Music/Miles Davis - Kind of Blue/01 · So What.flac">01 · So What.flac</td>
-                  <td>FLAC</td><td>9:26</td><td>44.1k</td>
-                  <td class="c-ok">16-bit</td><td>21.9 kHz (99%)</td>
+                  <td
+                    class="fname"
+                    data-path="/Users/you/Music/Miles Davis - Kind of Blue/01 · So What.flac"
+                  >
+                    01 · So What.flac
+                  </td>
+                  <td>FLAC</td>
+                  <td>9:26</td>
+                  <td>44.1k</td>
+                  <td class="c-ok">16-bit</td>
+                  <td>21.9 kHz (99%)</td>
                   <td><span class="tag t-clean" data-tip="tipClean">Clean</span></td>
                   <td class="c-ok">✓ OK</td>
                 </tr>
                 <tr>
-                  <td class="fname" data-path="/Users/you/Music/Studio Master/02 · Studio Master.flac">02 · Studio Master.flac</td>
-                  <td>FLAC</td><td>4:11</td><td>96k</td>
-                  <td class="c-ok">24-bit</td><td>22.0 kHz (46%)</td>
+                  <td
+                    class="fname"
+                    data-path="/Users/you/Music/Studio Master/02 · Studio Master.flac"
+                  >
+                    02 · Studio Master.flac
+                  </td>
+                  <td>FLAC</td>
+                  <td>4:11</td>
+                  <td>96k</td>
+                  <td class="c-ok">24-bit</td>
+                  <td>22.0 kHz (46%)</td>
                   <td><span class="tag t-upsampled" data-tip="d2tip">Upsampled</span></td>
                   <td class="c-ok">✓ OK</td>
                 </tr>
                 <tr>
-                  <td class="fname" data-path="/Users/you/Music/Remaster 2019/03 · Remaster 2019.flac">03 · Remaster 2019.flac</td>
-                  <td>FLAC</td><td>3:37</td><td>44.1k</td>
-                  <td class="c-ok">16-bit</td><td>22.05 kHz (100%)</td>
+                  <td
+                    class="fname"
+                    data-path="/Users/you/Music/Remaster 2019/03 · Remaster 2019.flac"
+                  >
+                    03 · Remaster 2019.flac
+                  </td>
+                  <td>FLAC</td>
+                  <td>3:37</td>
+                  <td>44.1k</td>
+                  <td class="c-ok">16-bit</td>
+                  <td>22.05 kHz (100%)</td>
                   <td><span class="tag t-transcoded" data-tip="d3tip">Transcoded</span></td>
                   <td class="c-ok">✓ OK</td>
                 </tr>
                 <tr>
-                  <td class="fname" data-path="/Users/you/Music/Acoustic Live/04 · Acoustic Live.flac">04 · Acoustic Live.flac</td>
-                  <td>FLAC</td><td>5:02</td><td>44.1k</td>
-                  <td class="c-ok">16-bit</td><td>18.6 kHz (84%)</td>
+                  <td
+                    class="fname"
+                    data-path="/Users/you/Music/Acoustic Live/04 · Acoustic Live.flac"
+                  >
+                    04 · Acoustic Live.flac
+                  </td>
+                  <td>FLAC</td>
+                  <td>5:02</td>
+                  <td>44.1k</td>
+                  <td class="c-ok">16-bit</td>
+                  <td>18.6 kHz (84%)</td>
                   <td><span class="tag t-clean" data-tip="tipDark">Clean</span></td>
                   <td class="c-mut">— <span class="nosig">no MD5</span></td>
                 </tr>
@@ -223,32 +285,25 @@
         <p class="kicker" data-i18n="s3k">Intégrité</p>
         <h2 data-i18n="s3t">Au-delà des détections</h2>
         <p class="lead" data-i18n="s3p"></p>
-        <div class="cards cards-3">
-          <article class="card">
-            <h3 data-i18n="i1t">Vérification MD5 FLAC</h3>
-            <p data-i18n-html="i1p"></p>
-          </article>
-          <article class="card">
-            <h3 data-i18n="i2t">Fake stereo</h3>
-            <p data-i18n="i2p"></p>
-          </article>
-          <article class="card">
-            <h3 data-i18n="i3t">Clipping</h3>
-            <p data-i18n="i3p"></p>
-          </article>
-          <article class="card">
-            <h3 data-i18n="i4t">Détection du format réel</h3>
-            <p data-i18n-html="i4p"></p>
-          </article>
-          <article class="card">
-            <h3 data-i18n="i5t">Dynamique (DR)</h3>
-            <p data-i18n="i5p"></p>
-          </article>
-          <article class="card">
-            <h3 data-i18n="i6t">Hi-Res &amp; DSD</h3>
-            <p data-i18n-html="i6p"></p>
-          </article>
+        <div class="analysis-directory">
+          <!-- ANALYSIS_DIRECTORY -->
         </div>
+        <p
+          class="note-inline"
+          data-fr="Le format réel est également lu dans l’en-tête du fichier, indépendamment de son extension. Les badges Hi-Res et DSD résument les caractéristiques du conteneur et les résultats disponibles."
+          data-en="The actual format is also read from the file header, independently of its extension. Hi-Res and DSD badges summarize container properties and available results."
+        >
+          Le format réel est également lu dans l’en-tête du fichier, indépendamment de son
+          extension.
+        </p>
+        <p
+          class="note-box"
+          data-fr="Les colonnes avancées sont masquées par défaut après la signature MD5. Affichez celles qui vous intéressent dans le choix des colonnes de l’application. Un tiret signifie que la mesure est indisponible, pas qu’elle vaut zéro."
+          data-en="Advanced columns after the MD5 signature are hidden by default. Show the ones you need using the app’s column chooser. A dash means a measurement is unavailable, not zero."
+        >
+          Les colonnes avancées sont masquées par défaut après la signature MD5. Affichez celles qui
+          vous intéressent dans le choix des colonnes de l’application.
+        </p>
       </section>
 
       <!-- Spectrogrammes -->
@@ -299,7 +354,9 @@
             <div class="conv-formats">
               <span class="fmt"><strong>FLAC</strong><em data-i18n="cf1">sans perte</em></span>
               <span class="fmt"><strong>Opus</strong><em data-i18n="cf2">libre de droits</em></span>
-              <span class="fmt"><strong>MP3</strong><em data-i18n="cf3">compatible partout</em></span>
+              <span class="fmt"
+                ><strong>MP3</strong><em data-i18n="cf3">compatible partout</em></span
+              >
               <span class="fmt"><strong>WAV</strong><em data-i18n="cf4">PCM 16 bits</em></span>
             </div>
             <p class="note-inline" data-i18n-html="s9n1"></p>
@@ -318,6 +375,104 @@
         <p class="note-inline" data-i18n-html="s7n2"></p>
         <p class="note-inline" data-i18n-html="s7m3u"></p>
         <p class="note-inline" data-i18n="s7n1"></p>
+      </section>
+
+      <section id="cli" class="section cli-section">
+        <div>
+          <p class="kicker" data-fr="Aussi dans votre terminal" data-en="Also in your terminal">
+            Aussi dans votre terminal
+          </p>
+          <h2
+            data-fr="Le même moteur. Une simple commande."
+            data-en="The same engine. One simple command."
+          >
+            Le même moteur. Une simple commande.
+          </h2>
+          <p
+            class="lead"
+            data-fr="Analysez un fichier ou un dossier, choisissez les résultats affichés et enregistrez un rapport JSON que l’application peut rouvrir. La commande s’appelle flaccompagnon."
+            data-en="Analyze a file or folder, choose which results to display and save a JSON report the app can reopen. The command is called flaccompagnon."
+          >
+            Analysez un fichier ou un dossier, choisissez les résultats affichés et enregistrez un
+            rapport JSON que l’application peut rouvrir.
+          </p>
+          <a
+            class="btn btn-outline"
+            href="docs/fr/cli.html"
+            data-doc="cli"
+            data-fr="Installer et utiliser la CLI →"
+            data-en="Install and use the CLI →"
+            >Installer et utiliser la CLI →</a
+          >
+        </div>
+        <div class="terminal-example">
+          <div class="terminal-header">
+            <span aria-hidden="true">❯_</span><span>flaccompagnon</span
+            ><span class="terminal-label" data-fr="Exemples" data-en="Examples">Exemples</span>
+          </div>
+          <p data-fr="Afficher le loudness et la phase" data-en="Show loudness and phase">
+            Afficher le loudness et la phase
+          </p>
+          <pre>
+flaccompagnon "Music/Album" \
+  --analysis loudness,phase</pre>
+          <p data-fr="Enregistrer le rapport complet" data-en="Save the complete report">
+            Enregistrer le rapport complet
+          </p>
+          <pre>
+flaccompagnon "Music/Album" \
+  --json "Music/Album/FlacCompagnon.json"</pre>
+          <small
+            data-fr="--analysis filtre l’affichage. Le calcul et le JSON restent complets."
+            data-en="--analysis filters the display. Computation and JSON remain complete."
+            >--analysis filtre l’affichage. Le calcul et le JSON restent complets.</small
+          >
+        </div>
+      </section>
+
+      <section id="ecosysteme" class="section ecosystem-section">
+        <p
+          class="kicker"
+          data-fr="Une bibliothèque, plusieurs usages"
+          data-en="One library, several uses"
+        >
+          Une bibliothèque, plusieurs usages
+        </p>
+        <div class="ecosystem-content">
+          <div>
+            <h2 data-fr="Votre musique, avec Aède." data-en="Your music, with Aède.">
+              Votre musique, avec Aède.
+            </h2>
+            <p
+              class="lead"
+              data-fr="Aède est un catalogue musical écrit en Rust pour organiser vos pistes et leurs métadonnées. Il intègre le moteur de FlacCompagnon et peut enregistrer un rapport d’analyse par album, directement dans son dossier."
+              data-en="Aède is a music catalog written in Rust for organizing tracks and metadata. It integrates FlacCompagnon’s engine and can save an analysis report for each album, directly in its folder."
+            >
+              Aède est un catalogue musical écrit en Rust pour organiser vos pistes et leurs
+              métadonnées. Il intègre le moteur de FlacCompagnon et peut enregistrer un rapport
+              d’analyse par album, directement dans son dossier.
+            </p>
+          </div>
+          <a
+            class="btn btn-outline"
+            href="https://craft-and-code.github.io/aede/"
+            target="_blank"
+            rel="noopener"
+            data-fr="Découvrir Aède ↗"
+            data-en="Discover Aède ↗"
+            >Découvrir Aède ↗</a
+          >
+        </div>
+        <p
+          class="note-inline"
+          data-fr="Vous développez en Rust ? Le core est réutilisable sans dépendance à Tauri."
+          data-en="Developing in Rust? The core is reusable without a Tauri dependency."
+        >
+          Vous développez en Rust ? Le core est réutilisable sans dépendance à Tauri.
+        </p>
+        <a href="https://craft-and-code.github.io/FlacCompagnon/doc/" target="_blank" rel="noopener"
+          >Rustdoc · API Rust ↗</a
+        >
       </section>
 
       <!-- Pipeline -->
@@ -361,17 +516,26 @@
         <h2 data-i18n="s6t">Une petite app native</h2>
         <p class="lead" data-i18n="s6p"></p>
         <div class="cards cards-3 dl">
-          <a class="card dlcard" href="https://github.com/craft-and-code/FlacCompagnon/releases/latest">
+          <a
+            class="card dlcard"
+            href="https://github.com/craft-and-code/FlacCompagnon/releases/latest"
+          >
             <span class="os">macOS</span>
             <span class="osx"><code>.dmg</code> · Apple Silicon</span>
             <span class="btn btn-grad small" data-i18n="dlBtn">Télécharger</span>
           </a>
-          <a class="card dlcard" href="https://github.com/craft-and-code/FlacCompagnon/releases/latest">
+          <a
+            class="card dlcard"
+            href="https://github.com/craft-and-code/FlacCompagnon/releases/latest"
+          >
             <span class="os">Windows</span>
             <span class="osx"><code>.msi</code> · x64</span>
             <span class="btn btn-grad small" data-i18n="dlBtn">Télécharger</span>
           </a>
-          <a class="card dlcard" href="https://github.com/craft-and-code/FlacCompagnon/releases/latest">
+          <a
+            class="card dlcard"
+            href="https://github.com/craft-and-code/FlacCompagnon/releases/latest"
+          >
             <span class="os">Linux</span>
             <span class="osx"><code>.AppImage</code> · <code>.deb</code></span>
             <span class="btn btn-grad small" data-i18n="dlBtn">Télécharger</span>
@@ -390,14 +554,20 @@
     </main>
 
     <footer class="footer">
-      <span data-i18n="ftLeft">© 2026 FlacCompagnon · Licence MIT · Construit en Rust + Tauri</span>
+      <span data-i18n="ftLeft"
+        >© 2026 FlacCompagnon · Application MIT · Core MPL-2.0 · Construit en Rust + Tauri</span
+      >
       <span class="ft-links">
         <a href="https://github.com/craft-and-code/FlacCompagnon">GitHub</a>
         <a href="https://github.com/craft-and-code/FlacCompagnon/releases/latest">Releases</a>
-        <a href="https://craft-and-code.github.io/FlacCompagnon/doc/" target="_blank" rel="noopener">Docs</a>
+        <a href="docs/fr/index.html" data-doc="index">Docs</a>
+        <a href="https://craft-and-code.github.io/FlacCompagnon/doc/" target="_blank" rel="noopener"
+          >Rustdoc</a
+        >
+        <a href="https://craft-and-code.github.io/aede/" target="_blank" rel="noopener">Aède</a>
       </span>
     </footer>
 
-    <script src="app.js"></script>
+    <script src="app.js" type="module"></script>
   </body>
 </html>

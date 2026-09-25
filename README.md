@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/ci.yml/badge.svg)](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/ci.yml) [![Release](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/release.yml/badge.svg)](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/release.yml) [![Deploy to GitHub Pages](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/site.yml/badge.svg)](https://github.com/craft-and-code/FlacCompagnon/actions/workflows/site.yml)
 
-[![Site: GitHub Pages](https://img.shields.io/badge/site-GitHub%20Pages-4b82f0?logo=github&logoColor=white)](https://craft-and-code.github.io/FlacCompagnon/) [![Docs: rustdoc](https://img.shields.io/badge/docs-rustdoc-7b4ff0?logo=rust&logoColor=white)](https://craft-and-code.github.io/FlacCompagnon/doc/) [![Latest release](https://img.shields.io/github/v/release/craft-and-code/FlacCompagnon?label=download&color=3ecf8e&logo=github)](https://github.com/craft-and-code/FlacCompagnon/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
+[![Site: GitHub Pages](https://img.shields.io/badge/site-GitHub%20Pages-4b82f0?logo=github&logoColor=white)](https://craft-and-code.github.io/FlacCompagnon/) [![Docs: rustdoc](https://img.shields.io/badge/docs-rustdoc-7b4ff0?logo=rust&logoColor=white)](https://craft-and-code.github.io/FlacCompagnon/doc/) [![Latest release](https://img.shields.io/github/v/release/craft-and-code/FlacCompagnon?label=download&color=3ecf8e&logo=github)](https://github.com/craft-and-code/FlacCompagnon/releases/latest) [![App: MIT](https://img.shields.io/badge/app-MIT-lightgrey)](LICENSE) [![Analysis core: MPL-2.0](https://img.shields.io/badge/analysis%20core-MPL--2.0-orange)](core/LICENSE)
 
 **A cross-platform desktop tool that checks whether your "lossless" audio is actually lossless.**
 
@@ -245,7 +245,7 @@ cargo run --release -p flaccompagnon-cli -- track.flac --analysis loudness --ana
 
 The installed executable is named `flaccompagnon`. `--analysis` selects which measurements to display in the terminal; the engine still computes the complete analysis, and a saved JSON report always includes every result. Use `flaccompagnon --help` for the available names and scan options.
 
-[Aède](https://github.com/craft-and-code/aede) uses this Rust engine directly through `flaccompagnon-core`. Its `aede analyze [folder…] --json` command groups tracks by album and saves one FlacCompagnon report in each album folder. Aède stores the measurements with their FlacCompagnon source attribution; it can also import an existing report with `aede import`.
+[Aède](https://craft-and-code.github.io/aede/) uses this Rust engine directly through `flaccompagnon-core`. Its `aede analyze [folder…] --json` command groups tracks by album and saves one FlacCompagnon report in each album folder. Aède stores the measurements with their FlacCompagnon source attribution; it can also import an existing report with `aede import`.
 
 ---
 
@@ -354,9 +354,11 @@ Four GitHub Actions workflows are included:
 - **Release** (`.github/workflows/release.yml`) builds the desktop installers and, in a separate job, standalone CLI archives for **macOS (Apple Silicon), Windows and Linux**. It publishes both to one GitHub Release when you push a version tag:
 
   ```bash
-  git tag v0.1.0
-  git push origin v0.1.0
+  git tag -a v0.9.5 -m "FlacCompagnon 0.9.5"
+  git push origin v0.9.5
   ```
+
+Before tagging, commit the intended release with matching versions in `Cargo.toml` (`workspace.package.version`), `src-tauri/tauri.conf.json`, `package.json` and `package-lock.json`. The tag starts both the desktop and CLI builds; pushing to the main branch separately triggers the Site workflow.
 
 (or from the Actions tab via "Run workflow"). The release is created as a **draft** — review the attached installers, then publish it. Your downloads then live on the repository's **Releases** page. ffmpeg is not bundled; users install it themselves for the spectrogram feature.
 
@@ -415,6 +417,8 @@ The **network is never touched by the test suite**: the lookup's HTTP calls are 
 
 ## Documentation (rustdoc)
 
+The website's **Docs** entry opens the [analysis guide](https://craft-and-code.github.io/FlacCompagnon/docs/en/index.html), also available [in French](https://craft-and-code.github.io/FlacCompagnon/docs/fr/index.html). Each analysis has a plain-language introduction, an illustrative diagram and an expandable technical section with methods, limits and verification examples. The [CLI guide](https://craft-and-code.github.io/FlacCompagnon/docs/en/cli.html) covers installation, options, JSON reports and Aède integration. Rustdoc remains the separate API reference, linked throughout the guide.
+
 The whole `core` crate is documented with Rust doc comments (crate-, module- and function-level), so you can browse the full API — every analysis routine, its inputs and its heuristics — as a generated HTML site. Build it locally with:
 
 ```bash
@@ -422,6 +426,18 @@ cargo doc -p flaccompagnon-core --no-deps --open
 ```
 
 On every push to the main branch the `Docs` workflow (`.github/workflows/docs.yml`) builds this documentation and publishes it into the `doc/` sub-folder of the `gh-pages` branch, so it can live alongside a static presentation site served from the root of the same branch (neither overwrites the other). Enable it once under **Settings → Pages → Source: Deploy from a branch → `gh-pages` / (root)**; the API docs are then served at <https://craft-and-code.github.io/FlacCompagnon/doc/>.
+
+### Build and preview the website
+
+```sh
+npm ci
+npm run build:site
+npm run preview:site
+```
+
+Use Node.js 22 or newer. Open `http://localhost:4174`. After changing content, rebuild and reload the preview. The build produces `dist-site/` and checks all generated local links, fragments, language counterparts and CLI analysis names. The **Site** workflow runs the same build on pushes affecting the site, documentation or build files, then publishes the homepage and `docs/` while preserving the separately published Rustdoc under `doc/`.
+
+Technical English articles remain in `docs/`; French articles live in `docs/fr/`. The site renders those sources directly, so the old Markdown articles have not been deleted or copied into a second set of HTML sources. `scripts/site/` owns the catalog, beginner explanations, diagrams and templates; `site/` owns the shared visual assets and browser interactions. Update both languages together when a method changes. Any later removal or relocation of Markdown should update the generator in the same change, after the new guide has been reviewed.
 
 ---
 
@@ -493,4 +509,7 @@ On the tagging side: **AcoustID/Chromaprint audio fingerprinting** so a track ca
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Bundled ffmpeg builds carry their own licenses; review them before redistribution.
+The desktop application, CLI, services and website source are MIT — see
+[LICENSE](LICENSE). The reusable [`flaccompagnon-core`](core) analysis library
+is MPL-2.0 — see [core/LICENSE](core/LICENSE). Bundled ffmpeg builds carry their
+own licenses; review them before redistribution.

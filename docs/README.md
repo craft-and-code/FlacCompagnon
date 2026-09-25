@@ -1,8 +1,10 @@
 # Analysis guide
 
+Read the illustrated website guide in [English](https://craft-and-code.github.io/FlacCompagnon/docs/en/index.html) or [French](https://craft-and-code.github.io/FlacCompagnon/docs/fr/index.html). These Markdown files are still its technical sources during validation; `npm run build:site` renders them into the site. The separate [CLI guide](cli.md) explains commands and JSON reports, and [Rustdoc](https://craft-and-code.github.io/FlacCompagnon/doc/) documents the Rust API.
+
 This directory documents every measurement and detection exposed by FlacCompagnon. Each page states what is measured, how the value or verdict is calculated, what the result means, what it cannot establish, and how to reproduce the check. A positive detection is evidence for the described property; a negative detection means only that this particular test did not establish it.
 
-The app decodes a file once and feeds the decoded frames to streaming measurements. Measurements can therefore share the same file read without sharing a conclusion. The three authenticity verdicts are deliberately independent: a file can be flagged for upscaling, upsampling, transcoding, several of these, or none.
+Streaming measurements share decoded frames, while codec-lattice searches can require additional analysis work. Measurements can therefore share a file read without sharing a conclusion. The three authenticity verdicts are deliberately independent: a file can be flagged for upscaling, upsampling, transcoding, several of these, or none.
 
 | Kind                   | Analysis                      | Result in the app                            | Documentation                                     |
 | ---------------------- | ----------------------------- | -------------------------------------------- | ------------------------------------------------- |
@@ -30,6 +32,8 @@ The app decodes a file once and feeds the decoded frames to streaming measuremen
 | Integrity check        | FLAC STREAMINFO signature     | FLAC MD5 status                              | [FLAC MD5](flac-md5.md)                           |
 
 The [audio measurements index](audio-measurements.md) and [discontinuity checks index](discontinuities.md) remain as stable entry points for existing links.
+
+[Whole-file MD5 and CRC32 fingerprints](fingerprints.md) complement FLAC audio-signature verification, with different behaviour after tag edits or file moves.
 
 ## Verification commands
 

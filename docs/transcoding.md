@@ -12,13 +12,15 @@ The transform band layouts and windows come from the relevant codec standards. T
 
 ## Result and applicability
 
-The lattice result is included in the detection detail even when no finding occurs. This distinguishes “measured with no significant lattice evidence” from “the search did not complete.” A detected score creates the `Transcoded` finding only at sample rates of 48 kHz or below, where the detector has the applicable tabulated bands. At higher rates the detail says that the lattice search is not applicable; it does not claim the source is lossless.
+The lattice result is included in the detection detail even when no finding occurs. This distinguishes “measured with no significant lattice evidence” from “the search did not complete.” A detected score creates the `Transcoded` finding only at the tabulated sample rates of 32, 44.1 and 48 kHz. At other rates, including higher rates the detail says that the lattice search is not applicable; it does not claim the source is lossless.
 
 The authenticity summary becomes `Flagged` if this or either independent authenticity detection is positive. `Clean` means no completed detector raised a finding. It is not a certificate of recording history.
 
 ## Limits
 
 The statistic assumes that, after the appropriate transform and scaling, uncompressed material does not concentrate on a codec grid as strongly as a matching transcode. Tonal, very quiet, processed or unusual signals can violate that model. Encoding, resampling, mixing, gain changes and re-encoding can weaken or erase a lattice. A codec or configuration outside the implemented analysis can also be missed.
+
+Calibration remains preliminary: a pure lossless 24-bit sine can still cross the AAC threshold.
 
 The score must therefore be read with the reported applicability and any skip reason. It should not be converted into a percentage or used alone to make a provenance claim.
 
