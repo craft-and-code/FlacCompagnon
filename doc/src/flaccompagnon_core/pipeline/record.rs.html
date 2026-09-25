@@ -56,40 +56,44 @@
 <a href=#56 id=56 data-nosnippet>56</a>        phase_correlation: <span class="prelude-val">None</span>,
 <a href=#57 id=57 data-nosnippet>57</a>        phase_inverted: <span class="prelude-val">None</span>,
 <a href=#58 id=58 data-nosnippet>58</a>        stereo_balance: <span class="prelude-val">None</span>,
-<a href=#59 id=59 data-nosnippet>59</a>        badge: <span class="prelude-val">None</span>,
-<a href=#60 id=60 data-nosnippet>60</a>        clipping: ClippingInfo::unmeasured(),
-<a href=#61 id=61 data-nosnippet>61</a>        dr_db: <span class="prelude-val">None</span>,
-<a href=#62 id=62 data-nosnippet>62</a>        integrated_lufs: <span class="prelude-val">None</span>,
-<a href=#63 id=63 data-nosnippet>63</a>        loudness_range_lu: <span class="prelude-val">None</span>,
-<a href=#64 id=64 data-nosnippet>64</a>        discontinuities: <span class="prelude-val">None</span>,
-<a href=#65 id=65 data-nosnippet>65</a>        flac_md5: <span class="prelude-val">None</span>,
-<a href=#66 id=66 data-nosnippet>66</a>        <span class="comment">// Computed here, beside `size_bytes` and `modified_unix`, and for the
-<a href=#67 id=67 data-nosnippet>67</a>        // same reason: it describes the file as an object rather than the
-<a href=#68 id=68 data-nosnippet>68</a>        // audio inside it, so a track that fails to decode still gets an
-<a href=#69 id=69 data-nosnippet>69</a>        // honest fingerprint. One extra read of the file — negligible next to
-<a href=#70 id=70 data-nosnippet>70</a>        // the spectral analysis and the lattice sweep that follow.
-<a href=#71 id=71 data-nosnippet>71</a>        </span>file_md5: digest.as_ref().map(|d| d.md5.clone()),
-<a href=#72 id=72 data-nosnippet>72</a>        file_crc32: digest.as_ref().map(|d| d.crc32.clone()),
-<a href=#73 id=73 data-nosnippet>73</a>        error: <span class="prelude-val">None</span>,
-<a href=#74 id=74 data-nosnippet>74</a>    }
-<a href=#75 id=75 data-nosnippet>75</a>}
-<a href=#76 id=76 data-nosnippet>76</a>
-<a href=#77 id=77 data-nosnippet>77</a><span class="doccomment">/// Average bitrate in kbps from the file's own size and duration — see
-<a href=#78 id=78 data-nosnippet>78</a>/// [`FileAnalysis::bitrate_kbps`] for why this (not a codec-reported figure)
-<a href=#79 id=79 data-nosnippet>79</a>/// is what's shown.
-<a href=#80 id=80 data-nosnippet>80</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>bitrate_kbps(size_bytes: u64, duration_secs: f64) -&gt; <span class="prelude-ty">Option</span>&lt;u32&gt; {
-<a href=#81 id=81 data-nosnippet>81</a>    <span class="kw">if </span>duration_secs &lt;= <span class="number">0.0 </span>{
-<a href=#82 id=82 data-nosnippet>82</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
-<a href=#83 id=83 data-nosnippet>83</a>    }
-<a href=#84 id=84 data-nosnippet>84</a>    <span class="kw">let </span>kbps = (size_bytes <span class="kw">as </span>f64 * <span class="number">8.0</span>) / duration_secs / <span class="number">1000.0</span>;
-<a href=#85 id=85 data-nosnippet>85</a>    <span class="kw">if </span>kbps.is_finite() &amp;&amp; kbps &gt;= <span class="number">0.0 </span>{
-<a href=#86 id=86 data-nosnippet>86</a>        <span class="prelude-val">Some</span>(kbps.round() <span class="kw">as </span>u32)
-<a href=#87 id=87 data-nosnippet>87</a>    } <span class="kw">else </span>{
-<a href=#88 id=88 data-nosnippet>88</a>        <span class="prelude-val">None
-<a href=#89 id=89 data-nosnippet>89</a>    </span>}
-<a href=#90 id=90 data-nosnippet>90</a>}
-<a href=#91 id=91 data-nosnippet>91</a>
-<a href=#92 id=92 data-nosnippet>92</a><span class="attr">#[cfg(test)]
-<a href=#93 id=93 data-nosnippet>93</a>#[path = <span class="string">"../../tests/unit/pipeline/record.rs"</span>]
-<a href=#94 id=94 data-nosnippet>94</a></span><span class="kw">mod </span>tests;
+<a href=#59 id=59 data-nosnippet>59</a>        high_frequency_stereo: <span class="prelude-val">None</span>,
+<a href=#60 id=60 data-nosnippet>60</a>        dc_offset: <span class="prelude-val">None</span>,
+<a href=#61 id=61 data-nosnippet>61</a>        local_phase: <span class="prelude-val">None</span>,
+<a href=#62 id=62 data-nosnippet>62</a>        badge: <span class="prelude-val">None</span>,
+<a href=#63 id=63 data-nosnippet>63</a>        clipping: ClippingInfo::unmeasured(),
+<a href=#64 id=64 data-nosnippet>64</a>        dr_db: <span class="prelude-val">None</span>,
+<a href=#65 id=65 data-nosnippet>65</a>        integrated_lufs: <span class="prelude-val">None</span>,
+<a href=#66 id=66 data-nosnippet>66</a>        loudness_peaks: <span class="prelude-val">None</span>,
+<a href=#67 id=67 data-nosnippet>67</a>        loudness_range_lu: <span class="prelude-val">None</span>,
+<a href=#68 id=68 data-nosnippet>68</a>        discontinuities: <span class="prelude-val">None</span>,
+<a href=#69 id=69 data-nosnippet>69</a>        flac_md5: <span class="prelude-val">None</span>,
+<a href=#70 id=70 data-nosnippet>70</a>        <span class="comment">// Computed here, beside `size_bytes` and `modified_unix`, and for the
+<a href=#71 id=71 data-nosnippet>71</a>        // same reason: it describes the file as an object rather than the
+<a href=#72 id=72 data-nosnippet>72</a>        // audio inside it, so a track that fails to decode still gets an
+<a href=#73 id=73 data-nosnippet>73</a>        // honest fingerprint. One extra read of the file — negligible next to
+<a href=#74 id=74 data-nosnippet>74</a>        // the spectral analysis and the lattice sweep that follow.
+<a href=#75 id=75 data-nosnippet>75</a>        </span>file_md5: digest.as_ref().map(|d| d.md5.clone()),
+<a href=#76 id=76 data-nosnippet>76</a>        file_crc32: digest.as_ref().map(|d| d.crc32.clone()),
+<a href=#77 id=77 data-nosnippet>77</a>        error: <span class="prelude-val">None</span>,
+<a href=#78 id=78 data-nosnippet>78</a>    }
+<a href=#79 id=79 data-nosnippet>79</a>}
+<a href=#80 id=80 data-nosnippet>80</a>
+<a href=#81 id=81 data-nosnippet>81</a><span class="doccomment">/// Average bitrate in kbps from the file's own size and duration — see
+<a href=#82 id=82 data-nosnippet>82</a>/// [`FileAnalysis::bitrate_kbps`] for why this (not a codec-reported figure)
+<a href=#83 id=83 data-nosnippet>83</a>/// is what's shown.
+<a href=#84 id=84 data-nosnippet>84</a></span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>bitrate_kbps(size_bytes: u64, duration_secs: f64) -&gt; <span class="prelude-ty">Option</span>&lt;u32&gt; {
+<a href=#85 id=85 data-nosnippet>85</a>    <span class="kw">if </span>duration_secs &lt;= <span class="number">0.0 </span>{
+<a href=#86 id=86 data-nosnippet>86</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
+<a href=#87 id=87 data-nosnippet>87</a>    }
+<a href=#88 id=88 data-nosnippet>88</a>    <span class="kw">let </span>kbps = (size_bytes <span class="kw">as </span>f64 * <span class="number">8.0</span>) / duration_secs / <span class="number">1000.0</span>;
+<a href=#89 id=89 data-nosnippet>89</a>    <span class="kw">if </span>kbps.is_finite() &amp;&amp; kbps &gt;= <span class="number">0.0 </span>{
+<a href=#90 id=90 data-nosnippet>90</a>        <span class="prelude-val">Some</span>(kbps.round() <span class="kw">as </span>u32)
+<a href=#91 id=91 data-nosnippet>91</a>    } <span class="kw">else </span>{
+<a href=#92 id=92 data-nosnippet>92</a>        <span class="prelude-val">None
+<a href=#93 id=93 data-nosnippet>93</a>    </span>}
+<a href=#94 id=94 data-nosnippet>94</a>}
+<a href=#95 id=95 data-nosnippet>95</a>
+<a href=#96 id=96 data-nosnippet>96</a><span class="attr">#[cfg(test)]
+<a href=#97 id=97 data-nosnippet>97</a>#[path = <span class="string">"../../tests/unit/pipeline/record.rs"</span>]
+<a href=#98 id=98 data-nosnippet>98</a></span><span class="kw">mod </span>tests;
 </code></pre></div></section></main></body></html>

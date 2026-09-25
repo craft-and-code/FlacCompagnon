@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["OPPOSED_CORRELATION"],"struct":["BandPhase","LocalPhase","LocalPhaseMeter","PhaseSummary"]};

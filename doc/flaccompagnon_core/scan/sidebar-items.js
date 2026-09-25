@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["SUPPORTED_EXTENSIONS"],"fn":["analyze_folder","is_supported_audio","list_audio_files"]};
+window.SIDEBAR_ITEMS = {"constant":["SUPPORTED_EXTENSIONS"],"fn":["analyze_folder","display_root","folder_report","gather_targets","is_supported_audio","list_audio_files"]};
