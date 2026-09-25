@@ -7,12 +7,27 @@ import { useEffect, useState } from "react";
 import * as api from "../api";
 import type { SpectrogramSize } from "../types";
 
-const KEY = "spectrogramSize";
+export const SPECTROGRAM_SIZE_STORAGE_KEY = "spectrogramSize";
+
+/// Interpret the only two stored values this preference supports. Keeping the
+/// fallback here means an old, corrupt or manually edited preference cannot
+/// make spectrogram generation send an invalid size to the Rust command.
+export function readSpectrogramSize(value: string | null): SpectrogramSize {
+  return value === "half" || value === "full" ? value : "half";
+}
+
+/// Write through the same tiny storage boundary as the column preferences.
+/// The hook owns the unavailable-storage fallback because it is UI state.
+export function writeSpectrogramSize(
+  storage: Pick<Storage, "setItem">,
+  size: SpectrogramSize,
+) {
+  storage.setItem(SPECTROGRAM_SIZE_STORAGE_KEY, size);
+}
 
 function stored(): SpectrogramSize {
   try {
-    const value = localStorage.getItem(KEY);
-    if (value === "half" || value === "full") return value;
+    return readSpectrogramSize(localStorage.getItem(SPECTROGRAM_SIZE_STORAGE_KEY));
   } catch {
     /* ignore */
   }
@@ -24,7 +39,7 @@ export function useSpectrogramSize() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(KEY, size);
+      writeSpectrogramSize(localStorage, size);
     } catch {
       /* ignore */
     }

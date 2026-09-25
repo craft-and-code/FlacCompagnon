@@ -8,6 +8,7 @@ const { outputFiles } = await build({
     contents: `export { ALL_COLUMNS } from "./src/components/resultColumns";
       export { sortFiles } from "./src/components/tableSort";
       export { reconcile } from "./src/components/useColumnPrefs";
+      export { SPECTROGRAM_SIZE_STORAGE_KEY, readSpectrogramSize, writeSpectrogramSize } from "./src/components/useSpectrogramSize";
       export { renderToStaticMarkup } from "react-dom/server";`,
     resolveDir: process.cwd(),
   },
@@ -16,10 +17,42 @@ const { outputFiles } = await build({
   // React's server renderer uses node built-ins via require.
   banner: { js: 'import { createRequire } from "node:module"; const require = createRequire(process.cwd() + "/package.json");' },
 });
-const { ALL_COLUMNS, sortFiles, renderToStaticMarkup, reconcile } = await import(
+const {
+  ALL_COLUMNS,
+  sortFiles,
+  renderToStaticMarkup,
+  reconcile,
+  SPECTROGRAM_SIZE_STORAGE_KEY,
+  readSpectrogramSize,
+  writeSpectrogramSize,
+} = await import(
   `data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString("base64")}`
 );
 const render = (key, file) => renderToStaticMarkup(ALL_COLUMNS.find((c) => c.key === key).render(file, null));
+
+test("columns after the FLAC MD5 signature start hidden without overriding a saved choice", () => {
+  const signature = ALL_COLUMNS.findIndex((column) => column.key === "md5");
+  const later = ALL_COLUMNS.slice(signature + 1);
+  assert.deepEqual(later.map((column) => column.key), ["fileMd5", "fileCrc32"]);
+  assert.ok(later.every((column) => !column.defaultVisible));
+
+  const fresh = reconcile({ order: [], hidden: [] });
+  assert.ok(later.every((column) => fresh.hidden.has(column.key)));
+
+  const saved = reconcile({ order: ALL_COLUMNS.map((column) => column.key), hidden: [] });
+  assert.ok(later.every((column) => !saved.hidden.has(column.key)));
+});
+
+test("spectrogram size accepts only supported values and persists the menu choice", () => {
+  assert.equal(readSpectrogramSize("half"), "half");
+  assert.equal(readSpectrogramSize("full"), "full");
+  assert.equal(readSpectrogramSize(null), "half");
+  assert.equal(readSpectrogramSize("large"), "half");
+
+  const writes = [];
+  writeSpectrogramSize({ setItem: (key, value) => writes.push([key, value]) }, "full");
+  assert.deepEqual(writes, [[SPECTROGRAM_SIZE_STORAGE_KEY, "full"]]);
+});
 
 test("loudness maxima are inserted after LUFS even with existing preferences, then stay movable", () => {
   const keys = ALL_COLUMNS.map((c) => c.key);
