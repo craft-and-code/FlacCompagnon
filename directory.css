@@ -1,0 +1,14 @@
+/* One analysis directory shared by the homepage and the guides. */
+.analysis-directory { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; margin-top: 30px; }
+.analysis-group :is(h2, h3) { font-size: 13px; font-weight: 500; color: var(--text-3); margin-bottom: 10px; font-family: var(--mono); }
+.analysis-group ul { list-style: none; }
+.analysis-group li { border-bottom: 1px solid var(--border-soft); padding: 0; }
+.analysis-group a { display: flex; gap: 16px; justify-content: space-between; color: var(--text); font-weight: 500; padding: 12px 0; }
+.analysis-group a:hover { color: var(--link); }
+.analysis-group a > span:last-child { color: var(--text-4); }
+.analysis-group p { font-size: 13px; color: var(--text-3); margin: -6px 0 12px; }
+
+.analysis-group[hidden], .analysis-group li[hidden] { display: none; }
+.analysis-group a > span:last-child { transition: transform .2s, color .2s; }
+.analysis-group a:hover > span:last-child { color: var(--link); transform: translate(2px, -2px); }
+@media (prefers-reduced-motion: reduce) { .analysis-group a:hover > span:last-child { transform: none; } }

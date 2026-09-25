@@ -1,182 +1,12 @@
 /* FlacCompagnon landing — vanilla i18n, interactive tooltips and canvas
    animations. Ported from the design handoff (no framework). */
 
-const DICT = {
-  fr: {
-    nPrev: "Aperçu", nDet: "Détections", nInt: "Intégrité", nSpec: "Spectrogrammes", nTags: "Tags", nConv: "Conversion", nExp: "Export", nPipe: "Pipeline", nDl: "Télécharger", nDoc: "Docs",
-    kick: "Open source · Rust + Tauri · macOS · Windows · Linux",
-    h1a: "Votre lossless est-il", h1b: "vraiment lossless ?",
-    sub: "FlacCompagnon analyse vos fichiers audio et démasque les faux FLAC : upscaling, upsampling et transcodage — y compris les transcodes AAC, à tous les débits. Déposez un dossier, l'analyse fait le reste.",
-    ctaDl: "Télécharger", ctaGh: "Voir sur GitHub",
-    note: "Gratuit · MIT · L’analyse ne modifie jamais vos fichiers",
-    s1k: "Aperçu", s1t: "L'analyse en un coup d'œil",
-    s1p: "Déposez un dossier ou des fichiers : chaque piste est décodée et passée au crible en parallèle. Un tag coloré par détection — et au survol, l'explication du verdict.",
-    cap1: "↑ Aperçu interactif de l'interface (thème sombre) — survolez les tags de détection.",
-    thFile: "Fichier", thFmt: "Format", thDur: "Durée", thSr: "Échantillonnage", thBits: "Bits réels", thCut: "Cut-off", thDet: "Détections",
-    sumCount: "4 fichiers", chClean: "2 clean", chUps: "1 upsamplé", chTr: "1 transcodé",
-    tipClean: "Aucune détection : contenu plein jusqu'à ~21,9 kHz, pas de signature lossy.",
-    tipDark: "Un master acoustique naturellement sombre : le spectre s'arrête à 18,6 kHz parce que personne n'a joué au-dessus, pas parce qu'un codec l'a coupé. Aucune grille de quantification n'a été trouvée — le fichier est déclaré propre.",
-    s2k: "Détections", s2t: "Trois détections indépendantes",
-    s2p: "Le modèle du Lossless Audio Checker, réimplémenté de zéro et validé sur des transcodes réels. Trois signatures indépendantes, chacune ciblant une manière différente de fabriquer un faux lossless.",
-    s2note: "Ces détections sont des heuristiques éclairées, pas une preuve cryptographique — les enregistrements naturellement « sombres » (acoustique, classique, bandes analogiques) peuvent déclencher un faux positif doux. Le spectrogramme reste l'arbitre final. La grille AAC, elle, frôle la preuve : la musique authentique ne retombe jamais dessus.",
-    d1t: "Upscaling — fausse résolution",
-    d1p: "FlacCompagnon regarde combien de bits chaque échantillon utilise réellement. Si les bits de poids faible restent toujours à zéro, ils ne portent aucune information : un fichier annoncé en 24 bits qui n'en utilise que 16 est un 16 bits « gonflé ».",
-    d1tip: "Marqué Upscaled : profondeur déclarée 24 bits, profondeur effective ≤ 16 bits. Les 8 bits de poids faible ne portent aucune information réelle.",
-    d1cap: "24 bits déclarés — les 8 bits bas sont vides",
-    d2t: "Upsampling — faux échantillonnage",
-    d2p: "Une analyse fréquentielle moyennée sur toute la piste. Si un conteneur « hi-res » 96 kHz s'arrête net vers 22 kHz, toute la bande supplémentaire est vide — le fichier a été suréchantillonné depuis un CD.",
-    d2tip: "Marqué Upsampled : le contenu s'arrête à ~22,0 kHz dans un conteneur 96,0 kHz — le mur caractéristique d'un suréchantillonnage, ici depuis une source 44,1 kHz.",
-    d2cap: "Le mur du cut-off à 22,05 kHz",
-    d3t: "Transcoding — source lossy",
-    d3p: "La signature la plus forte. FlacCompagnon rejoue le calcul interne de l'encodeur AAC : au bon alignement parmi 1024 essais, les coefficients d'un transcode « retombent » exactement sur la grille de valeurs que seul l'AAC produit. Efficace jusqu'à 320 kbps, y compris sur les passages percussifs.",
-    d3tip: "Marqué Transcoded : à l'alignement synchronisé de la MDCT, les bandes retombent de façon répétée sur la grille de quantification AAC (transcodes mesurés : 28–100 % des bandes, musique authentique ≤ 23 %) — source AAC quasi certaine.",
-    d3cap: "Les coefficients « snappent » sur la grille AAC",
-    s3k: "Intégrité", s3t: "Au-delà des détections",
-    s3p: "Six contrôles et fonctions complètent l'analyse.",
-    i1t: "Vérification MD5 FLAC",
-    i1p: "Quand elle est présente, un FLAC contient l'empreinte MD5 de son audio d'origine. FlacCompagnon décode entièrement le fichier et recompare le hash — le même contrôle que <code>flac -t</code>, fusionné avec l'analyse en un seul passage. Les FLAC sans empreinte sont signalés comme tels.",
-    i2t: "Fake stereo",
-    i2p: "Deux canaux strictement identiques ? Le fichier est en réalité du dual-mono déguisé en stéréo.",
-    i3t: "Clipping",
-    i3p: "Compte les salves d'échantillons à pleine échelle et mesure aussi le vrai pic (dBTP) par suréchantillonnage ×4 : certains masters écrêtent « entre » les échantillons, là où le pic classique ne voit rien — le signe d'un master trop fort, indépendamment du caractère lossless.",
-    i4t: "Détection du format réel",
-    i4p: "FlacCompagnon lit les octets d'en-tête, pas l'extension. Un <code>.flac</code> qui est en réalité un WAV — ou l'inverse — est repéré et signalé en rouge.",
-    i5t: "Dynamique (DR)",
-    i5p: "FlacCompagnon mesure la plage dynamique de chaque piste : l'écart entre les crêtes et le niveau moyen des passages forts. Une valeur élevée signale un master respectueux de la dynamique — typique des éditions Full Dynamic Range. Une valeur faible trahit un master écrasé par la « loudness war ».",
-    i6t: "Hi-Res & DSD",
-    i6p: "Les vraies pistes haute résolution et les fichiers DSD (<code>.dsf</code> / <code>.dff</code>) reçoivent un badge vérifié — et FlacCompagnon distingue le DSD authentique d'un PCM converti après coup (nécessite ffmpeg ; sans lui, seul l'en-tête est vérifié).",
-    s4k: "Spectrogrammes", s4t: "Le juge de paix",
-    s4p: "Un clic génère un spectrogramme haute résolution par piste, avec axe de fréquences gradué jusqu'à la fréquence de Nyquist (la moitié de l'échantillonnage, soit 22,05 kHz pour un CD à 44,1 kHz). Le cut-off se voit à l'œil nu.",
-    s4n1: "Rendu via ffmpeg, détecté automatiquement sur votre système.",
-    s4n2: "Un dossier <code>spectrograms/</code> est créé dans chaque dossier contenant des fichiers audio, et un PNG est généré par piste — uniquement si vous cliquez sur le bouton « Generate spectrograms ».",
-    s4n3: "Plus rapide encore : <strong>écoutez</strong>. Un clic sur la vignette d'une ligne lance la lecture, avec une barre de transport en pied de liste. Ce n'est pas un lecteur audio à proprement parler — juste de quoi confronter un verdict à votre oreille sans quitter l'application.",
-    s5k: "Pipeline", s5t: "Comment ça marche",
-    s5p: "Glissez-déposez un dossier ou des fichiers — ou choisissez-les avec le bouton d'import. Chaque piste est décodée, puis passée en revue par une batterie d'analyses, et le verdict s'affiche.",
-    p1: "dossier déposé", p2: "décodage · symphonia", p3: "analyse streaming",
-    p3a: "FFT ▸ cut-off", p3b: "MDCT ▸ grille AAC", p3c: "bits effectifs", p3d: "clipping · fake stereo",
-    p4: "table de résultats",
-    s5note: "Les FLAC sont décodés une seule fois : le même passage nourrit l'analyse et le hash MD5. Les fichiers sont traités en parallèle — un worker par cœur CPU, moins un pour garder l'interface fluide. Le décodage s'appuie sur Symphonia, une bibliothèque de décodage audio 100 % Rust (FLAC, WAV, ALAC, AAC…).",
-    s6k: "Téléchargement", s6t: "Une petite app native",
-    s6p: "Installeurs signés par la CI pour les trois plateformes, publiés sur les releases GitHub.",
-    dlBtn: "Télécharger",
-    ffnote: "ffmpeg n'est requis que pour les spectrogrammes et pour l'analyse de contenu des fichiers DSD — le reste de l'analyse s'en passe entièrement.",
-    ffinstall: "Pas de ffmpeg installé ? Consultez le <a href=\"https://github.com/craft-and-code/FlacCompagnon#prerequisites\" target=\"_blank\" rel=\"noopener\">README sur GitHub</a> pour l'installer sur macOS, Windows ou Linux.",
-    s8k: "Tags", s8t: "Corriger, pas seulement constater",
-    s8p: "Sélectionnez une ou plusieurs pistes — un volet d'édition s'ouvre à gauche, avec les champs habituels : titre, artiste, album, artiste d'album, compositeur, année, genre, n° de piste et de disque, commentaire, compilation. C'est le <strong>seul endroit de l'application qui écrit dans vos fichiers</strong>, et uniquement quand vous cliquez sur <strong>Save</strong>.",
-    t1t: "Édition par lot",
-    t1p: "Sélectionnez tout un album : chaque champ affiche la valeur commune ou un badge « plusieurs valeurs ». Seuls les champs que vous modifiez sont écrits — corriger l'album de 12 pistes n'écrase jamais leurs titres respectifs. Un bouton dédié renumérote la sélection de 1 à N d’un coup, dans l’ordre du tableau.",
-    t2t: "Pochettes",
-    t2p: "La pochette s'affiche dans un cadre carré de taille fixe — la hauteur du volet ne bouge donc pas d'une piste à l'autre. Plusieurs images dans la sélection : un carousel permet de les parcourir. Un clic l'ouvre en grand, à ses proportions réelles et avec son rôle (<em>Front cover</em>…), et un glisser-déposer d'image sur le carré la remplace sur toutes les pistes sélectionnées.",
-    t3t: "Recherche en ligne",
-    t3p: "Le bouton <strong>Search online</strong> interroge <strong>MusicBrainz</strong> et, si vous fournissez votre jeton personnel, <strong>Discogs</strong>. Si le fichier porte déjà un identifiant MusicBrainz (tagué par Picard), la bonne release est trouvée directement, sans recherche approximative.",
-    s8note: "Les résultats en ligne <strong>pré-remplissent</strong> le volet : rien n'est écrit tant que vous n'avez pas relu et cliqué sur Save — et <strong>Reset</strong> annule tout. C'est la seule fonction qui utilise le réseau, et jamais sans un clic de votre part.",
-    s9k: "Conversion", s9t: "Convertir sans casser le rangement",
-    s9p: "Un volet dédié, symétrique de celui des tags : déposez-y des pistes ou des dossiers, choisissez un format, et l'arborescence d'origine est <strong>reproduite à l'identique</strong> sous le dossier de destination. Les fichiers importés pour la conversion ne rejoignent jamais le tableau d'analyse — les deux listes sont indépendantes.",
-    cf1: "sans perte", cf2: "libre de droits", cf3: "compatible partout", cf4: "PCM 16 bits",
-    s9n1: "Opus et MP3 proposent un débit ; FLAC et WAV n'en ont pas à choisir. Le WAV produit est fixé en 16 bits, quelle que soit la profondeur de la source.",
-    s9n2: "Une case à cocher copie aussi tout ce qui n'est pas de l'audio — pochettes, playlists, spectrogrammes déjà générés — à la même place dans l'arborescence copiée.",
-    s9note: "Vos fichiers d'origine ne sont ni déplacés ni modifiés : la conversion écrit ailleurs, toujours. La lecture en cours se met en pause pendant le traitement (les encodeurs occupent tous les cœurs) et reprend ensuite toute seule. <strong>Cancel</strong> arrête le lot et efface les fichiers déjà écrits par celui-ci — sans toucher à ce que le dossier contenait avant.",
-    s7k: "Export", s7t: "Emportez vos résultats",
-    s7p: "Un clic sur <strong>Save…</strong> écrit deux fichiers, même nom, même dossier : un <code>.csv</code> — une ligne par piste, toutes les colonnes de l'analyse, prêt pour un tableur — et un <code>.json</code> qui conserve l'analyse complète, y compris le détail de chaque détection. Le nom et l'emplacement proposés reprennent le dossier analysé.",
-    s7n2: "Déposez un <code>.json</code> déjà exporté sur la liste pour recharger le tableau tel quel — aucun fichier audio n'est redécodé. Pas de bouton dédié : c'est le même geste que déposer un dossier.",
-    s7m3u: "<strong>Export playlist…</strong> écrit une playlist <strong>M3U</strong> dans l'ordre affiché à l'écran — y compris après avoir réorganisé les lignes à la souris. Au choix : M3U étendu (<code>.m3u8</code>, avec les durées et « Artiste — Titre ») par défaut, ou M3U simple (<code>.m3u</code>, les chemins seuls).",
-    s7n1: "Astuce : la corbeille en bout de ligne écarte un fichier de la liste — il ne figurera dans aucun des deux fichiers exportés.",
-    refT: "Références",
-    ref1: "J. Lacroix, Y. Prime, A. Remy & O. Derrien — « Lossless Audio Checker: A Software for the Detection of Upscaling, Upsampling, and Transcoding in Lossless Musical Tracks », AES 139th Convention, Paper 9416, New York, 2015.",
-    ref2: "O. Derrien et al. — « Detection of Genuine Lossless Audio Files: Application to the MPEG-AAC Codec », Journal of the AES, 2019.",
-    ref3: "FlacCompagnon est un successeur open source, réécrit de zéro, du Lossless Audio Checker (discontinué).",
-    ftLeft: "© 2026 FlacCompagnon · Licence MIT · Construit en Rust + Tauri",
-  },
-  en: {
-    nPrev: "Preview", nDet: "Detections", nInt: "Integrity", nSpec: "Spectrograms", nTags: "Tags", nConv: "Conversion", nExp: "Export", nPipe: "Pipeline", nDl: "Download", nDoc: "Docs",
-    kick: "Open source · Rust + Tauri · macOS · Windows · Linux",
-    h1a: "Is your lossless", h1b: "actually lossless?",
-    sub: "FlacCompagnon analyzes your audio files and exposes fake FLACs: upscaling, upsampling and transcoding — including AAC transcodes at every bitrate. Drop a folder, the analysis does the rest.",
-    ctaDl: "Download", ctaGh: "View on GitHub",
-    note: "Free · MIT · Analysis never modifies your files",
-    s1k: "Preview", s1t: "The analysis at a glance",
-    s1p: "Drop a folder or files: every track is decoded and screened in parallel. One coloured tag per detection — hover it for the reasoning behind the verdict.",
-    cap1: "↑ Interactive preview of the interface (dark theme) — hover the detection tags.",
-    thFile: "File", thFmt: "Format", thDur: "Length", thSr: "Sample rate", thBits: "Real bits", thCut: "Cut-off", thDet: "Detections",
-    sumCount: "4 files", chClean: "2 clean", chUps: "1 upsampled", chTr: "1 transcoded",
-    tipClean: "No detection: full-band content up to ~21.9 kHz, no lossy signature.",
-    tipDark: "A naturally dark acoustic master: the spectrum stops at 18.6 kHz because nobody played above it, not because a codec cut it off. No quantization lattice was found — the file is reported clean.",
-    s2k: "Detections", s2t: "Three independent detections",
-    s2p: "The Lossless Audio Checker model, re-implemented from scratch and validated on real transcodes. Three independent signatures, each targeting a different way of faking lossless.",
-    s2note: "These detections are informed heuristics, not cryptographic proof — naturally “dark” recordings (acoustic, classical, analog tape) can trip a soft false positive. The spectrogram is the final arbiter. The AAC grid, however, is close to proof: genuine music never lands on it.",
-    d1t: "Upscaling — fake resolution",
-    d1p: "FlacCompagnon checks how many bits each sample actually uses. If the low bits are always zero, they carry no information: a file advertised as 24-bit that really uses only 16 is an inflated 16-bit signal.",
-    d1tip: "Flagged Upscaled: declared depth 24-bit, effective depth ≤ 16-bit. The 8 low bits carry no real information.",
-    d1cap: "Declared 24-bit — the 8 low bits are empty",
-    d2t: "Upsampling — fake sample rate",
-    d2p: "A frequency analysis averaged over the whole track. If a “hi-res” 96 kHz container stops dead around 22 kHz, all the extra bandwidth is empty — the file was upsampled from a CD.",
-    d2tip: "Flagged Upsampled: content stops at ~22.0 kHz in a 96.0 kHz container — the tell-tale wall of upsampling, here from a 44.1 kHz source.",
-    d2cap: "The cut-off wall at 22.05 kHz",
-    d3t: "Transcoding — lossy source",
-    d3p: "The strongest signature. FlacCompagnon replays the AAC encoder's own internal computation: at the right alignment out of 1024 tries, a transcode's coefficients land back exactly on the grid of values only AAC produces. Effective up to 320 kbps, percussive passages included.",
-    d3tip: "Flagged Transcoded: at a synchronized MDCT onset, bands repeatedly land on AAC's quantization grid (measured transcodes: 28–100% of bands, genuine music ≤ 23%) — a near-conclusive AAC source.",
-    d3cap: "Coefficients snapping onto the AAC grid",
-    s3k: "Integrity", s3t: "Beyond the detections",
-    s3p: "Six checks and features round out the analysis.",
-    i1t: "FLAC MD5 verification",
-    i1p: "Every FLAC stores the MD5 of its decoded audio. FlacCompagnon fully decodes the file and recomputes the hash — the same check as flac -t, fused into the analysis pass.",
-    i2t: "Fake stereo",
-    i2p: "Both channels strictly identical? The file is really dual-mono dressed up as stereo.",
-    i3t: "Clipping",
-    i3p: "Counts full-scale sample runs and also measures the true peak (dBTP) via 4x oversampling: some masters clip \"between\" the samples, where the classic peak sees nothing — the sign of an over-loud master, independent of losslessness.",
-    i4t: "Real format detection",
-    i4p: "FlacCompagnon reads the header bytes, not the extension. A <code>.flac</code> that is really a WAV — or the reverse — is caught and flagged in red.",
-    i5t: "Dynamics (DR)",
-    i5p: "FlacCompagnon measures each track's dynamic range: the gap between the peaks and the average level of the loud passages. A high value signals a master that preserves dynamics — typical of Full Dynamic Range editions — while a low value betrays a loudness-war master.",
-    i6t: "Hi-Res & DSD",
-    i6p: "Genuine high-resolution tracks and DSD files (<code>.dsf</code> / <code>.dff</code>) earn a verified badge — and FlacCompagnon tells real DSD from PCM converted after the fact (requires ffmpeg; without it, only the header is verified).",
-    s4k: "Spectrograms", s4t: "The final arbiter",
-    s4p: "One click renders a high-resolution spectrogram per track, with a labelled frequency axis up to the Nyquist frequency (half the sample rate, e.g. 22.05 kHz for a 44.1 kHz CD). The cut-off is visible to the naked eye.",
-    s4n1: "Rendered via ffmpeg, located automatically on your system.",
-    s4n2: "A <code>spectrograms/</code> folder is created inside each folder that holds audio files, and one PNG per track is generated — only when you click the “Generate spectrograms” button.",
-    s4n3: "Quicker still: <strong>listen</strong>. Clicking a row's thumbnail starts playback, with a transport bar under the list. This is not really an audio player — just enough to hold a verdict up against your own ears without leaving the app.",
-    s5k: "Pipeline", s5t: "How it works",
-    s5p: "Drag and drop a folder or files — or pick them with the import button. Each track is decoded, then run through a battery of analyses, and the verdict appears.",
-    p1: "dropped folder", p2: "decode · symphonia", p3: "streaming analyzer",
-    p3a: "FFT ▸ cut-off", p3b: "MDCT ▸ AAC grid", p3c: "effective bits", p3d: "clipping · fake stereo",
-    p4: "results table",
-    s5note: "FLAC files are decoded once: the same pass feeds the analysis and the MD5 hash. Files are processed in parallel — one worker per CPU core, minus one to keep the UI responsive. Decoding relies on Symphonia, a pure-Rust audio decoding library (FLAC, WAV, ALAC, AAC…).",
-    s6k: "Download", s6t: "A small native app",
-    s6p: "CI-built installers for all three platforms, published on the GitHub releases.",
-    dlBtn: "Download",
-    ffnote: "ffmpeg is only needed for spectrograms and for DSD content analysis — the rest of the analysis works entirely without it.",
-    ffinstall: "No ffmpeg installed? See the <a href=\"https://github.com/craft-and-code/FlacCompagnon#prerequisites\" target=\"_blank\" rel=\"noopener\">README on GitHub</a> to install it on macOS, Windows or Linux.",
-    s8k: "Tags", s8t: "Fix it, don't just flag it",
-    s8p: "Select one or more tracks and an editing panel opens on the left, with the usual fields: title, artist, album, album artist, composer, year, genre, track and disc numbers, comment, compilation. It is the <strong>only place in the app that writes to your files</strong>, and only when you click <strong>Save</strong>.",
-    t1t: "Batch editing",
-    t1p: "Select a whole album: each field shows either the shared value or a “multiple values” badge. Only the fields you actually touch are written — fixing the album on 12 tracks never flattens their individual titles. A dedicated button renumbers the selection 1 through N in one go, in table order.",
-    t2t: "Cover art",
-    t2p: "The cover keeps its original aspect ratio, whatever its size. Several images in the selection: a carousel lets you browse them. Click it to open it full size with its picture role (<em>Front cover</em>…), or drop an image file onto it to replace the cover on every selected track.",
-    t3t: "Online lookup",
-    t3p: "The <strong>Search online</strong> button queries <strong>MusicBrainz</strong> and, if you supply your own personal token, <strong>Discogs</strong>. When the file already carries a MusicBrainz ID (tagged with Picard), the right release is found directly — no fuzzy searching.",
-    s8note: "Online results <strong>pre-fill</strong> the panel: nothing is written until you have reviewed it and pressed Save — and <strong>Reset</strong> discards everything. This is the only feature that uses the network, and never without a click from you.",
-    s9k: "Conversion", s9t: "Convert without wrecking your filing",
-    s9p: "A dedicated panel, mirroring the tag one: drop tracks or folders into it, pick a format, and the source folder structure is <strong>reproduced exactly</strong> under the destination you choose. Files imported for conversion never join the analysis table — the two lists are independent.",
-    cf1: "lossless", cf2: "royalty-free", cf3: "plays everywhere", cf4: "16-bit PCM",
-    s9n1: "Opus and MP3 offer a bitrate; FLAC and WAV have none to choose. The WAV written is fixed at 16-bit, whatever the source depth.",
-    s9n2: "A checkbox also copies everything that is not audio — covers, playlists, spectrograms you already generated — to the same place in the copied tree.",
-    s9note: "Your originals are neither moved nor modified: conversion always writes somewhere else. Playback pauses for the duration (the encoders take every core) and resumes on its own afterwards. <strong>Cancel</strong> stops the batch and deletes the files it had already written — leaving whatever the folder held beforehand untouched.",
-    s7k: "Export", s7t: "Take your results with you",
-    s7p: "Clicking <strong>Save…</strong> writes two files, same name, same folder: a <code>.csv</code> — one row per track, every analysis column, ready for a spreadsheet — and a <code>.json</code> that keeps the full analysis, including each detection's detail. The suggested name and location follow the analyzed folder.",
-    s7n2: "Drop a previously-exported <code>.json</code> onto the list to reload the table as-is — no audio is re-decoded. No dedicated button: same gesture as dropping a folder.",
-    s7m3u: "<strong>Export playlist…</strong> writes an <strong>M3U</strong> playlist in the order shown on screen — including any manual reordering you did by dragging rows. Your choice of Extended M3U (<code>.m3u8</code>, with durations and “Artist — Title”) by default, or Simple M3U (<code>.m3u</code>, paths only).",
-    s7n1: "Tip: the trash icon at the end of a row removes a file from the list — it will not appear in either exported file.",
-    refT: "References",
-    ref1: "J. Lacroix, Y. Prime, A. Remy & O. Derrien — “Lossless Audio Checker: A Software for the Detection of Upscaling, Upsampling, and Transcoding in Lossless Musical Tracks”, AES 139th Convention, Paper 9416, New York, 2015.",
-    ref2: "O. Derrien et al. — “Detection of Genuine Lossless Audio Files: Application to the MPEG-AAC Codec”, Journal of the AES, 2019.",
-    ref3: "FlacCompagnon is an open-source, from-scratch successor to the discontinued Lossless Audio Checker.",
-    ftLeft: "© 2026 FlacCompagnon · MIT License · Built with Rust + Tauri",
-  },
-};
+import { DICT } from "./copy.js";
 
 let lang = "fr";
 const $ = (s) => document.querySelector(s);
 const specState = { key: "" };
+const docsRoot = document.documentElement.dataset.docsRoot || "docs";
 
 function applyLang(l) {
   lang = DICT[l] ? l : "fr";
@@ -190,6 +20,12 @@ function applyLang(l) {
     const v = t[el.getAttribute("data-i18n-html")];
     if (v != null) el.innerHTML = v;
   });
+  document.querySelectorAll("[data-fr][data-en]").forEach((el) => {
+    el.textContent = el.dataset[lang];
+  });
+  document.querySelectorAll("[data-doc]").forEach((el) => {
+    el.href = `${docsRoot}/${lang}/${el.dataset.doc}.html`;
+  });
   document.documentElement.lang = lang;
   $("#lang-fr").classList.toggle("on", lang === "fr");
   $("#lang-en").classList.toggle("on", lang === "en");
@@ -202,13 +38,17 @@ function applyLang(l) {
 // --- language toggle ---
 $("#lang-fr").addEventListener("click", () => applyLang("fr"));
 $("#lang-en").addEventListener("click", () => applyLang("en"));
-// Default to the browser language: French UI only if the browser is French,
-// English everywhere else. A previous manual choice (localStorage) wins.
-let initial = (navigator.language || "").toLowerCase().startsWith("fr") ? "fr" : "en";
-try {
-  const saved = localStorage.getItem("fc-lang");
-  if (saved === "fr" || saved === "en") initial = saved;
-} catch {}
+// The English landing page selects its language from its stable URL. The root
+// page otherwise follows the browser language, and a previous manual choice
+// still wins there.
+const pageLanguage = document.documentElement.dataset.defaultLanguage;
+let initial = pageLanguage || ((navigator.language || "").toLowerCase().startsWith("fr") ? "fr" : "en");
+if (!pageLanguage) {
+  try {
+    const saved = localStorage.getItem("fc-lang");
+    if (saved === "fr" || saved === "en") initial = saved;
+  } catch {}
+}
 applyLang(initial);
 
 // --- floating tooltip for the app-preview table tags ---

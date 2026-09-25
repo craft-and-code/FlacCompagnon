@@ -1,0 +1,144 @@
+/* Compact additions keep the landing page's original palette and spacing. */
+.nav-docs {
+  font-size: 14px;
+  color: var(--text);
+  white-space: nowrap;
+}
+.section .analysis-directory {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 38px;
+}
+.cli-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 44px;
+  align-items: center;
+}
+.cli-section h2 {
+  line-height: 1.2;
+}
+.cli-section .btn {
+  margin-top: 26px;
+}
+.terminal-example {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 24px 26px;
+  min-width: 0;
+  box-shadow: 0 20px 70px var(--bg);
+}
+.terminal-header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: var(--link);
+  font: 12px var(--mono);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 17px;
+}
+.terminal-label {
+  margin-left: auto;
+  color: var(--text-4);
+}
+.terminal-example p {
+  margin: 24px 0 8px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+.terminal-example pre {
+  overflow-x: auto;
+  color: var(--text);
+  font: 12px/1.9 var(--mono);
+  padding-bottom: 5px;
+}
+.terminal-example small {
+  display: block;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  margin-top: 22px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+.ecosystem-section {
+  border-block: 1px solid var(--border-soft);
+  padding-block: 48px;
+}
+.ecosystem-content {
+  display: flex;
+  gap: 48px;
+  align-items: center;
+  justify-content: space-between;
+}
+.ecosystem-content .lead {
+  max-width: 700px;
+}
+.ecosystem-section > a {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 14px;
+}
+.section[id] {
+  scroll-margin-top: 68px;
+}
+@media (max-width: 1000px) {
+  .nav-links {
+    gap: 14px;
+  }
+  .nav {
+    gap: 16px;
+  }
+  .section .analysis-directory {
+    grid-template-columns: 1fr 1fr;
+  }
+  .cli-section {
+    gap: 28px;
+  }
+}
+@media (max-width: 760px) {
+  .cli-section {
+    grid-template-columns: 1fr;
+  }
+  .ecosystem-content {
+    display: block;
+  }
+  .ecosystem-content .btn {
+    margin-top: 24px;
+  }
+  .nav {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+  }
+  .nav .brand span {
+    font-size: 14px;
+  }
+  .nav-right {
+    gap: 12px;
+  }
+  .nav-right > .btn {
+    display: none;
+  }
+  .section {
+    padding-block: 58px;
+  }
+  .section h2 {
+    font-size: 29px;
+  }
+}
+@media (max-width: 500px) {
+  .section .analysis-directory {
+    grid-template-columns: 1fr;
+    gap: 26px;
+  }
+  .terminal-example {
+    padding-inline: 16px;
+  }
+  .hero {
+    padding-top: 66px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

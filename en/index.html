@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en" data-docs-root="../docs" data-default-language="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FlacCompagnon — Verify FLAC files and detect fake lossless audio</title>
+    <meta
+      name="description"
+      content="FlacCompagnon checks FLAC authenticity: fake lossless, upsampling, transcoding, loudness, stereo phase, dynamics and integrity. A free native app, CLI and Rust engine."
+    />
+    <meta name="author" content="craft-and-code" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://craft-and-code.github.io/FlacCompagnon/en/" />
+    <link rel="alternate" hreflang="fr" href="https://craft-and-code.github.io/FlacCompagnon/" />
+    <link rel="alternate" hreflang="en" href="https://craft-and-code.github.io/FlacCompagnon/en/" />
+    <link
+      rel="alternate"
+      hreflang="x-default"
+      href="https://craft-and-code.github.io/FlacCompagnon/"
+    />
+
+    <!-- Open Graph / Facebook / Discord / LinkedIn -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://craft-and-code.github.io/FlacCompagnon/en/" />
+    <meta property="og:site_name" content="FlacCompagnon" />
+    <meta property="og:title" content="FlacCompagnon — Verify your FLAC files" />
+    <meta
+      property="og:description"
+      content="Detect fake lossless files and analyze the loudness, stereo phase, dynamics and integrity of your music library."
+    />
+    <meta
+      property="og:image"
+      content="https://craft-and-code.github.io/FlacCompagnon/assets/og-image.png"
+    />
+    <meta property="og:image:alt" content="FlacCompagnon audio analysis tool" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="fr_FR" />
+
+    <!-- Twitter / X card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="FlacCompagnon — Verify your FLAC files" />
+    <meta
+      name="twitter:description"
+      content="Detect fake lossless files and analyze the authenticity of your music library."
+    />
+    <meta
+      name="twitter:image"
+      content="https://craft-and-code.github.io/FlacCompagnon/assets/og-image.png"
+    />
+    <meta name="twitter:image:alt" content="FlacCompagnon audio analysis tool" />
+
+    <meta name="theme-color" content="#0d0e13" />
+    <link rel="icon" href="../assets/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../assets/favicon-16.png" />
+    <link rel="apple-touch-icon" href="../assets/favicon-180.png" />
+    <!-- Fonts are self-hosted (see @font-face in styles.css and
+         assets/fonts/). No external requests, no third-party calls. -->
+    <link rel="stylesheet" href="../styles.css" />
+    <link rel="stylesheet" href="../directory.css" />
+    <link rel="stylesheet" href="../home.css" />
+
+    <!-- Structured data: helps search engines show FlacCompagnon as a downloadable
+         app (price, platforms, rating box) in rich results. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "FlacCompagnon",
+        "url": "https://craft-and-code.github.io/FlacCompagnon/en/",
+        "description": "Audio authenticity checks, loudness, stereo phase, dynamics and integrity measurements. Native desktop app, standalone CLI and reusable Rust analysis library, with tag editing, format conversion and report export.",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "macOS, Windows, Linux",
+        "isAccessibleForFree": true,
+        "featureList": "Fake-lossless, upscaling, upsampling and transcoding detection; LUFS loudness; stereo phase and balance; dynamics, clipping and true peak; FLAC MD5 verification; CLI; JSON export.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "author": {
+          "@type": "Organization",
+          "name": "craft-and-code",
+          "url": "https://github.com/craft-and-code"
+        },
+        "license": "https://github.com/craft-and-code/FlacCompagnon/blob/main/LICENSE",
+        "additionalProperty": {
+          "@type": "PropertyValue",
+          "name": "Analysis core license",
+          "value": "MPL-2.0",
+          "url": "https://github.com/craft-and-code/FlacCompagnon/blob/main/core/LICENSE"
+        },
+        "downloadUrl": "https://github.com/craft-and-code/FlacCompagnon/releases/latest",
+        "softwareVersion": "0.9.5"
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#top" data-fr="Aller au contenu" data-en="Skip to content"
+      >Skip to content</a>
+    <canvas id="bgc" aria-hidden="true"></canvas>
+
+    <!-- Nav -->
+    <header class="nav">
+      <a class="brand" href="#top">
+        <img src="../assets/logo.png" alt="FlacCompagnon" width="28" height="28" />
+        <span>FlacCompagnon</span>
+      </a>
+      <nav class="nav-links" aria-label="Navigation">
+        <a href="#apercu" data-i18n="nPrev">Preview</a>
+        <a href="#integrite" data-fr="Analyses" data-en="Analyses">Analyses</a>
+        <a href="#cli">CLI</a>
+        <a href="#ecosysteme">Aède</a>
+      </nav>
+      <div class="nav-right">
+        <a class="nav-docs" href="../docs/en/index.html" data-doc="index">Docs ↗</a>
+        <div class="lang" role="group" aria-label="Language">
+          <button id="lang-en" type="button" aria-pressed="false" aria-label="English">EN</button>
+          <button id="lang-fr" type="button" aria-pressed="true" aria-label="Français">FR</button>
+        </div>
+        <a class="btn btn-grad" href="#telecharger" data-i18n="nDl">Download</a>
+      </div>
+    </header>
+
+    <main id="top">
+      <!-- Hero -->
+      <section class="hero">
+        <p class="kicker" data-i18n="kick">Open source · Rust + Tauri · macOS · Windows · Linux</p>
+        <h1>
+          <span class="up" data-i18n="h1a">Is your lossless</span>
+          <span class="up grad" data-i18n="h1b">actually lossless?</span>
+        </h1>
+        <p class="sub up" data-i18n="sub">FlacCompagnon examines your audio: authenticity, loudness, stereo, dynamics and integrity. In a native app or from the terminal, find the measurements that help you understand your library.</p>
+        <div class="hero-cta up">
+          <a class="btn btn-grad" href="#telecharger" data-i18n="ctaDl">Download</a>
+          <a
+            class="btn btn-outline"
+            href="../docs/en/index.html"
+            data-doc="index"
+            data-fr="Comprendre les analyses"
+            data-en="Understand the analyses"
+            >Understand the analyses</a>
+        </div>
+        <p class="note up" data-i18n="note">Free · App MIT · Core MPL-2.0 · Analysis never modifies your files</p>
+        <a class="scroll-cue" href="#apercu" aria-label="scroll">▾</a>
+      </section>
+
+      <!-- Aperçu -->
+      <section id="apercu" class="section">
+        <p class="kicker" data-i18n="s1k">Preview</p>
+        <h2 data-i18n="s1t">The analysis at a glance</h2>
+        <p class="lead" data-i18n="s1p">Drop a folder or files: every track is decoded and screened in parallel. One coloured tag per detection — hover it for the reasoning behind the verdict.</p>
+
+        <div class="app-window">
+          <div class="titlebar">
+            <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+            <span class="tb-title">FlacCompagnon</span>
+          </div>
+          <div class="toolbar">
+            <span class="count" data-i18n="sumCount">4 files</span>
+            <span class="chip c-clean" data-i18n="chClean">2 clean</span>
+            <span class="chip c-upsampled" data-i18n="chUps">1 upsampled</span>
+            <span class="chip c-transcoded" data-i18n="chTr">1 transcoded</span>
+          </div>
+          <div class="table-wrap">
+            <table class="results">
+              <thead>
+                <tr>
+                  <th data-i18n="thFile">File</th>
+                  <th data-i18n="thFmt">Format</th>
+                  <th data-i18n="thDur">Length</th>
+                  <th data-i18n="thSr">Sample rate</th>
+                  <th data-i18n="thBits">Real bits</th>
+                  <th data-i18n="thCut">Cut-off</th>
+                  <th data-i18n="thDet">Detections</th>
+                  <th>MD5</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td
+                    class="fname"
+                    data-path="/Users/you/Music/Miles Davis - Kind of Blue/01 · So What.flac"
+                  >
+                    01 · So What.flac
+                  </td>
+                  <td>FLAC</td>
+                  <td>9:26</td>
+                  <td>44.1k</td>
+                  <td class="c-ok">16-bit</td>
+                  <td>21.9 kHz (99%)</td>
+                  <td><span class="tag t-clean" data-tip="tipClean">Clean</span></td>
+                  <td class="c-ok">✓ OK</td>
+                </tr>
+                <tr>
+                  <td
+                    class="fname"
+                    data-path="/Users/you/Music/Studio Master/02 · Studio Master.flac"
+                  >
+                    02 · Studio Master.flac
+                  </td>
+                  <td>FLAC</td>
+                  <td>4:11</td>
+                  <td>96k</td>
+                  <td class="c-ok">24-bit</td>
+                  <td>22.0 kHz (46%)</td>
+                  <td><span class="tag t-upsampled" data-tip="d2tip">Upsampled</span></td>
+                  <td class="c-ok">✓ OK</td>
+                </tr>
+                <tr>
+                  <td
+                    class="fname"
+                    data-path="/Users/you/Music/Remaster 2019/03 · Remaster 2019.flac"
+                  >
+                    03 · Remaster 2019.flac
+                  </td>
+                  <td>FLAC</td>
+                  <td>3:37</td>
+                  <td>44.1k</td>
+                  <td class="c-ok">16-bit</td>
+                  <td>22.05 kHz (100%)</td>
+                  <td><span class="tag t-transcoded" data-tip="d3tip">Transcoded</span></td>
+                  <td class="c-ok">✓ OK</td>
+                </tr>
+                <tr>
+                  <td
+                    class="fname"
+                    data-path="/Users/you/Music/Acoustic Live/04 · Acoustic Live.flac"
+                  >
+                    04 · Acoustic Live.flac
+                  </td>
+                  <td>FLAC</td>
+                  <td>5:02</td>
+                  <td>44.1k</td>
+                  <td class="c-ok">16-bit</td>
+                  <td>18.6 kHz (84%)</td>
+                  <td><span class="tag t-clean" data-tip="tipDark">Clean</span></td>
+                  <td class="c-mut">— <span class="nosig">no MD5</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p class="cap" data-i18n="cap1">Illustrative interface preview — hover over detections to read their interpretation.</p>
+      </section>
+
+      <!-- Détections -->
+      <section id="detections" class="section">
+        <p class="kicker" data-i18n="s2k">Detections</p>
+        <h2 data-i18n="s2t">Three independent detections</h2>
+        <p class="lead" data-i18n="s2p">Three independent checks examine sample precision, frequency bandwidth and traces of lossy codecs. Their methods and limits are explained in the documentation.</p>
+
+        <div class="cards cards-3">
+          <article class="card det">
+            <span class="tag t-upscaled">Upscaled</span>
+            <h3 data-i18n="d1t">Upscaling — fake resolution</h3>
+            <p data-i18n="d1p">The meter looks for consistently unused bits, then for a lower-depth grid beneath small residuals. Exact depth is distinguished from an estimate, marked with ≈.</p>
+            <canvas id="gUp" class="det-canvas" aria-hidden="true"></canvas>
+            <p class="cap" data-i18n="d1cap">Declared 24-bit — the 8 low bits are empty</p>
+          </article>
+          <article class="card det">
+            <span class="tag t-upsampled">Upsampled</span>
+            <h3 data-i18n="d2t">Upsampling — fake sample rate</h3>
+            <p data-i18n="d2p">In files above 48 kHz, the analysis searches for a persistently empty high band. This is consistent with a lower-rate source, but also with a naturally limited or filtered master.</p>
+            <canvas id="gWall" class="det-canvas" aria-hidden="true"></canvas>
+            <p class="cap" data-i18n="d2cap">The cut-off wall at 22.05 kHz</p>
+          </article>
+          <article class="card det">
+            <span class="tag t-transcoded">Transcoded</span>
+            <h3 data-i18n="d3t">Transcoding — lossy source</h3>
+            <p data-i18n="d3p">The analysis searches for quantization grids that AAC and MP3 can leave in decoded audio. Their presence is evaluated statistically, with calibration still preliminary.</p>
+            <canvas id="gGrid" class="det-canvas" aria-hidden="true"></canvas>
+            <p class="cap" data-i18n="d3cap">Coefficients snapping onto the AAC grid</p>
+          </article>
+        </div>
+        <p class="note-box" data-i18n="s2note">A detection is a clue, not a certificate of origin. Processing and artistic choices can imitate or hide a signature. Clean means no detector raised a finding. Combine measurements, spectrograms and listening.</p>
+      </section>
+
+      <!-- Intégrité -->
+      <section id="integrite" class="section">
+        <p class="kicker" data-i18n="s3k">All analyses</p>
+        <h2 data-i18n="s3t">Every measurement answers a question.</h2>
+        <p class="lead" data-i18n="s3p">Explore the analyses by family. Each link opens a plain-language explanation, followed by the detailed method, limits and test examples.</p>
+        <div class="analysis-directory">
+          <section class="analysis-group" id="analysis-authenticity"><h3 data-fr="Authenticité &amp; spectre" data-en="Authenticity &amp; spectrum">Authenticity &amp; spectrum</h3><ul><li><a data-doc="upscaling" href="../docs/en/upscaling.html"><span data-fr="Profondeur réelle" data-en="Real bit depth">Real bit depth</span><span aria-hidden="true">↗</span></a></li><li><a data-doc="upsampling" href="../docs/en/upsampling.html"><span data-fr="Upsampling" data-en="Upsampling">Upsampling</span><span aria-hidden="true">↗</span></a></li><li><a data-doc="transcoding" href="../docs/en/transcoding.html"><span data-fr="Transcodage AAC / MP3" data-en="AAC / MP3 transcoding">AAC / MP3 transcoding</span><span aria-hidden="true">↗</span></a></li><li><a data-doc="spectral-cutoff" href="../docs/en/spectral-cutoff.html"><span data-fr="Coupure spectrale" data-en="Spectral cutoff">Spectral cutoff</span><span aria-hidden="true">↗</span></a></li></ul></section><section class="analysis-group" id="analysis-stereo"><h3 data-fr="Stéréo &amp; phase" data-en="Stereo &amp; phase">Stereo &amp; phase</h3><ul><li><a data-doc="fake-stereo" href="../docs/en/fake-stereo.html"><span data-fr="Dual mono" data-en="Dual mono">Dual mono</span><span aria-hidden="true">↗</span></a></li><li><a data-doc="stereo-polarity" href="../docs/en/stereo-polarity.html"><span data-fr="Polarité globale" data-en="Global polarity">Global polarity</span><span aria-hidden="true">↗</span></a></li><li><a data-doc="local-phase" href="../docs/en/local-phase.html"><span data-fr="Phase locale &amp; par bande" data-en="Local &amp; band phase">Local &amp; band phase</span><span aria-hidden="true">↗</span></a></li><li><a data-doc="stereo-balance" href="../docs/en/stereo-balance.html"><span data-fr="Balance stéréo" data-en="Stereo balance">Stereo balance</span><span aria-hidden="true">↗</span></a></li><li><a data-doc="high-frequency-stereo" href="../docs/en/high-frequency-stereo.html"><span data-fr="HF Stereo" data-en="HF Stereo">HF Stereo</span><span aria-hidden="true">↗</span></a></li></ul></section><section class="analysis-group" id="analysis-levels"><h3 data-fr="Niveaux &amp; dynamique" data-en="Levels &amp; dynamics">Levels &amp; dynamics</h3><ul><li><a data-doc="dc-offset" href="../docs/en/dc-offset.html"><span data-fr="Décalage continu" data-en="DC offset">DC offset</span><span aria-hidden="true">↗</span></a></li><li><a data-doc="clipping" href="../docs/en/clipping.html"><span data-fr="Clipping" data-en="Clipping">Clipping</span><span aria-hidden="true">↗</span></a></li><li><a data-doc="true-peak" href="../docs/en/true-peak.html"><span data-fr="True peak" data-en="True peak">True peak</span><span aria-hidden="true">↗</span></a></li><li><a data-doc="dynamic-range" href="../docs/en/dynamic-range.html"><span data-fr="Dynamique (DR)" data-en="Dynamics (DR)">Dynamics (DR)</span><span aria-hidden="true">↗</span></a></li></ul></section><section class="analysis-group" id="analysis-loudness"><h3 data-fr="Loudness" data-en="Loudness">Loudness</h3><ul><li><a data-doc="integrated-loudness" href="../docs/en/integrated-loudness.html"><span data-fr="LUFS intégré" data-en="Integrated LUFS">Integrated LUFS</span><span aria-hidden="true">↗</span></a></li><li><a data-doc="momentary-loudness" href="../docs/en/momentary-loudness.html"><span data-fr="LUFS-M max" data-en="LUFS-M max">LUFS-M max</span><span aria-hidden="true">↗</span></a></li><li><a data-doc="short-term-loudness" href="../docs/en/short-term-loudness.html"><span data-fr="LUFS-S max" data-en="LUFS-S max">LUFS-S max</span><span aria-hidden="true">↗</span></a></li><li><a data-doc="loudness-range" href="../docs/en/loudness-range.html"><span data-fr="Loudness Range (LRA)" data-en="Loudness Range (LRA)">Loudness Range (LRA)</span><span aria-hidden="true">↗</span></a></li></ul></section><section class="analysis-group" id="analysis-integrity"><h3 data-fr="Intégrité &amp; discontinuités" data-en="Integrity &amp; discontinuities">Integrity &amp; discontinuities</h3><ul><li><a data-doc="impulses" href="../docs/en/impulses.html"><span data-fr="Impulsions" data-en="Impulses">Impulses</span><span aria-hidden="true">↗</span></a></li><li><a data-doc="dropouts" href="../docs/en/dropouts.html"><span data-fr="Dropouts" data-en="Dropouts">Dropouts</span><span aria-hidden="true">↗</span></a></li><li><a data-doc="flac-md5" href="../docs/en/flac-md5.html"><span data-fr="Signature MD5 FLAC" data-en="FLAC MD5 signature">FLAC MD5 signature</span><span aria-hidden="true">↗</span></a></li><li><a data-doc="fingerprints" href="../docs/en/fingerprints.html"><span data-fr="Empreintes MD5 &amp; CRC32" data-en="MD5 &amp; CRC32 fingerprints">MD5 &amp; CRC32 fingerprints</span><span aria-hidden="true">↗</span></a></li></ul></section><section class="analysis-group" id="analysis-dsd"><h3 data-fr="Sources DSD" data-en="DSD sources">DSD sources</h3><ul><li><a data-doc="dsd-pcm-source" href="../docs/en/dsd-pcm-source.html"><span data-fr="Source PCM dans un DSD" data-en="PCM source in DSD">PCM source in DSD</span><span aria-hidden="true">↗</span></a></li><li><a data-doc="dsd-heritage" href="../docs/en/dsd-heritage.html"><span data-fr="Héritage DSD dans le PCM" data-en="DSD heritage in PCM">DSD heritage in PCM</span><span aria-hidden="true">↗</span></a></li></ul></section>
+        </div>
+        <p
+          class="note-inline"
+          data-fr="Le format réel est également lu dans l’en-tête du fichier, indépendamment de son extension. Les badges Hi-Res et DSD résument les caractéristiques du conteneur et les résultats disponibles."
+          data-en="The actual format is also read from the file header, independently of its extension. Hi-Res and DSD badges summarize container properties and available results."
+        >The actual format is also read from the file header, independently of its extension. Hi-Res and DSD badges summarize container properties and available results.</p>
+        <p
+          class="note-box"
+          data-fr="Les colonnes avancées sont masquées par défaut après la signature MD5. Affichez celles qui vous intéressent dans le choix des colonnes de l’application. Un tiret signifie que la mesure est indisponible, pas qu’elle vaut zéro."
+          data-en="Advanced columns after the MD5 signature are hidden by default. Show the ones you need using the app’s column chooser. A dash means a measurement is unavailable, not zero."
+        >Advanced columns after the MD5 signature are hidden by default. Show the ones you need using the app’s column chooser. A dash means a measurement is unavailable, not zero.</p>
+      </section>
+
+      <!-- Spectrogrammes -->
+      <section id="spectrogrammes" class="section">
+        <p class="kicker" data-i18n="s4k">Spectrograms</p>
+        <h2 data-i18n="s4t">See what the numbers suggest</h2>
+        <div class="spec-grid">
+          <div>
+            <p class="lead" data-i18n="s4p">One click renders a high-resolution spectrogram per track, with a labelled frequency axis up to the Nyquist frequency (half the sample rate, e.g. 22.05 kHz for a 44.1 kHz CD). The cut-off is visible to the naked eye.</p>
+            <p class="note-inline" data-i18n="s4n1">Rendered via ffmpeg, located automatically on your system.</p>
+            <p class="note-inline" data-i18n-html="s4n2">A <code>spectrograms/</code> folder is created inside each folder that holds audio files, and one PNG per track is generated — only when you click the “Generate spectrograms” button.</p>
+            <p class="note-inline" data-i18n-html="s4n3">Quicker still: <strong>listen</strong>. Clicking a row's thumbnail starts playback, with a transport bar under the list. This is not really an audio player — just enough to hold a verdict up against your own ears without leaving the app.</p>
+          </div>
+          <canvas id="gSpec" class="spec-canvas" aria-hidden="true"></canvas>
+        </div>
+      </section>
+
+      <!-- Tags -->
+      <section id="tags" class="section">
+        <p class="kicker" data-i18n="s8k">Tags</p>
+        <h2 data-i18n="s8t">Fix it, don't just flag it</h2>
+        <p class="lead" data-i18n-html="s8p">Select one or more tracks and an editing panel opens on the left, with the usual fields: title, artist, album, album artist, composer, year, genre, track and disc numbers, comment, compilation. It is the <strong>only place in the app that writes to your files</strong>, and only when you click <strong>Save</strong>.</p>
+        <div class="cards cards-3">
+          <article class="card">
+            <h3 data-i18n="t1t">Batch editing</h3>
+            <p data-i18n-html="t1p">Select a whole album: each field shows either the shared value or a “multiple values” badge. Only the fields you actually touch are written — fixing the album on 12 tracks never flattens their individual titles. A dedicated button renumbers the selection 1 through N in one go, in table order.</p>
+          </article>
+          <article class="card">
+            <h3 data-i18n="t2t">Cover art</h3>
+            <p data-i18n-html="t2p">Choose the image role: front cover, back cover, booklet… The selection displays the corresponding picture, and imports or exports follow that role. Original proportions are preserved; click to view it full size.</p>
+          </article>
+          <article class="card">
+            <h3 data-i18n="t3t">Online lookup</h3>
+            <p data-i18n-html="t3p">The <strong>Search online</strong> button queries <strong>MusicBrainz</strong> and, if you supply your own personal token, <strong>Discogs</strong>. When the file already carries a MusicBrainz ID (tagged with Picard), the right release is found directly — no fuzzy searching.</p>
+          </article>
+        </div>
+        <p class="note-box" data-i18n-html="s8note">Online results <strong>pre-fill</strong> the panel: nothing is written until you have reviewed it and pressed Save — and <strong>Reset</strong> discards everything. This is the only feature that uses the network, and never without a click from you.</p>
+      </section>
+
+      <!-- Conversion -->
+      <section id="conversion" class="section">
+        <p class="kicker" data-i18n="s9k">Conversion</p>
+        <h2 data-i18n="s9t">Convert without wrecking your filing</h2>
+        <p class="lead" data-i18n-html="s9p">A dedicated panel, mirroring the tag one: drop tracks or folders into it, pick a format, and the source folder structure is <strong>reproduced exactly</strong> under the destination you choose. Files imported for conversion never join the analysis table — the two lists are independent.</p>
+
+        <div class="conv-grid">
+          <div>
+            <div class="conv-formats">
+              <span class="fmt"><strong>FLAC</strong><em data-i18n="cf1">lossless</em></span>
+              <span class="fmt"><strong>Opus</strong><em data-i18n="cf2">royalty-free</em></span>
+              <span class="fmt"
+                ><strong>MP3</strong><em data-i18n="cf3">plays everywhere</em></span
+              >
+              <span class="fmt"><strong>WAV</strong><em data-i18n="cf4">16-bit PCM</em></span>
+            </div>
+            <p class="note-inline" data-i18n-html="s9n1">Opus and MP3 offer a bitrate; FLAC and WAV have none to choose. The WAV written is fixed at 16-bit, whatever the source depth.</p>
+            <p class="note-inline" data-i18n-html="s9n2">A checkbox also copies everything that is not audio — covers, playlists, spectrograms you already generated — to the same place in the copied tree.</p>
+          </div>
+          <canvas id="gConv" class="conv-canvas" aria-hidden="true"></canvas>
+        </div>
+        <p class="note-box" data-i18n-html="s9note">Your originals are neither moved nor modified: conversion always writes somewhere else. Playback pauses for the duration (the encoders take every core) and resumes on its own afterwards. <strong>Cancel</strong> stops the batch and deletes the files it had already written — leaving whatever the folder held beforehand untouched.</p>
+      </section>
+
+      <!-- Export -->
+      <section id="export" class="section">
+        <p class="kicker" data-i18n="s7k">Export</p>
+        <h2 data-i18n="s7t">Take your results with you</h2>
+        <p class="lead" data-i18n-html="s7p">Clicking <strong>Save…</strong> writes two files, same name, same folder: a <code>.csv</code> — one row per track, every analysis column, ready for a spreadsheet — and a <code>.json</code> that keeps the full analysis, including each detection's detail. The suggested name and location follow the analyzed folder.</p>
+        <p class="note-inline" data-i18n-html="s7n2">Drop a previously-exported <code>.json</code> onto the list to reload the table as-is — no audio is re-decoded. No dedicated button: same gesture as dropping a folder.</p>
+        <p class="note-inline" data-i18n-html="s7m3u"><strong>Export playlist…</strong> writes an <strong>M3U</strong> playlist in the order shown on screen — including any manual reordering you did by dragging rows. Your choice of Extended M3U (<code>.m3u8</code>, with durations and “Artist — Title”) by default, or Simple M3U (<code>.m3u</code>, paths only).</p>
+        <p class="note-inline" data-i18n="s7n1">Tip: the trash icon at the end of a row removes a file from the list — it will not appear in either exported file.</p>
+      </section>
+
+      <section id="cli" class="section cli-section">
+        <div>
+          <p class="kicker" data-fr="Aussi dans votre terminal" data-en="Also in your terminal">Also in your terminal</p>
+          <h2
+            data-fr="Le même moteur. Une simple commande."
+            data-en="The same engine. One simple command."
+          >The same engine. One simple command.</h2>
+          <p
+            class="lead"
+            data-fr="Analysez un fichier ou un dossier, choisissez les résultats affichés et enregistrez un rapport JSON que l’application peut rouvrir. La commande s’appelle flaccompagnon."
+            data-en="Analyze a file or folder, choose which results to display and save a JSON report the app can reopen. The command is called flaccompagnon."
+          >Analyze a file or folder, choose which results to display and save a JSON report the app can reopen. The command is called flaccompagnon.</p>
+          <a
+            class="btn btn-outline"
+            href="../docs/en/cli.html"
+            data-doc="cli"
+            data-fr="Installer et utiliser la CLI →"
+            data-en="Install and use the CLI →"
+            >Install and use the CLI →</a>
+        </div>
+        <div class="terminal-example">
+          <div class="terminal-header">
+            <span aria-hidden="true">❯_</span><span>flaccompagnon</span
+            ><span class="terminal-label" data-fr="Exemples" data-en="Examples">Examples</span>
+          </div>
+          <p data-fr="Afficher le loudness et la phase" data-en="Show loudness and phase">Show loudness and phase</p>
+          <pre>
+flaccompagnon "Music/Album" \
+  --analysis loudness,phase</pre>
+          <p data-fr="Enregistrer le rapport complet" data-en="Save the complete report">Save the complete report</p>
+          <pre>
+flaccompagnon "Music/Album" \
+  --json "Music/Album/FlacCompagnon.json"</pre>
+          <small
+            data-fr="--analysis filtre l’affichage. Le calcul et le JSON restent complets."
+            data-en="--analysis filters the display. Computation and JSON remain complete."
+            >--analysis filters the display. Computation and JSON remain complete.</small>
+        </div>
+      </section>
+
+      <section id="ecosysteme" class="section ecosystem-section">
+        <p
+          class="kicker"
+          data-fr="Une bibliothèque, plusieurs usages"
+          data-en="One library, several uses"
+        >One library, several uses</p>
+        <div class="ecosystem-content">
+          <div>
+            <h2 data-fr="Votre musique, avec Aède." data-en="Your music, with Aède.">Your music, with Aède.</h2>
+            <p
+              class="lead"
+              data-fr="Aède est un catalogue musical écrit en Rust pour organiser vos pistes et leurs métadonnées. Il intègre le moteur de FlacCompagnon et peut enregistrer un rapport d’analyse par album, directement dans son dossier."
+              data-en="Aède is a music catalog written in Rust for organizing tracks and metadata. It integrates FlacCompagnon’s engine and can save an analysis report for each album, directly in its folder."
+            >Aède is a music catalog written in Rust for organizing tracks and metadata. It integrates FlacCompagnon’s engine and can save an analysis report for each album, directly in its folder.</p>
+          </div>
+          <a
+            class="btn btn-outline"
+            href="https://craft-and-code.github.io/aede/"
+            target="_blank"
+            rel="noopener"
+            data-fr="Découvrir Aède ↗"
+            data-en="Discover Aède ↗"
+            >Discover Aède ↗</a>
+        </div>
+        <p
+          class="note-inline"
+          data-fr="Vous développez en Rust ? Le core est réutilisable sans dépendance à Tauri."
+          data-en="Developing in Rust? The core is reusable without a Tauri dependency."
+        >Developing in Rust? The core is reusable without a Tauri dependency.</p>
+        <a href="https://craft-and-code.github.io/FlacCompagnon/doc/" target="_blank" rel="noopener"
+          >Rustdoc · API Rust ↗</a
+        >
+      </section>
+
+      <!-- Pipeline -->
+      <section id="pipeline" class="section">
+        <p class="kicker" data-i18n="s5k">Pipeline</p>
+        <h2 data-i18n="s5t">How it works</h2>
+        <p class="lead" data-i18n="s5p">Drag and drop a folder or files — or pick them with the import button. Each track is decoded, then run through a battery of analyses, and the verdict appears.</p>
+        <div class="pipeline">
+          <div class="pstage">
+            <span class="pnum">1</span>
+            <span class="plabel" data-i18n="p1">dropped folder</span>
+          </div>
+          <span class="parrow" aria-hidden="true"></span>
+          <div class="pstage">
+            <span class="pnum">2</span>
+            <span class="plabel" data-i18n="p2">decode · symphonia</span>
+          </div>
+          <span class="parrow" aria-hidden="true"></span>
+          <div class="pstage wide">
+            <span class="pnum">3</span>
+            <span class="plabel" data-i18n="p3">streaming analyzer</span>
+            <div class="psub">
+              <span data-i18n="p3a">FFT ▸ cut-off</span>
+              <span data-i18n="p3b">AAC / MP3 ▸ grids</span>
+              <span data-i18n="p3c">effective bits</span>
+              <span data-i18n="p3d">LUFS · phase · levels</span>
+            </div>
+          </div>
+          <span class="parrow" aria-hidden="true"></span>
+          <div class="pstage">
+            <span class="pnum">4</span>
+            <span class="plabel" data-i18n="p4">results table</span>
+          </div>
+        </div>
+        <p class="note-box" data-i18n="s5note">The Rust engine is shared by the app, CLI and Aède. Streaming measurements and FLAC MD5 verification share decoding; searching for codec signatures can require additional work.</p>
+      </section>
+
+      <!-- Téléchargement -->
+      <section id="telecharger" class="section">
+        <p class="kicker" data-i18n="s6k">Download</p>
+        <h2 data-i18n="s6t">A small native app</h2>
+        <p class="lead" data-i18n="s6p">Installers built by GitHub Actions for all three platforms. Separate CLI archives are available in releases that include them.</p>
+        <div class="cards cards-3 dl">
+          <a
+            class="card dlcard"
+            href="https://github.com/craft-and-code/FlacCompagnon/releases/latest"
+          >
+            <span class="os">macOS</span>
+            <span class="osx"><code>.dmg</code> · Apple Silicon</span>
+            <span class="btn btn-grad small" data-i18n="dlBtn">Download</span>
+          </a>
+          <a
+            class="card dlcard"
+            href="https://github.com/craft-and-code/FlacCompagnon/releases/latest"
+          >
+            <span class="os">Windows</span>
+            <span class="osx"><code>.msi</code> · x64</span>
+            <span class="btn btn-grad small" data-i18n="dlBtn">Download</span>
+          </a>
+          <a
+            class="card dlcard"
+            href="https://github.com/craft-and-code/FlacCompagnon/releases/latest"
+          >
+            <span class="os">Linux</span>
+            <span class="osx"><code>.AppImage</code> · <code>.deb</code></span>
+            <span class="btn btn-grad small" data-i18n="dlBtn">Download</span>
+          </a>
+        </div>
+        <p class="note-inline center" data-i18n="ffnote">ffmpeg is only needed for spectrograms and for DSD content analysis — the rest of the analysis works entirely without it.</p>
+        <p class="note-inline center" data-i18n-html="ffinstall">No ffmpeg installed? See the <a href="https://github.com/craft-and-code/FlacCompagnon#prerequisites" target="_blank" rel="noopener">README on GitHub</a> to install it on macOS, Windows or Linux.</p>
+
+        <div class="refs">
+          <h4 data-i18n="refT">References</h4>
+          <p data-i18n="ref1">J. Lacroix, Y. Prime, A. Remy &amp; O. Derrien — “Lossless Audio Checker: A Software for the Detection of Upscaling, Upsampling, and Transcoding in Lossless Musical Tracks”, AES 139th Convention, Paper 9416, New York, 2015.</p>
+          <p data-i18n="ref2">O. Derrien et al. — “Detection of Genuine Lossless Audio Files: Application to the MPEG-AAC Codec”, Journal of the AES, 2019.</p>
+          <p data-i18n="ref3">FlacCompagnon is an independent project. Measurements and their limits are documented; no detection alone constitutes proof of provenance.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span data-i18n="ftLeft"
+        >© 2026 FlacCompagnon · App MIT · Core MPL-2.0 · Built with Rust + Tauri</span>
+      <span class="ft-links">
+        <a href="https://github.com/craft-and-code/FlacCompagnon">GitHub</a>
+        <a href="https://github.com/craft-and-code/FlacCompagnon/releases/latest">Releases</a>
+        <a href="../docs/en/index.html" data-doc="index">Docs</a>
+        <a href="https://craft-and-code.github.io/FlacCompagnon/doc/" target="_blank" rel="noopener"
+          >Rustdoc</a
+        >
+        <a href="https://craft-and-code.github.io/aede/" target="_blank" rel="noopener">Aède</a>
+      </span>
+    </footer>
+
+    <script src="../app.js" type="module"></script>
+  </body>
+</html>

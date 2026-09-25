@@ -1,0 +1,65 @@
+<!doctype html><html lang="en"><head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>User guide — FlacCompagnon Docs</title>
+    <meta name="description" content="Analyze, browse, edit tags, convert and listen to your files."/>
+    <meta name="robots" content="index,follow"/>
+    <meta name="theme-color" content="#0d0e13"/>
+    <link rel="canonical" href="https://craft-and-code.github.io/FlacCompagnon/docs/en/user-guide.html"/>
+    <link rel="alternate" hreflang="fr" href="https://craft-and-code.github.io/FlacCompagnon/docs/fr/user-guide.html"/><link rel="alternate" hreflang="en" href="https://craft-and-code.github.io/FlacCompagnon/docs/en/user-guide.html"/>
+    <link rel="alternate" hreflang="x-default" href="https://craft-and-code.github.io/FlacCompagnon/docs/en/user-guide.html"/>
+    <meta property="og:type" content="article"/>
+    <meta property="og:url" content="https://craft-and-code.github.io/FlacCompagnon/docs/en/user-guide.html"/>
+    <meta property="og:site_name" content="FlacCompagnon"/>
+    <meta property="og:title" content="User guide — FlacCompagnon"/>
+    <meta property="og:description" content="Analyze, browse, edit tags, convert and listen to your files."/>
+    <meta property="og:image" content="https://craft-and-code.github.io/FlacCompagnon/assets/og-image.png"/>
+    <meta property="og:image:alt" content="FlacCompagnon audio analysis tool"/>
+    <meta property="og:locale" content="en_US"/>
+    <meta property="og:locale:alternate" content="fr_FR"/>
+    <meta name="twitter:card" content="summary_large_image"/>
+    <meta name="twitter:title" content="User guide — FlacCompagnon"/>
+    <meta name="twitter:description" content="Analyze, browse, edit tags, convert and listen to your files."/>
+    <meta name="twitter:image" content="https://craft-and-code.github.io/FlacCompagnon/assets/og-image.png"/>
+    <meta name="twitter:image:alt" content="FlacCompagnon audio analysis tool"/>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"FlacCompagnon","item":"https://craft-and-code.github.io/FlacCompagnon/"},{"@type":"ListItem","position":2,"name":"Documentation","item":"https://craft-and-code.github.io/FlacCompagnon/docs/en/index.html"},{"@type":"ListItem","position":3,"name":"User guide"}]}</script>
+    <link rel="icon" href="../../assets/favicon.ico"/>
+    <link rel="stylesheet" href="../../styles.css"/>
+    <link rel="stylesheet" href="../../directory.css"/>
+    <link rel="stylesheet" href="../../guide.css"/>
+    <script src="../../guide.js" type="module"></script>
+  </head><body class="guide-body"><a class="skip-link" href="#content">Skip to content</a><header class="nav guide-header"><a class="brand" href="../../"><img src="../../assets/logo.png" alt="" width="28" height="28"/><span>FlacCompagnon</span></a><a class="guide-header-label" href="index.html">Docs</a><div class="nav-right"><a class="guide-rustdoc" href="https://craft-and-code.github.io/FlacCompagnon/doc/" target="_blank" rel="noopener">Rustdoc ↗</a><nav class="lang" aria-label="Language"><a href="../en/user-guide.html" lang="en" hreflang="en" data-language="en" aria-current="page">EN</a><a href="../fr/user-guide.html" lang="fr" hreflang="fr" data-language="fr" >FR</a></nav></div></header><div class="guide-layout"><aside class="guide-sidebar"><nav class="guide-nav" aria-label="Documentation"><details class="guide-nav-section" data-guide-nav-section="user-guide" open><summary class="guide-nav-section-title">User guide<span aria-hidden="true"></span></summary><ul><li><a href="user-guide.html" aria-current="page">User guide</a></li></ul></details><details class="guide-nav-section" data-guide-nav-section="analyses"><summary class="guide-nav-section-title">Analyses<span aria-hidden="true"></span></summary><a class="guide-overview" href="index.html" >Overview</a><div class="guide-nav-group"><h2>Authenticity &amp; spectrum</h2><ul><li><a href="upscaling.html" >Real bit depth</a></li><li><a href="upsampling.html" >Upsampling</a></li><li><a href="transcoding.html" >AAC / MP3 transcoding</a></li><li><a href="spectral-cutoff.html" >Spectral cutoff</a></li></ul></div><div class="guide-nav-group"><h2>Stereo &amp; phase</h2><ul><li><a href="fake-stereo.html" >Dual mono</a></li><li><a href="stereo-polarity.html" >Global polarity</a></li><li><a href="local-phase.html" >Local &amp; band phase</a></li><li><a href="stereo-balance.html" >Stereo balance</a></li><li><a href="high-frequency-stereo.html" >HF Stereo</a></li></ul></div><div class="guide-nav-group"><h2>Levels &amp; dynamics</h2><ul><li><a href="dc-offset.html" >DC offset</a></li><li><a href="clipping.html" >Clipping</a></li><li><a href="true-peak.html" >True peak</a></li><li><a href="dynamic-range.html" >Dynamics (DR)</a></li></ul></div><div class="guide-nav-group"><h2>Loudness</h2><ul><li><a href="integrated-loudness.html" >Integrated LUFS</a></li><li><a href="momentary-loudness.html" >LUFS-M max</a></li><li><a href="short-term-loudness.html" >LUFS-S max</a></li><li><a href="loudness-range.html" >Loudness Range (LRA)</a></li></ul></div><div class="guide-nav-group"><h2>Integrity &amp; discontinuities</h2><ul><li><a href="impulses.html" >Impulses</a></li><li><a href="dropouts.html" >Dropouts</a></li><li><a href="flac-md5.html" >FLAC MD5 signature</a></li><li><a href="fingerprints.html" >MD5 &amp; CRC32 fingerprints</a></li></ul></div><div class="guide-nav-group"><h2>DSD sources</h2><ul><li><a href="dsd-pcm-source.html" >PCM source in DSD</a></li><li><a href="dsd-heritage.html" >DSD heritage in PCM</a></li></ul></div></details><details class="guide-nav-section" data-guide-nav-section="cli"><summary class="guide-nav-section-title">Command line<span aria-hidden="true"></span></summary><ul><li><a href="cli.html" >Using the CLI</a></li></ul></details><div class="guide-api-block"><a class="guide-api" href="https://craft-and-code.github.io/FlacCompagnon/doc/" target="_blank" rel="noopener">Rustdoc · API Rust ↗</a></div></nav></aside><main id="content" class="guide-main"><p class="kicker">Getting started</p><h1>User guide</h1><p class="guide-intro">Analyze, browse, edit tags, convert and listen to your files.</p><div class="guide-prose"><p>FlacCompagnon brings library analysis, listening, tag editing and conversion together. This guide follows a simple flow: drop some tracks, browse the results, then change only what you choose to change.</p>
+<h2 id="before-you-start">Before you start<a class="heading-link" href="#before-you-start" aria-label="Before you start">#</a></h2><p>You can drop one audio file or a whole folder. Subfolders are scanned, and files already in the list are not added twice.</p>
+<p>Analysis never changes your files. Writing to disk always requires a clear action: saving tags or artwork, renaming or renumbering a track, converting, generating spectrograms or saving a report.</p>
+<h2 id="analyze-files-by-drag-and-drop">Analyze files by drag and drop<a class="heading-link" href="#analyze-files-by-drag-and-drop" aria-label="Analyze files by drag and drop">#</a></h2><ol>
+<li>Open FlacCompagnon.</li>
+<li>Drop a folder or audio files on the large central area.</li>
+<li>Wait for the analysis to finish. The list shows the files, their properties and the useful findings.</li>
+</ol>
+<p>The <strong>Add titles…</strong> button also opens a folder picker. Use it when you prefer a file dialog to drag and drop.</p>
+<p>Each row represents one track. Visible columns can show the format, sample rate, bit depth, a detection and level measurements. A result calls attention to a measured property; it does not replace listening.</p>
+<blockquote>
+<p><strong>On-screen cue:</strong> use the small magnifier on a row to reveal the file in Finder or Explorer. The nearby play button starts that track.</p>
+</blockquote>
+<p>To understand a column, open its article in <a href="https://github.com/craft-and-code/FlacCompagnon/blob/main/index.md">Analyses</a>. Every article explains what the measurement observes and its limitations.</p>
+<h2 id="edit-tags-and-artwork">Edit tags and artwork<a class="heading-link" href="#edit-tags-and-artwork" aria-label="Edit tags and artwork">#</a></h2><p>Select one or more tracks in the list. The <strong>Tags</strong> panel opens on the left.</p>
+<p>It contains the album artwork and the common fields: title, artist, album, album artist, year, genre, track number and comment. Edit one or more fields, then use <strong>Save</strong> at the bottom of the panel to write the changes to the selected files.</p>
+<p>Artwork follows the role chosen in the list beneath the cover, such as <em>Front cover</em> or <em>Back cover</em>. Change the role to display the matching image. You can:</p>
+<ul>
+<li>drop an image on the cover to stage it for the selected tracks;</li>
+<li>use the export button below the image to extract it next to the audio files;</li>
+<li>use the trash button to stage its deletion.</li>
+</ul>
+<p>Changes remain pending until you select <strong>Save</strong>. <strong>Reset</strong> only cancels pending changes.</p>
+<h2 id="convert-a-selection">Convert a selection<a class="heading-link" href="#convert-a-selection" aria-label="Convert a selection">#</a></h2><p>The two-arrow button in the top bar opens the <strong>Convert</strong> panel on the right.</p>
+<p>Drop files or a folder directly on this panel to make an independent conversion list. If tracks are already analyzed and selected, use <strong>Add selected</strong> to add them to that list.</p>
+<p>Choose the output format, then the options available for it. Lossy formats expose a bitrate; FLAC exposes encoding effort. <strong>Also copy other files</strong> keeps covers, playlists and other non-audio files alongside the converted tracks.</p>
+<p>When the list and settings are right, select <strong>Convert</strong> and choose a destination folder. FlacCompagnon leaves the analysis list intact: conversion does not erase or replace the originals.</p>
+<h2 id="listen-to-a-track">Listen to a track<a class="heading-link" href="#listen-to-a-track" aria-label="Listen to a track">#</a></h2><p>The bottom bar is the player. Click a row’s play button, or select tracks and use the main button in the bar.</p>
+<p>Previous and next follow the selection when there is one. Without a selection, they follow the currently displayed list. Use the slider for volume and the progress bar to move through the track.</p>
+<p>Listening is particularly useful after a finding: locate the section an analysis highlights, then compare it with what you actually hear.</p>
+<h2 id="search-a-library">Search a library<a class="heading-link" href="#search-a-library" aria-label="Search a library">#</a></h2><p>The <strong>Filter…</strong> field in the upper left narrows the list as you type. It searches the file name, information shown by the analysis and tags already read: artist, album, title, genre, catalogue number and more.</p>
+<p>Enter several words to keep tracks containing each word in one piece of information. Clear the field to restore the full list. This filter does not remove a file from an export or report; it only changes the display and playback queue.</p>
+<h2 id="save-and-resume-later">Save and resume later<a class="heading-link" href="#save-and-resume-later" aria-label="Save and resume later">#</a></h2><p>Use <strong>Save…</strong> to save a report. The JSON keeps analysis results and the displayed track order; you can drop it back into FlacCompagnon later without running the analysis again.</p>
+<p>For automated use, see <a href="cli.html">Using the CLI</a>. It provides the same analyses from a terminal and can write the same JSON format.</p>
+</div></main><aside class="guide-toc"><p>On this page</p><a href="#before-you-start">Before you start</a><a href="#analyze-files-by-drag-and-drop">Analyze files by drag and drop</a><a href="#edit-tags-and-artwork">Edit tags and artwork</a><a href="#convert-a-selection">Convert a selection</a><a href="#listen-to-a-track">Listen to a track</a><a href="#search-a-library">Search a library</a><a href="#save-and-resume-later">Save and resume later</a></aside></div><footer class="footer"><span>FlacCompagnon · App MIT · Core MPL-2.0 · Rust + Tauri</span><span class="ft-links"><a href="../../">Home</a><a href="https://github.com/craft-and-code/FlacCompagnon">GitHub</a><a href="https://craft-and-code.github.io/aede/" target="_blank" rel="noopener">Aède</a></span></footer></body></html>
