@@ -368,8 +368,10 @@ Before tagging, commit the intended release with matching versions in `Cargo.tom
 | -------------------------- | ---------------------------------------------------- |
 | Windows 10/11 (64-bit)     | `FlacCompagnon-App_<version>_Windows-x64.msi`        |
 | macOS (Apple Silicon)      | `FlacCompagnon-App_<version>_macOS-AppleSilicon.dmg` |
-| Linux (any distro, 64-bit) | `FlacCompagnon-App_<version>_Linux-x86_64.AppImage`  |
+| Linux (glibc 2.35+, 64-bit) | `FlacCompagnon-App_<version>_x86_64.AppImage`  |
 | Linux (Debian / Ubuntu)    | `FlacCompagnon-App_<version>_Linux-x86_64.deb`       |
+
+Linux builds require glibc 2.35 or later (for example Ubuntu 22.04 or later). Before upload, the release workflow repairs and verifies the AppImage launch permissions, checks its glibc requirements, and opens the packaged application under a virtual display.
 
 The CLI archives are named `FlacCompagnon-CLI_<version>_<platform>.tar.gz` (or `.zip` on Windows).
 

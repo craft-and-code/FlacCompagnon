@@ -75,6 +75,9 @@ jobs:
       - name: Build frontend (typecheck + bundle)
         run: npm run build
 
+      - name: AppImage packaging regression tests
+        run: python3 -m unittest discover -s tests -p "appimage*_test.py"
+
       - name: Search regression tests
         run: npm run test:search
 

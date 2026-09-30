@@ -62,7 +62,7 @@ jobs:
             libgtk-3-dev \
             libssl-dev \
             libasound2-dev \
-            autoconf automake libtool
+            autoconf automake libtool squashfs-tools xvfb xdotool dbus-x11
 
       # `audiopus_sys` 0.1.x — the version `audiopus` 0.2 pins — builds its
       # vendored libopus with the autotools, so `autoreconf` has to exist. The
@@ -96,7 +96,7 @@ jobs:
         run: npm install
 
       # Build only — the artifacts are renamed below so every download says
-      # which OS it is for, then uploaded in a separate step.
+      # which platform it is for, then uploaded in a separate step.
       - name: Build the app
         id: build
         uses: tauri-apps/tauri-action@v0
@@ -105,9 +105,26 @@ jobs:
         with:
           args: ${{ matrix.args }}
 
+      - name: Collect artifact paths
+        shell: bash
+        env:
+          ARTIFACT_PATHS: ${{ steps.build.outputs.artifactPaths }}
+        run: printf '%s' "$ARTIFACT_PATHS" > paths.json
+
+      - name: Repair and verify AppImage permissions and glibc baseline
+        if: matrix.platform == 'ubuntu-22.04'
+        run: python3 scripts/appimage_packaging.py paths.json
+
+      - name: Check AppImage opens a window
+        if: matrix.platform == 'ubuntu-22.04'
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: xvfb-run -a dbus-run-session -- python3 scripts/appimage_smoke.py paths.json
+
       # Rename every produced installer to FlacCompagnon-App_<version>_<Platform>.<ext>
       # (e.g. FlacCompagnon-App_0.7.0_Windows-x64.msi). The release also
       # contains CLI archives, so the product name makes the choice explicit.
+      # AppImages omit "Linux": their format already identifies the OS.
       # tauri-action reports the built files in `artifactPaths`
       # (a JSON array); it is written to a file rather than interpolated into
       # the script so no path can break the quoting.
@@ -116,9 +133,6 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist-release
-          cat > paths.json <<'JSON'
-          ${{ steps.build.outputs.artifactPaths }}
-          JSON
           echo "--- tauri reported these artifacts ---"
           cat paths.json
           python3 - <<'PY'
@@ -150,7 +164,8 @@ jobs:
               # The separator may be "_", "-" or "." (RPM: name-ver-rel.arch.rpm).
               stem = re.sub(r"[._-](aarch64|x64|x86_64|amd64)([_-](en-US|setup))?$", "", stem)
               version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
-              dest = out / f"FlacCompagnon-App_{version}_{label}{ext}"
+              asset_label = "x86_64" if ext == ".AppImage" else label
+              dest = out / f"FlacCompagnon-App_{version}_{asset_label}{ext}"
               shutil.copy2(src, dest)
               copied += 1
               print("renamed:", name, "->", dest.name)
@@ -291,7 +306,7 @@ jobs:
           | --- | --- |
           | **Windows** (10/11, 64-bit) | `FlacCompagnon-App_<version>_Windows-x64.msi` — the installer |
           | **macOS** (Apple Silicon: M1/M2/M3/M4) | `FlacCompagnon-App_<version>_macOS-AppleSilicon.dmg` — the installer |
-          | **Linux** (any distro, 64-bit) | `FlacCompagnon-App_<version>_Linux-x86_64.AppImage` — portable, just make it executable |
+          | **Linux** (glibc 2.35+, 64-bit) | `FlacCompagnon-App_<version>_x86_64.AppImage` — portable, just make it executable |
           | **Linux** (Debian / Ubuntu) | `FlacCompagnon-App_<version>_Linux-x86_64.deb` — system package |
 
           ## Command line
