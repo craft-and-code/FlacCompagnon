@@ -1,8 +1,13 @@
 // Pixel offsets support wrapped detection cells and shorter error rows without
 // imposing a new row height on the table. Unvisited rows start at an estimate.
-export function rowOffsets(paths: readonly string[], heights: ReadonlyMap<string, number>, estimate = 36) {
+export function rowOffsets(
+  paths: readonly string[],
+  heights: ReadonlyMap<string, number>,
+  estimate = 36,
+) {
   const offsets = [0];
-  for (const path of paths) offsets.push(offsets[offsets.length - 1] + (heights.get(path) ?? estimate));
+  for (const path of paths)
+    offsets.push(offsets[offsets.length - 1] + (heights.get(path) ?? estimate));
   return offsets;
 }
 
@@ -17,8 +22,15 @@ function rowAt(offsets: readonly number[], position: number) {
   return Math.min(lo, Math.max(0, offsets.length - 2));
 }
 
-/// Rows covering the viewport plus a small buffer, even after a list shrinks.
-export function tableWindow(offsets: readonly number[], scrollTop: number, height: number, buffer = 300) {
+/// Rows covering the viewport plus enough runway for a fast wheel or trackpad
+/// scroll. The table still mounts a bounded window, while its existing rows
+/// remain under the viewport until React receives the next scroll position.
+export function tableWindow(
+  offsets: readonly number[],
+  scrollTop: number,
+  height: number,
+  buffer = 1200,
+) {
   const count = offsets.length - 1;
   const total = offsets[count];
   const top = Math.max(0, Math.min(scrollTop, total - height));

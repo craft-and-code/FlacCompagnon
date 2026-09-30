@@ -354,24 +354,24 @@ Four GitHub Actions workflows are included:
 - **Release** (`.github/workflows/release.yml`) builds the desktop installers and, in a separate job, standalone CLI archives for **macOS (Apple Silicon), Windows and Linux**. It publishes both to one GitHub Release when you push a version tag:
 
   ```bash
-  git tag -a v0.9.5 -m "FlacCompagnon 0.9.5"
-  git push origin v0.9.5
+  git tag -a v0.9.6 -m "FlacCompagnon 0.9.6"
+  git push origin v0.9.6
   ```
 
 Before tagging, commit the intended release with matching versions in `Cargo.toml` (`workspace.package.version`), `src-tauri/tauri.conf.json`, `package.json` and `package-lock.json`. The tag starts both the desktop and CLI builds; pushing to the main branch separately triggers the Site workflow.
 
 (or from the Actions tab via "Run workflow"). The release is created as a **draft** — review the attached installers, then publish it. Your downloads then live on the repository's **Releases** page. ffmpeg is not bundled; users install it themselves for the spectrogram feature.
 
-**Every artifact name ends with its platform**, so there is no guessing on the Releases page:
+**Every release asset names its product first**, so the graphical application and the command-line archive are distinct before the platform suffix:
 
-| Your system                | File to download                                 |
-| -------------------------- | ------------------------------------------------ |
-| Windows 10/11 (64-bit)     | `FlacCompagnon_<version>_Windows-x64.msi`        |
-| macOS (Apple Silicon)      | `FlacCompagnon_<version>_macOS-AppleSilicon.dmg` |
-| Linux (any distro, 64-bit) | `FlacCompagnon_<version>_Linux-x86_64.AppImage`  |
-| Linux (Debian / Ubuntu)    | `FlacCompagnon_<version>_Linux-x86_64.deb`       |
+| Your system                | File to download                                     |
+| -------------------------- | ---------------------------------------------------- |
+| Windows 10/11 (64-bit)     | `FlacCompagnon-App_<version>_Windows-x64.msi`        |
+| macOS (Apple Silicon)      | `FlacCompagnon-App_<version>_macOS-AppleSilicon.dmg` |
+| Linux (any distro, 64-bit) | `FlacCompagnon-App_<version>_Linux-x86_64.AppImage`  |
+| Linux (Debian / Ubuntu)    | `FlacCompagnon-App_<version>_Linux-x86_64.deb`       |
 
-The CLI archives are named `flaccompagnon_<version>_<platform>.tar.gz` (or `.zip` on Windows).
+The CLI archives are named `FlacCompagnon-CLI_<version>_<platform>.tar.gz` (or `.zip` on Windows).
 
 The macOS `.app.tar.gz` is the same application as the `.dmg`, just archived. The release workflow builds with `tauri-action`, renames each artifact with its platform label, then uploads the set as a **draft** release.
 
@@ -417,7 +417,7 @@ The **network is never touched by the test suite**: the lookup's HTTP calls are 
 
 ## Documentation (rustdoc)
 
-The website's **Docs** entry opens the [analysis guide](https://craft-and-code.github.io/FlacCompagnon/docs/en/index.html), also available [in French](https://craft-and-code.github.io/FlacCompagnon/docs/fr/index.html). Each analysis has a plain-language introduction, an illustrative diagram and an expandable technical section with methods, limits and verification examples. The [CLI guide](https://craft-and-code.github.io/FlacCompagnon/docs/en/cli.html) covers installation, options, JSON reports and Aède integration. Rustdoc remains the separate API reference, linked throughout the guide.
+The website's **Docs** entry opens the [user guide](https://craft-and-code.github.io/FlacCompagnon/docs/en/user-guide.html), also available [in French](https://craft-and-code.github.io/FlacCompagnon/docs/fr/user-guide.html). Each analysis has a plain-language introduction, an illustrative diagram and an expandable technical section with methods, limits and verification examples. The [CLI guide](https://craft-and-code.github.io/FlacCompagnon/docs/en/cli.html) covers installation, options, JSON reports and Aède integration. Rustdoc remains the separate API reference, linked throughout the guide.
 
 The whole `core` crate is documented with Rust doc comments (crate-, module- and function-level), so you can browse the full API — every analysis routine, its inputs and its heuristics — as a generated HTML site. Build it locally with:
 

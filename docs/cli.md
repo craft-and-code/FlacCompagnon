@@ -4,7 +4,7 @@ The **CLI** is FlacCompagnon without the graphical window: type a command in Ter
 
 ## Install and check
 
-On the [GitHub Releases page](https://github.com/craft-and-code/FlacCompagnon/releases), choose a standalone archive named `flaccompagnon_<version>_<platform>.tar.gz` or `.zip`. CLI archives are built separately from the desktop installers; choose a release that includes them. The platforms are macOS Apple Silicon, Linux x86_64 and Windows x64.
+On the [GitHub Releases page](https://github.com/craft-and-code/FlacCompagnon/releases), choose a standalone archive named `FlacCompagnon-CLI_<version>_<platform>.tar.gz` or `.zip`. The graphical application files begin with `FlacCompagnon-App`, so the two downloads are distinguishable at a glance. The platforms are macOS Apple Silicon, Linux x86_64 and Windows x64.
 
 Extract the archive. In its folder, run:
 
@@ -28,7 +28,7 @@ The examples below assume the executable's folder has been added to your `PATH`.
 flaccompagnon "Music/Album/01 - Track.flac"
 ```
 
-The output lists the path and measurements for each file. Quotation marks keep a path containing spaces together. An unavailable Rust value may appear as `None`; it is not a measured zero. Results are printed after the selected files have been analyzed, so a large batch can remain quiet for a while.
+Progress shows each file before analysis. Measurements are hidden by default; add `--show-results` to print them. An animated loader appears during file discovery and decoding in an interactive terminal. Quotation marks keep a path containing spaces together. An unavailable Rust value may appear as `None`; it is not a measured zero. Progress is sent to stderr; requested results go to stdout.
 
 To scan an album, including its subfolders:
 
@@ -75,7 +75,7 @@ flaccompagnon "Music/Album" -a clipping,clicks,dropouts
 flaccompagnon "Music/Album" --json "Music/Album/FlacCompagnon.json"
 ```
 
-`--json` requires a **file path**, not just a folder or a flag. The parent folder must already exist. An existing file at that path is overwritten. This command produces one report covering all selected audio files; scanning several albums does not automatically split it into one report per album.
+`--json` requires a **file path**, not just a folder or a flag. The parent folder must already exist. Valid measurements in existing reports are reused when audio size and modification time agree. Add `--force` to reanalyze and replace the chosen report. A malformed destination requires `--force`. This command produces one report covering all selected audio files; use `--json-layout album` or `--json-layout artist` to split several albums into separate reports.
 
 The schema is the desktop app's complete, versioned `flaccompagnon-report` format. Drop the JSON onto the desktop results list to reopen the saved analysis without re-decoding the audio. A report is a snapshot: it does not update itself after audio is edited, and saved paths can become stale when files move. See [file fingerprints](fingerprints.md) for identity and relocation limits.
 
@@ -96,7 +96,7 @@ aede scan "Music"
 aede analyze "Music" --json
 ```
 
-Aède analyzes cataloged tracks and writes one `FlacCompagnon.json` in each album folder, using its catalog grouping (including a shared album folder for multi-disc releases). An existing report can be imported with `aede import "Music/Album/FlacCompagnon.json"`. Consult Aède's README for its version-specific options.
+Aède analyzes cataloged tracks and writes one `<album>.json` in each album folder, using its catalog grouping (including a shared album folder for multi-disc releases). An existing report can be imported with `aede import "Music/Album/FlacCompagnon.json"`. Consult Aède's README for its version-specific options.
 
 ## DSD and FFmpeg
 
@@ -117,13 +117,16 @@ flaccompagnon [OPTIONS] <FILE|FOLDER>...
 | Option                | Effect                                                                    |
 | --------------------- | ------------------------------------------------------------------------- |
 | `-a, --analysis NAME` | Select terminal fields; repeat or separate names with commas              |
+| `--show-results` | Print terminal measurements (default: progress only) |
+| `--force` | Reanalyze files and replace selected reports |
+| `--json-layout album\|artist` | Save one report per album in its folder or parent |
 | `-j, --json PATH`     | Write the complete JSON report                                            |
 | `--recursive`         | Include subfolders (default)                                              |
 | `--no-recursive`      | Stay at the named folder level                                            |
 | `--no-flac-md5`       | Read stored FLAC signatures without verifying decoded audio against them  |
 | `--ffmpeg PATH`       | Choose the FFmpeg executable for DSD decoding                             |
 | `-h, --help`          | Print help                                                                |
-| `-V, --version`       | Print the version (use on its own)                                        |
+| `-v, -V, --version`       | Print the version (use on its own)                                        |
 | `--`                  | Treat all remaining arguments as paths, including names starting with `-` |
 
 ## Exit codes and automation
@@ -146,3 +149,18 @@ cargo build --release -p flaccompagnon-cli
 ```
 
 On Windows the executable is `target\release\flaccompagnon.exe`. This build does not require the Tauri desktop runtime. Other Rust software can depend on the `flaccompagnon-core` crate directly; its functions and report types are documented in [Rustdoc](https://craft-and-code.github.io/FlacCompagnon/doc/). A Git dependency needs a pushed commit or tag; it does not need to wait for release binaries to finish building.
+
+## Reuse results and choose report placement
+
+```sh
+flaccompagnon "Music/Artist" --json-layout album
+flaccompagnon "Music/Artist" --json-layout artist
+flaccompagnon "Music/Artist" --json-layout album --force
+flaccompagnon "Music/Album" --show-results
+```
+
+`album` saves `<album>.json` inside each album folder; `artist` saves the same separate album reports in their parent folder. Audio files are grouped by directory; numbered `CD`, `Disc` and `Disk` subfolders share their parent album. This filesystem grouping does not use tags. `--json-layout` enables saving and cannot be combined with `--json PATH`.
+
+Even without saving, existing FlacCompagnon reports beside albums or in their parent folders can supply successful results. Files absent from reports, changed files and previous errors are analyzed. Reports are snapshots checked by path, size and modification time; use `--force` if those metadata stayed unchanged despite an audio edit or to recompute with a newer engine. `--analysis` also enables terminal results and filters their fields.
+
+Aède accepts the same `--force`, `--show-results` and `--json-layout album|artist` options for `aede analyze`; `--json` retains its default album placement.

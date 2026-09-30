@@ -11,7 +11,7 @@ test("clearing a filter keeps rendering bounded for ten thousand files", () => {
     const offsets = Array.from({ length: count + 1 }, (_, i) => i * 36);
     const { start, end } = tableWindow(offsets, 0, 600);
     assert.equal(start, 0);
-    assert.ok(end <= 26);
+    assert.ok(end <= 51);
     assert.ok(offsets[end] >= Math.min(600, count * 36));
   }
 });
@@ -22,7 +22,10 @@ test("filtering a deeply scrolled list never produces a blank window", () => {
 });
 
 test("wrapped cells and error rows retain their own heights after sorting", () => {
-  const heights = new Map([["error", 31], ["wrapped", 60]]);
+  const heights = new Map([
+    ["error", 31],
+    ["wrapped", 60],
+  ]);
   const offsets = rowOffsets(["error", "wrapped", "regular"], heights);
   assert.deepEqual(offsets, [0, 31, 91, 127]);
   assert.deepEqual(tableWindow(offsets, 32, 20, 0), { start: 1, end: 2, top: 32 });
@@ -35,7 +38,15 @@ test("scrolling to the last file covers the viewport without exceeding the list"
   assert.equal(end, 10000);
   assert.equal(top, 360000 - 600);
   assert.ok(offsets[start] <= top);
-  assert.ok(end - start <= 26);
+  assert.ok(end - start <= 51);
+});
+
+test("a fast scroll remains within the rows rendered before the next paint", () => {
+  const offsets = Array.from({ length: 10001 }, (_, i) => i * 36);
+  const initial = tableWindow(offsets, 0, 600);
+  // A two-viewport jump ends at 1,800 px. The initial window already covers
+  // it, so the spacer cannot briefly be the only content under the viewport.
+  assert.ok(offsets[initial.end] >= 1_800);
 });
 
 test("scrolling during rename retains only the editor and viewport rows", () => {

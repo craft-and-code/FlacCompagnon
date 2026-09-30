@@ -29,6 +29,17 @@ table {
   border-collapse: separate;
   border-spacing: 0;
 }
+/* Once the initial result-set sizing pass has run, the colgroup becomes the
+   layout contract. Virtual rows can then enter and leave without their text
+   resizing the visible table. The saved minimum keeps a wide result set
+   horizontally scrollable instead of squeezing its columns on window resize. */
+.table-wrap > table.column-widths-locked {
+  table-layout: fixed;
+}
+.table-wrap > table.column-widths-locked tbody td:not(.detections) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 thead th {
   position: sticky;
   top: 0;

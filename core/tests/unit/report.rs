@@ -120,6 +120,28 @@ fn discontinuity_counts_and_locations_survive_json_and_csv() {
 }
 
 #[test]
+fn json_ignores_invisible_floating_point_rounding_noise() {
+    let mut first = sample_file();
+    let mut second = sample_file();
+    first.duration_secs = 126.26666666666668;
+    second.duration_secs = 126.26666666666667;
+    let first = FolderReport {
+        root: "/music".into(),
+        files: vec![first],
+        has_flac: true,
+    };
+    let second = FolderReport {
+        root: "/music".into(),
+        files: vec![second],
+        has_flac: true,
+    };
+
+    assert_eq!(build_json(&first).unwrap(), build_json(&second).unwrap());
+    let saved = parse_json(&build_json(&first).unwrap()).unwrap();
+    assert_eq!(saved.files[0].duration_secs, 126.266666667);
+}
+
+#[test]
 fn balance_exports_preserve_direction_and_silence_without_infinite_numbers() {
     use crate::analysis::stereo::StereoBalance;
     for (balance, db, silent) in [

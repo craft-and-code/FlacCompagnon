@@ -95,9 +95,13 @@ export function ResultsTable({
   const tableRef = useRef<HTMLTableElement>(null);
   const orderedPaths = useMemo(() => files.map((f) => f.path), [files]);
 
-  const displayedPaths = useMemo(() => displayedFiles.map(f => f.path), [displayedFiles]);
+  const displayedPaths = useMemo(() => displayedFiles.map((f) => f.path), [displayedFiles]);
   const { viewportRef, onScroll, indices, offsets } = useTableWindow(
-    displayedPaths, JSON.stringify([filterKey, sort]), editingPath, tableRef, scrollRef,
+    displayedPaths,
+    JSON.stringify([filterKey, sort]),
+    editingPath,
+    tableRef,
+    scrollRef,
   );
   const noMatches = files.length > 0 && displayedFiles.length === 0;
 
@@ -123,7 +127,20 @@ export function ResultsTable({
     if (col.conditional === "md5") return showMd5;
     return true;
   });
-  const columnWidths = useTableColumnWidths(tableRef, middleColumns.map(col => col.key).join(","));
+  // A filter only changes which rows are visible; it must not reset the
+  // layout. A new result set, or a user column change, gets one fresh natural
+  // sizing pass before widths are fixed for scrolling.
+  const columnKeys = middleColumns.map((col) => col.key).join(",");
+  const resultSetKey = useMemo(
+    () =>
+      files
+        .map((file) => file.path)
+        .sort()
+        .join("\u0000"),
+    [files],
+  );
+  const columnLayoutKey = `${columnKeys}\u0001${resultSetKey}`;
+  const columnWidths = useTableColumnWidths(tableRef, columnLayoutKey);
 
   const [colMenu, setColMenu] = useState<{ x: number; y: number } | null>(null);
 
@@ -136,6 +153,13 @@ export function ResultsTable({
   const selected = new Set(selectedPaths);
   const dragging = new Set(dragState.active ? dragState.paths : []);
   const totalColumns = LEAD_HEADERS.length + middleColumns.length + 1; // +1: delete button
+  const widthsLocked = columnWidths.length === totalColumns;
+  const tableClassName =
+    [sort ? "sorted" : "", widthsLocked ? "column-widths-locked" : ""].filter(Boolean).join(" ") ||
+    undefined;
+  const tableMinWidth = widthsLocked
+    ? `${Math.ceil(columnWidths.reduce((total, width) => total + width, 0))}px`
+    : undefined;
 
   const sortIndicator = (col?: SortColumn) =>
     col &&
@@ -150,8 +174,17 @@ export function ResultsTable({
     // Dropping audio anywhere on this list adds it, the same way the
     // empty-state dropzone this replaces does — see dropZones.ts.
     <div ref={viewportRef} onScroll={onScroll} className="table-wrap" {...dropZone("list")}>
-      <table ref={tableRef} className={sort ? "sorted" : undefined} aria-rowcount={displayedFiles.length + 1}>
-        <colgroup>{columnWidths.map((width, i) => <col key={i} style={{ width }} />)}</colgroup>
+      <table
+        ref={tableRef}
+        className={tableClassName}
+        style={tableMinWidth ? { minWidth: tableMinWidth } : undefined}
+        aria-rowcount={displayedFiles.length + 1}
+      >
+        <colgroup>
+          {columnWidths.map((width, i) => (
+            <col key={i} style={{ width }} />
+          ))}
+        </colgroup>
         <thead
           onContextMenu={(ev) => {
             ev.preventDefault();
@@ -223,9 +256,11 @@ export function ResultsTable({
             const previousEnd = position === 0 ? 0 : offsets[indices[position - 1] + 1];
             return (
               <Fragment key={f.path}>
-                {offsets[index] > previousEnd && <tr className="table-spacer" aria-hidden="true">
-                  <td colSpan={totalColumns} style={{ height: offsets[index] - previousEnd }} />
-                </tr>}
+                {offsets[index] > previousEnd && (
+                  <tr className="table-spacer" aria-hidden="true">
+                    <td colSpan={totalColumns} style={{ height: offsets[index] - previousEnd }} />
+                  </tr>
+                )}
                 <ResultRow
                   file={f}
                   rowIndex={index + 2}
@@ -279,8 +314,14 @@ export function ResultsTable({
             );
           })}
           <tr className="table-spacer" aria-hidden="true">
-            <td colSpan={totalColumns} style={{ height: offsets[displayedFiles.length] -
-              (indices.length ? offsets[indices[indices.length - 1] + 1] : 0) }} />
+            <td
+              colSpan={totalColumns}
+              style={{
+                height:
+                  offsets[displayedFiles.length] -
+                  (indices.length ? offsets[indices[indices.length - 1] + 1] : 0),
+              }}
+            />
           </tr>
         </tbody>
       </table>

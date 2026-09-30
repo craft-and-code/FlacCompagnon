@@ -1,4 +1,5 @@
 use super::*;
+use std::path::Path;
 
 #[test]
 fn unknown_analysis_is_rejected() {
@@ -28,4 +29,14 @@ fn json_destination_is_kept_separate_from_audio_targets() {
         .unwrap();
     assert_eq!(args.json.as_deref(), Some(Path::new("report.json")));
     assert_eq!(args.targets, ["album"]);
+}
+
+#[test]
+fn invalid_json_layout_and_conflicting_destinations_are_rejected() {
+    for options in [
+        vec!["--json-layout", "wrong", "album"],
+        vec!["--json-layout", "album", "--json", "report.json", "album"],
+    ] {
+        assert!(Args::parse(options.into_iter().map(str::to_string)).is_err());
+    }
 }

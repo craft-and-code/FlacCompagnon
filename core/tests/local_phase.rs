@@ -51,10 +51,12 @@ fn local_phase_survives_decoding_and_exports_time_and_band_evidence() {
         has_flac: false,
     };
     let json = report::build_json(&report).unwrap();
-    assert_eq!(
-        report::parse_json(&json).unwrap().files[0].local_phase,
-        Some(local)
-    );
+    // JSON keeps a portable, nine-decimal representation of f64 fields. The
+    // reloaded report therefore has the exported precision, and serializing
+    // it again must produce the same portable document.
+    let restored_from_json = report::parse_json(&json).unwrap();
+    assert!(restored_from_json.files[0].local_phase.is_some());
+    assert_eq!(report::build_json(&restored_from_json).unwrap(), json);
     let csv = report::build_csv(&report);
     let mut lines = csv.lines();
     let headers: Vec<_> = lines.next().unwrap().split(',').collect();

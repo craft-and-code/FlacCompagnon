@@ -105,9 +105,10 @@ jobs:
         with:
           args: ${{ matrix.args }}
 
-      # Rename every produced installer to <name>_<version>_<Platform>.<ext>
-      # (e.g. FlacCompagnon_0.7.0_Windows-x64.msi) so the Releases page is
-      # unambiguous. tauri-action reports the built files in `artifactPaths`
+      # Rename every produced installer to FlacCompagnon-App_<version>_<Platform>.<ext>
+      # (e.g. FlacCompagnon-App_0.7.0_Windows-x64.msi). The release also
+      # contains CLI archives, so the product name makes the choice explicit.
+      # tauri-action reports the built files in `artifactPaths`
       # (a JSON array); it is written to a file rather than interpolated into
       # the script so no path can break the quoting.
       - name: Rename artifacts with the platform label
@@ -148,7 +149,8 @@ jobs:
               # Drop the arch/locale noise Tauri adds; the label already says it.
               # The separator may be "_", "-" or "." (RPM: name-ver-rel.arch.rpm).
               stem = re.sub(r"[._-](aarch64|x64|x86_64|amd64)([_-](en-US|setup))?$", "", stem)
-              dest = out / f"{stem}_{label}{ext}"
+              version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+              dest = out / f"FlacCompagnon-App_{version}_{label}{ext}"
               shutil.copy2(src, dest)
               copied += 1
               print("renamed:", name, "->", dest.name)
@@ -209,7 +211,7 @@ jobs:
           output = pathlib.Path("dist-cli")
           output.mkdir(exist_ok=True)
           version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
-          stem = f"flaccompagnon_{version}_{label}"
+          stem = f"FlacCompagnon-CLI_{version}_{label}"
           if label.startswith("Windows"):
               with zipfile.ZipFile(output / f"{stem}.zip", "w", zipfile.ZIP_DEFLATED) as archive:
                   archive.write(binary, binary.name)
@@ -279,20 +281,25 @@ jobs:
 
           ---
 
-          Cross-platform builds of FlacCompagnon. **Every file name ends with
-          its platform**, so pick the one that matches your system:
+          Cross-platform builds of FlacCompagnon. The asset names begin with
+          **FlacCompagnon-App** for the graphical application and
+          **FlacCompagnon-CLI** for the command line.
+
+          ## Graphical application
 
           | Your system | Download |
           | --- | --- |
-          | **Windows** (10/11, 64-bit) | `..._Windows-x64.msi` — the installer |
-          | **macOS** (Apple Silicon: M1/M2/M3/M4) | `..._macOS-AppleSilicon.dmg` — the installer |
-          | **Linux** (any distro, 64-bit) | `..._Linux-x86_64.AppImage` — portable, just make it executable |
-          | **Linux** (Debian / Ubuntu) | `..._Linux-x86_64.deb` — system package |
+          | **Windows** (10/11, 64-bit) | `FlacCompagnon-App_<version>_Windows-x64.msi` — the installer |
+          | **macOS** (Apple Silicon: M1/M2/M3/M4) | `FlacCompagnon-App_<version>_macOS-AppleSilicon.dmg` — the installer |
+          | **Linux** (any distro, 64-bit) | `FlacCompagnon-App_<version>_Linux-x86_64.AppImage` — portable, just make it executable |
+          | **Linux** (Debian / Ubuntu) | `FlacCompagnon-App_<version>_Linux-x86_64.deb` — system package |
 
-          Each platform also has a standalone `flaccompagnon_<version>_<Platform>.tar.gz`
-          (or `.zip` on Windows). Extract it and run `flaccompagnon --help`.
+          ## Command line
 
-          The macOS `.app.tar.gz` is the same app as the `.dmg`, just archived —
+          Download `FlacCompagnon-CLI_<version>_<Platform>.tar.gz` (or `.zip`
+          on Windows), extract it, then run `flaccompagnon --help`.
+
+          The macOS `FlacCompagnon-App_…app.tar.gz` is the same app as the `.dmg`, just archived —
           use the `.dmg` unless you specifically want the raw bundle.
 
           **macOS — first launch.** These builds are **not signed with an Apple

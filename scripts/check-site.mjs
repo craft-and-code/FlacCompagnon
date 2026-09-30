@@ -36,7 +36,7 @@ assert.ok(englishHomepage, "Missing English homepage");
 for (const markup of [
   '<html lang="en" data-docs-root="../docs" data-default-language="en">',
   '<link rel="canonical" href="https://craft-and-code.github.io/FlacCompagnon/en/"',
-  'href="../docs/en/index.html"',
+  'href="../docs/en/user-guide.html"',
   'src="../app.js"',
 ]) {
   assert.ok(englishHomepage.includes(markup), `English homepage misses ${markup}`);

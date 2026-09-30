@@ -1,6 +1,6 @@
 # Analysis guide
 
-Read the illustrated website guide in [English](https://craft-and-code.github.io/FlacCompagnon/docs/en/index.html) or [French](https://craft-and-code.github.io/FlacCompagnon/docs/fr/index.html). These Markdown files are still its technical sources during validation; `npm run build:site` renders them into the site. The separate [CLI guide](cli.md) explains commands and JSON reports, and [Rustdoc](https://craft-and-code.github.io/FlacCompagnon/doc/) documents the Rust API.
+Read the illustrated website [user guide in English](https://craft-and-code.github.io/FlacCompagnon/docs/en/user-guide.html) or [French](https://craft-and-code.github.io/FlacCompagnon/docs/fr/user-guide.html). These Markdown files are still its technical sources during validation; `npm run build:site` renders them into the site. The separate [CLI guide](cli.md) explains commands and JSON reports, and [Rustdoc](https://craft-and-code.github.io/FlacCompagnon/doc/) documents the Rust API.
 
 This directory documents every measurement and detection exposed by FlacCompagnon. Each page states what is measured, how the value or verdict is calculated, what the result means, what it cannot establish, and how to reproduce the check. A positive detection is evidence for the described property; a negative detection means only that this particular test did not establish it.
 
