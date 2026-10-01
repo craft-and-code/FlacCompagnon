@@ -503,6 +503,10 @@ Easy future additions (the analyzer is modular): per-channel spectral analysis a
 
 On the tagging side: **AcoustID/Chromaprint audio fingerprinting** so a track can be identified from its sound rather than its metadata — the way MusicBrainz Picard does. Fingerprinting needs an extra native dependency and an AcoustID API key, so it is deliberately out of scope for now.
 
+## Projects using FlacCompagnon
+
+- [Audio Fake Detector PRO](https://github.com/alessandrocomito/audiofakedetectorpro) offers an alternative lossless PCM verification mode through FlacCompagnonCLI, its custom command-line frontend based on FlacCompagnon.
+
 ## References
 
 - J. Lacroix, Y. Prime, A. Remy & O. Derrien, _Lossless Audio Checker: A Software for the Detection of Upscaling, Upsampling, and Transcoding in Lossless Musical Tracks_, AES 139th Convention, Paper 9416, New York, 2015 — [AES e-Library #17972](https://aes.org/publications/elibrary-page/?id=17972).

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { analyses, cli, userGuide } from "../scripts/site/catalog.mjs";
 import { guidePage } from "../scripts/site/template.mjs";
 
@@ -86,4 +88,11 @@ test("the homepage CLI example is one terminal surface", async () => {
 
   assert.match(home, /<pre>\s*flaccompagnon "Music\/Album"/);
   assert.doesNotMatch(home, /<pre>\s*<code>\s*flaccompagnon/);
+});
+
+test("site checks find CLI analyses after the parser moved out of main.rs", async () => {
+  const run = promisify(execFile);
+  await run(process.execPath, ["scripts/build-site.mjs"], { cwd: root });
+  const { stdout } = await run(process.execPath, ["scripts/check-site.mjs"], { cwd: root });
+  assert.match(stdout, /both CLI option lists match the parser/);
 });

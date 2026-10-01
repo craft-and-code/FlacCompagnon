@@ -112,10 +112,11 @@ for (const lang of ["fr", "en"]) {
   }
 }
 // Keep the published option table in sync with the actual command parser.
-const cliSource = await readFile(resolve(import.meta.dirname, "../cli/src/main.rs"), "utf8");
-const analysisNames = [
-  ...cliSource.match(/const ANALYSES:.*?= &\[([\s\S]*?)\];/)[1].matchAll(/"([^"]+)"/g),
-].map((m) => m[1]);
+const cliSource = await readFile(resolve(import.meta.dirname, "../cli/src/args.rs"), "utf8");
+const analysisList = cliSource.match(/const ANALYSES:.*?= &\[([\s\S]*?)\];/);
+assert.ok(analysisList, "Cannot find the CLI analysis list in cli/src/args.rs");
+const analysisNames = [...analysisList[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+assert.ok(analysisNames.length, "The CLI analysis list is empty");
 for (const lang of ["fr", "en"]) {
   const guide = html.get(resolve(output, `docs/${lang}/cli.html`));
   for (const name of analysisNames)
