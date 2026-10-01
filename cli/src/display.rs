@@ -1,7 +1,16 @@
 //! Human-readable analysis measurements.
 
 use crate::args::Args;
-use flaccompagnon_core::FileAnalysis;
+use flaccompagnon_core::{decode::FlacMd5Status, FileAnalysis};
+
+fn flac_md5_label(status: Option<&FlacMd5Status>) -> String {
+    let Some(status) = status else {
+        return "N/A".to_string();
+    };
+    let label = status.label();
+    // The column already identifies MD5; reuse the core wording without its prefix.
+    label.strip_prefix("MD5 ").unwrap_or(&label).to_string()
+}
 
 pub(crate) fn display(file: &FileAnalysis, args: &Args) {
     println!("{}", file.path);
@@ -70,12 +79,17 @@ pub(crate) fn display(file: &FileAnalysis, args: &Args) {
         println!("  DC offset: {:?}", file.dc_offset);
     }
     if args.selected("flac-md5") {
-        println!("  FLAC MD5: {:?}", file.flac_md5);
+        println!("  FLAC MD5: {}", flac_md5_label(file.flac_md5.as_ref()));
     }
     if args.selected("fingerprints") {
         println!(
-            "  File MD5: {:?}; CRC32: {:?}",
-            file.file_md5, file.file_crc32
+            "  File MD5: {}; CRC32: {}",
+            file.file_md5.as_deref().unwrap_or("N/A"),
+            file.file_crc32.as_deref().unwrap_or("N/A")
         );
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/unit/display.rs"]
+mod tests;

@@ -68,15 +68,9 @@ fn run(args: Args) -> Result<(), String> {
                 file.clone()
             } else {
                 changed = true;
-                progress::with_loading(
-                    &format!(
-                        "[{}/{}] Analyzing {}",
-                        index + 1,
-                        paths.len(),
-                        path.display()
-                    ),
-                    || core::analyze_file(path, &options),
-                )
+                progress::with_analysis(path, index, paths.len(), || {
+                    core::analyze_file(path, &options)
+                })
             };
             failed |= file.error.is_some();
             if args.show_results || !args.analyses.is_empty() {

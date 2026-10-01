@@ -3,22 +3,21 @@
 // component under src/components — this file should stay readable as a
 // description of the app's shape.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 
 import type { PlaylistFormat } from "./types";
 import * as api from "./api";
 import { commonDir, fileSearchFields, matchesSearch } from "./format";
 import { ConfirmDialog } from "./components/ConfirmDialog";
-import { ConvertPanel } from "./components/ConvertPanel";
+import { DeferredPanel } from "./components/DeferredPanel";
 import { Dropzone } from "./components/Dropzone";
 import { Footer } from "./components/Footer";
 import { DropGuard, Progress } from "./components/Progress";
-import { PlaylistFormatModal } from "./components/PlaylistFormatModal";
 import { ResultsSummary } from "./components/ResultsSummary";
 import { ResultsTable } from "./components/ResultsTable";
 import type { TableScrollHandle } from "./components/useTableWindow";
-import { TagPanel, type TagPanelHandle } from "./components/TagPanel";
+import type { TagPanelHandle } from "./components/TagPanel";
 import { nextSort, sortFiles, type SortColumn, type SortState } from "./components/tableSort";
 import { TopBar } from "./components/TopBar";
 import { useAnalysis } from "./components/useAnalysis";
@@ -46,6 +45,18 @@ import { useGlobalShortcut } from "./components/useGlobalShortcut";
 import { useTagCache, useTagPrefetch } from "./components/useTagCache";
 import { useToast } from "./components/useToast";
 import "./App.css";
+
+// These panels are absent from the initial screen; load their code and CSS
+// only when needed, without delaying window reveal or native event listeners.
+const TagPanel = lazy(() =>
+  import("./components/TagPanel").then((m) => ({ default: m.TagPanel })),
+);
+const ConvertPanel = lazy(() =>
+  import("./components/ConvertPanel").then((m) => ({ default: m.ConvertPanel })),
+);
+const PlaylistFormatModal = lazy(() =>
+  import("./components/PlaylistFormatModal").then((m) => ({ default: m.PlaylistFormatModal })),
+);
 
 export function App() {
   const { toast, showToast } = useToast();
@@ -594,16 +605,18 @@ export function App() {
 
       <div className="main-row">
         {selection.selectedPaths.length > 0 && (
-          <TagPanel
-            ref={tagPanelRef}
-            selectedPaths={selection.selectedPaths}
-            tagSets={selectedTagSets}
-            formats={selectedFormats}
-            coverDragOver={drop.overCover}
-            onClose={guardedDeselectAll}
-            onSaved={invalidate}
-            onToast={showToast}
-          />
+          <DeferredPanel>
+            <TagPanel
+              ref={tagPanelRef}
+              selectedPaths={selection.selectedPaths}
+              tagSets={selectedTagSets}
+              formats={selectedFormats}
+              coverDragOver={drop.overCover}
+              onClose={guardedDeselectAll}
+              onSaved={invalidate}
+              onToast={showToast}
+            />
+          </DeferredPanel>
         )}
 
         <div className="main-col">
@@ -681,33 +694,35 @@ export function App() {
         </div>
 
         {convert.open && (
-          <ConvertPanel
-            targets={convert.targets}
-            selected={convert.selected}
-            format={convert.format}
-            bitrateKbps={convert.bitrateKbps}
-            flacEffort={convert.flacEffort}
-            preserveModtime={convert.preserveModtime}
-            copyOthers={convert.copyOthers}
-            importing={convert.importing}
-            busy={convert.busy}
-            cancelling={convert.cancelling}
-            progressLabel={convert.progressLabel}
-            dragOver={drop.overConvert}
-            mainSelectionCount={selection.selectedPaths.length}
-            onClose={convert.closePanel}
-            onSetFormat={convert.setFormat}
-            onSetBitrateKbps={convert.setBitrateKbps}
-            onSetFlacEffort={convert.setFlacEffort}
-            onSetPreserveModtime={convert.setPreserveModtime}
-            onSetCopyOthers={convert.setCopyOthers}
-            onRemoveTarget={convert.removeTarget}
-            onClearTargets={convert.clearTargets}
-            onToggleSelected={convert.toggleSelected}
-            onAddSelected={() => void convert.addTargets(selection.selectedPaths)}
-            onConvert={() => void convert.convert()}
-            onCancel={() => void convert.cancel()}
-          />
+          <DeferredPanel>
+            <ConvertPanel
+              targets={convert.targets}
+              selected={convert.selected}
+              format={convert.format}
+              bitrateKbps={convert.bitrateKbps}
+              flacEffort={convert.flacEffort}
+              preserveModtime={convert.preserveModtime}
+              copyOthers={convert.copyOthers}
+              importing={convert.importing}
+              busy={convert.busy}
+              cancelling={convert.cancelling}
+              progressLabel={convert.progressLabel}
+              dragOver={drop.overConvert}
+              mainSelectionCount={selection.selectedPaths.length}
+              onClose={convert.closePanel}
+              onSetFormat={convert.setFormat}
+              onSetBitrateKbps={convert.setBitrateKbps}
+              onSetFlacEffort={convert.setFlacEffort}
+              onSetPreserveModtime={convert.setPreserveModtime}
+              onSetCopyOthers={convert.setCopyOthers}
+              onRemoveTarget={convert.removeTarget}
+              onClearTargets={convert.clearTargets}
+              onToggleSelected={convert.toggleSelected}
+              onAddSelected={() => void convert.addTargets(selection.selectedPaths)}
+              onConvert={() => void convert.convert()}
+              onCancel={() => void convert.cancel()}
+            />
+          </DeferredPanel>
         )}
       </div>
 
@@ -729,11 +744,13 @@ export function App() {
         />
       )}
 
-      <PlaylistFormatModal
-        open={playlistModalOpen}
-        onClose={() => setPlaylistModalOpen(false)}
-        onConfirm={onPlaylistConfirm}
-      />
+      {playlistModalOpen && <DeferredPanel>
+        <PlaylistFormatModal
+          open={playlistModalOpen}
+          onClose={() => setPlaylistModalOpen(false)}
+          onConfirm={onPlaylistConfirm}
+        />
+      </DeferredPanel>}
 
       <ConfirmDialog
         open={pendingAction != null}

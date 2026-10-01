@@ -40,6 +40,17 @@ fn cli_json_round_trips_as_a_desktop_report() {
         String::from_utf8_lossy(&result.stderr).contains("[1/1]"),
         "the terminal shows analysis progress"
     );
+    let progress = String::from_utf8_lossy(&result.stderr);
+    assert!(!progress.contains('\r'), "redirected logs must not animate");
+    assert!(
+        !progress.contains('\u{1b}'),
+        "redirected logs must not contain terminal escapes"
+    );
+    assert_eq!(
+        progress.matches("Analyzing ").count(),
+        1,
+        "each file is logged once"
+    );
     let text = std::fs::read_to_string(output).expect("report was written");
     let parsed = report::parse_json(&text).expect("same re-importable JSON as desktop");
     assert_eq!(parsed.files.len(), 1);

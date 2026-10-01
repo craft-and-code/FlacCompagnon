@@ -81,5 +81,8 @@ pub async fn analyze_paths(app: AppHandle, targets: Vec<String>) -> Result<Folde
 /// and DSD content analysis).
 #[tauri::command]
 pub async fn ffmpeg_available() -> bool {
-    spectrogram::resolve_ffmpeg().is_some()
+    // Probing launches external processes; keep it off the async command executor.
+    tauri::async_runtime::spawn_blocking(|| spectrogram::resolve_ffmpeg().is_some())
+        .await
+        .unwrap_or(false)
 }

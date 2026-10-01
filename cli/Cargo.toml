@@ -11,8 +11,10 @@ name = "flaccompagnon"
 path = "src/main.rs"
 
 [dependencies]
+indicatif = "0.18"
 flaccompagnon-core = { path = "../core" }
 
 [dev-dependencies]
+indicatif = { version = "0.18", features = ["in_memory"] }
 tempfile = "3"
 hound = "3"
