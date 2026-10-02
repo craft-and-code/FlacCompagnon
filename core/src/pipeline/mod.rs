@@ -16,16 +16,17 @@
 //! one bad file never aborts a batch.
 
 mod dsd;
+mod measurements;
 mod record;
+use measurements::apply_outcome;
 pub mod transcode;
 
 use std::path::Path;
 
-use crate::analysis::detections;
 use crate::decode;
 use crate::decode::FlacMd5Status;
-use crate::dsd as dsd_format;
 use crate::types::{FileAnalysis, ScanOptions};
+use crate::{AnalysisKind as Kind, AnalysisSelection};
 use record::{bitrate_kbps, skeleton};
 
 /// Analyze a single audio file end-to-end.
@@ -64,7 +65,26 @@ pub fn analyze_file_cancellable(
     opts: &ScanOptions,
     cancelled: &(dyn Fn() -> bool + Sync),
 ) -> FileAnalysis {
-    let mut result = skeleton(path);
+    analyze_selected_cancellable(path, opts, AnalysisSelection::all(), cancelled)
+}
+
+/// Execute only the requested measurements and their decode dependencies.
+/// No selected measurement means metadata only; existing APIs still select all.
+pub fn analyze_file_selected(
+    path: &Path,
+    opts: &ScanOptions,
+    selection: AnalysisSelection,
+) -> FileAnalysis {
+    analyze_selected_cancellable(path, opts, selection, &|| false)
+}
+
+fn analyze_selected_cancellable(
+    path: &Path,
+    opts: &ScanOptions,
+    selection: AnalysisSelection,
+    cancelled: &(dyn Fn() -> bool + Sync),
+) -> FileAnalysis {
+    let mut result = skeleton(path, selection.enabled(Kind::Fingerprints));
 
     let ext = path
         .extension()
@@ -72,11 +92,27 @@ pub fn analyze_file_cancellable(
         .map(|e| e.to_ascii_lowercase())
         .unwrap_or_default();
 
+    if !selection.audio() {
+        if ext == "flac" && selection.enabled(Kind::FlacMd5) {
+            match decode::verify_flac_md5(path, opts.verify_flac_md5) {
+                Ok(status) => result.flac_md5 = Some(status),
+                Err(error) => {
+                    result.error = Some(error.to_string());
+                    result.flac_md5 = Some(FlacMd5Status::Error(error.to_string()));
+                }
+            }
+        }
+        flag_container_mismatch(path, &mut result, true);
+        result.restrict_to(selection);
+        return result;
+    }
+
     // DSD files take a dedicated path: exact header verification, then (when
     // ffmpeg is available) content analysis on the decoded PCM.
     if ext == "dsf" || ext == "dff" {
-        dsd::analyze(path, opts, &mut result);
+        dsd::analyze(path, opts, &mut result, selection);
         flag_container_mismatch(path, &mut result, false);
+        result.restrict_to(selection);
         return result;
     }
 
@@ -88,18 +124,22 @@ pub fn analyze_file_cancellable(
     // column then reports the error.
     let mut flac_md5_status: Option<FlacMd5Status> = None;
     let decoded = if is_flac {
-        match decode::decode_and_analyze_flac(path, opts.verify_flac_md5) {
+        match decode::decode_and_analyze_flac_selected(
+            path,
+            opts.verify_flac_md5 && selection.enabled(Kind::FlacMd5),
+            selection,
+        ) {
             Ok((outcome, md5)) => {
                 flac_md5_status = Some(md5);
                 Ok(outcome)
             }
             Err(e) => {
                 flac_md5_status = Some(FlacMd5Status::Error(e.to_string()));
-                decode::decode_and_analyze(path)
+                decode::decode_and_analyze_selected(path, selection)
             }
         }
     } else {
-        decode::decode_and_analyze(path)
+        decode::decode_and_analyze_selected(path, selection)
     };
 
     // Sigma-delta noise heritage of a DSD master, when found in hi-res PCM.
@@ -114,12 +154,16 @@ pub fn analyze_file_cancellable(
             // `transcode::detect` is this module's own bridge (decode, then
             // ask), while `crate::transcode` is the detector crate-module it
             // bridges to.
-            let transcoded = transcode::detect(
-                path,
-                &crate::transcode::AacParams::default(),
-                &crate::transcode::Mp3Params::default(),
-                cancelled,
-            );
+            let transcoded = if selection.enabled(Kind::Authenticity) {
+                Some(transcode::detect(
+                    path,
+                    &crate::transcode::AacParams::default(),
+                    &crate::transcode::Mp3Params::default(),
+                    cancelled,
+                ))
+            } else {
+                None
+            };
             dsd_heritage = apply_outcome(outcome, &mut result, transcoded);
         }
         Err(e) => result.error = Some(e.to_string()),
@@ -133,83 +177,12 @@ pub fn analyze_file_cancellable(
         result.flac_md5 = flac_md5_status;
     }
 
-    result.badge = hires_badge(&result, dsd_heritage);
+    if selection.enabled(Kind::Authenticity) {
+        result.badge = hires_badge(&result, dsd_heritage);
+    }
     result.bitrate_kbps = bitrate_kbps(result.size_bytes, result.duration_secs);
+    result.restrict_to(selection);
     result
-}
-
-/// Fold a successful decode into `result`, and return the DSD-heritage rise
-/// (in dB) if the ultrasonic content shows one.
-fn apply_outcome(
-    outcome: decode::DecodeOutcome,
-    result: &mut FileAnalysis,
-    transcoded: crate::transcode::LatticeResult,
-) -> Option<f32> {
-    result.format = outcome.format;
-    result.codec = outcome.codec;
-    result.sample_rate = outcome.sample_rate;
-    result.channels = outcome.channels;
-    result.declared_bits = outcome.declared_bits;
-    result.duration_secs = outcome.duration_secs;
-
-    let summary = outcome
-        .analyzer
-        .finish(outcome.sample_rate, outcome.declared_bits);
-
-    result.cutoff_hz = Some(summary.cutoff_hz);
-    result.cutoff_ratio = Some(summary.cutoff_ratio);
-    // The *old* detector's `summary.requant_rate` is no longer surfaced: it
-    // came from the spectral machinery this rewrite replaced. What the column
-    // shows now is the lattice search's own score.
-    // Borrowed, not consumed: `classify` needs the same value below, and
-    // `LatticeResult` carries a `String` in its error case so it is not `Copy`.
-    result.lattice_score = transcoded.as_ref().ok().map(|e| e.likelihood as f32);
-    result.clipping = summary.clipping.clone();
-    result.dr_db = summary.dr_db;
-    result.integrated_lufs = summary.integrated_lufs;
-    result.loudness_peaks = summary.loudness_peaks;
-    result.loudness_range_lu = summary.loudness_range_lu;
-    // Bounded event lists are cheap to copy; classification still borrows
-    // the complete summary below.
-    result.discontinuities = summary.discontinuities.clone();
-    result.stereo_balance = summary.stereo_balance;
-    result.high_frequency_stereo = summary.high_frequency_stereo;
-    // At most 32 means; retain the summary for classification below.
-    result.dc_offset = summary.dc_offset.clone();
-    result.local_phase = summary.local_phase;
-    result.bit_depth_evidence = summary.bit_depth_evidence;
-
-    if outcome.channels >= 2 {
-        result.fake_stereo = Some(summary.fake_stereo);
-    }
-    if outcome.channels == 2 {
-        result.phase_correlation = summary.phase_correlation;
-        result.phase_inverted = summary.phase_correlation.map(|_| summary.phase_inverted);
-    }
-    let real_bits = match (outcome.declared_bits, summary.real_bit_depth) {
-        (Some(_), Some(real)) => {
-            result.real_bit_depth = Some(real);
-            Some(real)
-        }
-        _ => None,
-    };
-    // `transcoded` is handed in — see the call site for why. An `Err` there
-    // means "no answer" (unsupported rate, too short, undecodable), never
-    // "clean": an un-run test must leave the flag down and say why, which is
-    // what carrying the reason all the way here buys.
-    result.detections = detections::classify(
-        &summary,
-        outcome.sample_rate,
-        outcome.declared_bits,
-        real_bits,
-        transcoded,
-    );
-
-    dsd_format::dsd_heritage_check(
-        &summary.spectrum_db,
-        outcome.sample_rate,
-        summary.fft_size(),
-    )
 }
 
 /// Compare the container the magic bytes say this is against what the

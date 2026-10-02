@@ -6,6 +6,7 @@ use crate::types::ClippingInfo;
 /// only `codec` varies between the test cases below.
 fn hires_pcm(codec: Option<&str>) -> FileAnalysis {
     FileAnalysis {
+        analyses_run: None,
         path: "/music/a.m4a".into(),
         file_name: "a.m4a".into(),
         format: "ALAC/MP4".into(),

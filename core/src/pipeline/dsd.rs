@@ -28,7 +28,12 @@ const CD_NYQUIST_CEILING_HZ: f64 = 23_000.0;
 
 /// Exact DSF/DFF header verification plus, when ffmpeg is available, a content
 /// check on the decoded PCM (the PCM-source brick wall).
-pub(super) fn analyze(path: &Path, opts: &ScanOptions, result: &mut FileAnalysis) {
+pub(super) fn analyze(
+    path: &Path,
+    opts: &ScanOptions,
+    result: &mut FileAnalysis,
+    selection: crate::AnalysisSelection,
+) {
     let info = match dsd_format::parse(path) {
         Ok(i) => i,
         Err(e) => {
@@ -43,15 +48,24 @@ pub(super) fn analyze(path: &Path, opts: &ScanOptions, result: &mut FileAnalysis
 
     let mut flagged: Option<dsd_format::PcmSourceCheck> = None;
     let mut analyzed = false;
+    let content_selection = selection.dsd_pcm();
 
     if info.dst_compressed {
         result.detections = verdict(
             false,
             "DST-compressed DFF: header verified; content analysis is not supported for DST streams.",
         );
+    } else if !content_selection.audio() {
+        return;
     } else if let Some(ffmpeg) = &opts.ffmpeg {
         let decoded_rate = (info.sample_rate / DSD_TO_PCM_DIVISOR).max(1);
-        match decode::decode_and_analyze_dsd(ffmpeg, path, info.channels, decoded_rate) {
+        match decode::decode_and_analyze_dsd_selected(
+            ffmpeg,
+            path,
+            info.channels,
+            decoded_rate,
+            content_selection,
+        ) {
             Ok(outcome) => {
                 analyzed = true;
                 // The DFF header carries a byte size, not a sample count, so
@@ -83,11 +97,15 @@ pub(super) fn analyze(path: &Path, opts: &ScanOptions, result: &mut FileAnalysis
                     result.phase_inverted =
                         summary.phase_correlation.map(|_| summary.phase_inverted);
                 }
-                flagged = dsd_format::pcm_source_check(
-                    &summary.spectrum_db,
-                    decoded_rate,
-                    summary.fft_size(),
-                );
+                flagged = if selection.enabled(crate::AnalysisKind::Authenticity) {
+                    dsd_format::pcm_source_check(
+                        &summary.spectrum_db,
+                        decoded_rate,
+                        summary.fft_size(),
+                    )
+                } else {
+                    None
+                };
                 result.detections = match flagged {
                     Some(hit) => verdict(true, &pcm_source_detail(hit)),
                     None => verdict(

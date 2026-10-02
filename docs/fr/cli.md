@@ -2,6 +2,8 @@
 
 La **CLI** permet d’utiliser FlacCompagnon sans fenêtre graphique : vous saisissez une commande dans Terminal ou PowerShell, vous indiquez un fichier ou un dossier, et les résultats s’affichent au même endroit. Elle utilise le même moteur Rust et le même format de rapport JSON que l’application. L’analyse lit vos fichiers audio sans les modifier.
 
+Avec uniquement `-a flac-md5`, sans `--json` ni `--json-layout`, la CLI se limite au décodage et au contrôle de l’intégrité des FLAC. Elle évite les analyses spectrales, la détection de transcodage et les empreintes du fichier entier. Un échec de comparaison MD5 ou de décodage donne un code de sortie non nul. Les autres sélections explicites exécutent elles aussi uniquement les mesures demandées. Les exports JSON conservent l’analyse complète. Ce contrôle utilise `flac -t` si l’exécutable optionnel `flac` est disponible dans le `PATH`, sinon le vérificateur Rust interne.
+
 ## Installer et vérifier
 
 Dans les [Releases GitHub](https://github.com/craft-and-code/FlacCompagnon/releases), choisissez une archive autonome nommée `FlacCompagnon-CLI_<version>_<plateforme>.tar.gz` ou `.zip`. Les fichiers de l’application graphique commencent par `FlacCompagnon-App`, pour distinguer les deux téléchargements. Les plateformes prévues sont macOS Apple Silicon, Linux x86_64 et Windows x64.
@@ -42,7 +44,7 @@ Vous pouvez mélanger plusieurs fichiers et dossiers. Pour rester au premier niv
 flaccompagnon "Music/Album A" "Music/Album B" --no-recursive
 ```
 
-## Choisir les résultats affichés
+## Choisir les analyses à exécuter
 
 ```sh
 flaccompagnon "Music/Album" --analysis loudness
@@ -50,7 +52,7 @@ flaccompagnon "Music/Album" --analysis phase --analysis hf-stereo
 flaccompagnon "Music/Album" -a clipping,clicks,dropouts
 ```
 
-**La sélection filtre actuellement l’affichage du terminal uniquement.** Le moteur calcule toujours l’analyse complète. Cette option ne réduit donc pas le travail à la seule mesure demandée, et le JSON conserve tous les résultats.
+**Sans export JSON, la sélection contrôle les calculs et l’affichage du terminal.** Seules les mesures demandées et leurs calculs préparatoires nécessaires sont exécutés. Les virgules et les options `--analysis` répétées permettent de combiner autant de mesures que nécessaire. Par exemple, `-a flac-md5,loudness` décode une seule fois pour vérifier l’intégrité audio et mesurer la loudness, sans analyse spectrale ni détection de transcodage. Sans sélection, toutes les analyses sont exécutées. `--json` et `--json-layout` exigent toutes les analyses et ne peuvent pas être combinés avec `--analysis` (`-a`). La CLI refuse cette combinaison avant de parcourir les fichiers, avec le code de sortie 2 ; elle n’élargit pas silencieusement votre sélection.
 
 | Nom            | Résultats dans le terminal                                          |
 | -------------- | ------------------------------------------------------------------- |
@@ -79,10 +81,10 @@ flaccompagnon "Music/Album" --json "Music/Album/FlacCompagnon.json"
 
 Le schéma est le format complet et versionné `flaccompagnon-report` de l’application. Déposez le JSON sur sa liste de résultats pour rouvrir l’analyse sans redécoder le son. Le rapport est un instantané : il ne s’actualise pas après une modification du son et ses chemins peuvent devenir obsolètes après un déplacement. Consultez les [empreintes de fichiers](fingerprints.md) pour les possibilités et limites d’identification.
 
-Vous pouvez afficher seulement quelques mesures tout en enregistrant l’ensemble :
+Un export JSON exige toujours toutes les analyses. Pour afficher les mesures complètes tout en les enregistrant, utilisez `--show-results` :
 
 ```sh
-flaccompagnon "Music/Album" -a loudness,phase -j "Music/Album/FlacCompagnon.json"
+flaccompagnon "Music/Album" --show-results -j "Music/Album/FlacCompagnon.json"
 ```
 
 ## Un rapport par album avec Aède
@@ -114,20 +116,20 @@ La recherche utilise d’abord `--ffmpeg`, puis la variable d’environnement `F
 flaccompagnon [OPTIONS] <FILE|FOLDER>...
 ```
 
-| Option                | Effet                                                                          |
-| --------------------- | ------------------------------------------------------------------------------ |
-| `-a, --analysis NAME` | Choisit les champs du terminal ; répétable ou noms séparés par des virgules    |
-| `--show-results` | Affiche les mesures dans le terminal |
-| `--force` | Refait les analyses et remplace les rapports sélectionnés |
-| `--json-layout album\|artist` | Un rapport par album dans son dossier ou son parent |
-| `-j, --json PATH`     | Écrit le rapport JSON complet                                                  |
-| `--recursive`         | Inclut les sous-dossiers, par défaut                                           |
-| `--no-recursive`      | Reste au niveau du dossier indiqué                                             |
-| `--no-flac-md5`       | Lit les signatures FLAC sans les comparer à l’audio décodé                     |
-| `--ffmpeg PATH`       | Choisit l’exécutable FFmpeg pour le DSD                                        |
-| `-h, --help`          | Affiche l’aide                                                                 |
-| `-v, -V, --version`       | Affiche la version ; s’utilise seul                                            |
-| `--`                  | Traite les arguments suivants comme des chemins, même s’ils commencent par `-` |
+| Option                        | Effet                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------ |
+| `-a, --analysis NAME`         | Exécute les analyses choisies ; répétable ou noms séparés par des virgules     |
+| `--show-results`              | Affiche les mesures dans le terminal                                           |
+| `--force`                     | Refait les analyses et remplace les rapports sélectionnés                      |
+| `--json-layout album\|artist` | Un rapport par album dans son dossier ou son parent                            |
+| `-j, --json PATH`             | Exécute toutes les analyses et écrit le rapport JSON complet                   |
+| `--recursive`                 | Inclut les sous-dossiers, par défaut                                           |
+| `--no-recursive`              | Reste au niveau du dossier indiqué                                             |
+| `--no-flac-md5`               | Lit les signatures FLAC sans les comparer à l’audio décodé                     |
+| `--ffmpeg PATH`               | Choisit l’exécutable FFmpeg pour le DSD                                        |
+| `-h, --help`                  | Affiche l’aide                                                                 |
+| `-v, -V, --version`           | Affiche la version ; s’utilise seul                                            |
+| `--`                          | Traite les arguments suivants comme des chemins, même s’ils commencent par `-` |
 
 ## Codes de sortie et automatisation
 
@@ -158,7 +160,7 @@ flaccompagnon "Musique/Groupe" --json-layout artist
 flaccompagnon "Musique/Album" --json "Musique/Album/rapport.json"
 ```
 
-`album` enregistre `<album>.json` dans chaque dossier d’album. `artist` enregistre ces fichiers séparés dans leur dossier parent, celui du groupe. Le regroupement repose sur les dossiers audio ; les sous-dossiers numérotés `CD`, `Disc` et `Disk` sont regroupés dans leur album parent. Il ne repose pas sur les tags. `--json-layout` active l’enregistrement et ne se combine pas avec `--json PATH`, qui produit un rapport unique. Le dossier de destination doit exister. Les JSON complets peuvent être réimportés dans l’application ou Aède.
+`album` enregistre `<album>.json` dans chaque dossier d’album. `artist` enregistre ces fichiers séparés dans leur dossier parent, celui du groupe. Le regroupement repose sur les dossiers audio ; les sous-dossiers numérotés `CD`, `Disc` et `Disk` sont regroupés dans leur album parent. Il ne repose pas sur les tags. `--json-layout` active l’enregistrement et ne se combine pas avec `--analysis` ni avec `--json PATH`, qui produit un rapport unique. Le dossier de destination doit exister. Les JSON complets peuvent être réimportés dans l’application ou Aède.
 
 ## Réutiliser ou refaire une analyse
 
@@ -169,6 +171,5 @@ flaccompagnon "Musique/Groupe" --json-layout album --force
 ```
 
 `--force` refait les analyses et remplace les rapports sélectionnés pour l’enregistrement. Une destination contenant un JSON invalide nécessite cette option. Ces contrôles reposent sur les métadonnées : utilisez également `--force` après une modification qui conserve taille et date, ou pour recalculer avec une nouvelle version du moteur.
-
 
 Aède accepte les mêmes options `--force`, `--show-results` et `--json-layout album|artist` avec `aede analyze`. `--json` conserve l’enregistrement dans chaque album.

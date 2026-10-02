@@ -102,6 +102,8 @@ export interface DiscontinuityAnalysis {
 }
 
 export interface FileAnalysis {
+  // Missing/null means a complete legacy or desktop analysis.
+  analyses_run?: string[] | null;
   path: string;
   file_name: string;
   format: string;

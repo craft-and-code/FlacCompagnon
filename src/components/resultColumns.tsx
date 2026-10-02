@@ -29,7 +29,7 @@ import { DiscontinuityCell } from "./DiscontinuityCell";
 import { DcOffsetCell } from "./DcOffsetCell";
 import { LocalPhaseCell } from "./LocalPhaseCell";
 import { LoudnessPeakCell } from "./LoudnessPeakCell";
-import { fmtBitrate, fmtCutoff, fmtDuration, fmtModified, fmtSize } from "../format";
+import { analysisWasRun, fmtBitrate, fmtCutoff, fmtDuration, fmtModified, fmtSize } from "../format";
 import {
   ClippingCell,
   DetectionsCell,
@@ -112,7 +112,7 @@ function tagCell(value: string | null | undefined): ReactNode {
   return <td className={value ? undefined : "c-muted"}>{value || "—"}</td>;
 }
 
-export const ALL_COLUMNS: ColumnDef[] = [
+const columns: ColumnDef[] = [
   {
     key: "format",
     label: "Format",
@@ -400,3 +400,21 @@ export const ALL_COLUMNS: ColumnDef[] = [
     render: (f) => <FileHashCell hash={f.file_crc32} />,
   },
 ];
+
+const measurementNames: Partial<Record<ColumnKey, string>> = {
+  quality: "authenticity", detections: "authenticity", cutoff: "spectrum",
+  realBits: "bit-depth", stereo: "stereo", balance: "stereo",
+  localPhase: "phase", bandPhase: "phase", hfStereo: "hf-stereo", dcOffset: "dc-offset",
+  clipping: "clipping", truePeak: "clipping", dynamics: "dynamics",
+  loudness: "loudness", momentary: "loudness", shortTerm: "loudness", lra: "loudness",
+  clicks: "clicks", dropouts: "dropouts", md5: "flac-md5", fileMd5: "fingerprints", fileCrc32: "fingerprints",
+};
+
+export const ALL_COLUMNS: ColumnDef[] = columns.map((column) => {
+  const analysis = measurementNames[column.key];
+  return {
+    ...column,
+    render: (file, tag) => analysis && !analysisWasRun(file, analysis)
+      ? <td className="c-muted">—</td> : column.render(file, tag),
+  };
+});

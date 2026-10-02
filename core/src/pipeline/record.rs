@@ -15,13 +15,22 @@ use crate::types::{ClippingInfo, FileAnalysis};
 
 /// The record we can already fill in before decoding anything, so an
 /// unreadable file still produces a useful row.
-pub(super) fn skeleton(path: &Path) -> FileAnalysis {
+pub(super) fn skeleton(path: &Path, fingerprints: bool) -> FileAnalysis {
     // Read once, up front, from the filesystem: available even for a file
     // whose audio fails to decode, so an unreadable track still reports an
     // honest size (and modification time) in the table. One `metadata` call
     // rather than two separate ones for size and mtime.
-    let meta = std::fs::metadata(path).ok();
-    let digest = crate::hash::file_digest(path).ok();
+    let meta = std::fs::metadata(path);
+    let digest = fingerprints.then(|| crate::hash::file_digest(path));
+    // A fingerprints-only request has no later decoder to report read failures.
+    let error = meta.as_ref().err().map(ToString::to_string).or_else(|| {
+        digest
+            .as_ref()
+            .and_then(|result| result.as_ref().err())
+            .map(ToString::to_string)
+    });
+    let meta = meta.ok();
+    let digest = digest.and_then(Result::ok);
     let size_bytes = meta.as_ref().map(|m| m.len()).unwrap_or(0);
     let modified_unix = meta.as_ref().and_then(|m| m.modified().ok()).and_then(|t| {
         t.duration_since(std::time::UNIX_EPOCH)
@@ -30,6 +39,7 @@ pub(super) fn skeleton(path: &Path) -> FileAnalysis {
     });
 
     FileAnalysis {
+        analyses_run: None,
         path: path.to_string_lossy().to_string(),
         file_name: path
             .file_name()
@@ -74,7 +84,7 @@ pub(super) fn skeleton(path: &Path) -> FileAnalysis {
         // the spectral analysis and the lattice sweep that follow.
         file_md5: digest.as_ref().map(|d| d.md5.clone()),
         file_crc32: digest.as_ref().map(|d| d.crc32.clone()),
-        error: None,
+        error,
     }
 }
 

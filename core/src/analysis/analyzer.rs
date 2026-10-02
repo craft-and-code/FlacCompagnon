@@ -37,7 +37,7 @@ use super::loudness_peaks::LoudnessPeaks;
 use super::mdct::{Mdct, AAC_N};
 use super::truepeak::TruePeak;
 use super::{bitdepth, clipping, loudness::LoudnessMeter, spectrum};
-use crate::ClippingInfo;
+use crate::{AnalysisKind as Kind, AnalysisSelection, ClippingInfo};
 
 /// Full-scale detection threshold (normalized). Samples with |value| at or
 /// above this are treated as clipped.
@@ -142,9 +142,10 @@ impl AnalysisSummary {
 /// Incremental audio analyzer.
 pub struct StreamAnalyzer {
     channels: usize,
+    selection: AnalysisSelection,
 
     // --- spectrum ---
-    fft: Arc<dyn Fft<f32>>,
+    fft: Option<Arc<dyn Fft<f32>>>,
     hann: Vec<f32>,
     frame_buf: Vec<f32>, // mono accumulation buffer, length grows to FFT_SIZE
     power_acc: Vec<f64>, // accumulated |X|^2 per bin, length FFT_SIZE/2 + 1
@@ -152,7 +153,7 @@ pub struct StreamAnalyzer {
 
     // --- clipping ---
     clip_state: clipping::ClipState,
-    true_peak: TruePeak,
+    true_peak: Option<TruePeak>,
     loudness: Option<LoudnessMeter>,
     discontinuities: Option<DiscontinuityDetector>,
     high_frequency_stereo: Option<HighFrequencyStereoMeter>,
@@ -168,10 +169,10 @@ pub struct StreamAnalyzer {
     total_frames: u64,
 
     // --- bit depth ---
-    bit_depth: bitdepth::BitDepthAnalyzer,
+    bit_depth: Option<bitdepth::BitDepthAnalyzer>,
 
     // --- MDCT (AAC-SIN) ---
-    mdct: &'static Mdct,
+    mdct: Option<&'static Mdct>,
     mdct_prev: Vec<f32>, // previous hop (N mono samples)
     mdct_fill: Vec<f32>, // current hop being filled
     mdct_have_prev: bool,
@@ -191,9 +192,16 @@ pub struct StreamAnalyzer {
 impl StreamAnalyzer {
     /// Start a fresh analysis for a stream with `channels` audio channels.
     pub fn new(channels: usize, sample_rate: u32) -> Self {
+        Self::new_selected(channels, sample_rate, AnalysisSelection::all())
+    }
+
+    /// Build only the meters needed by the selection and its dependencies.
+    pub fn new_selected(channels: usize, sample_rate: u32, selection: AnalysisSelection) -> Self {
         let mut planner = FftPlanner::<f32>::new();
-        let fft = planner.plan_fft_forward(FFT_SIZE);
-        let hann: Vec<f32> = (0..FFT_SIZE)
+        let fft = selection
+            .spectrum()
+            .then(|| planner.plan_fft_forward(FFT_SIZE));
+        let hann: Vec<f32> = (0..if selection.spectrum() { FFT_SIZE } else { 0 })
             .map(|n| {
                 let x = std::f32::consts::PI * n as f32 / (FFT_SIZE as f32 - 1.0);
                 x.sin().powi(2) // Hann window == sin^2
@@ -201,31 +209,59 @@ impl StreamAnalyzer {
             .collect();
         Self {
             channels: channels.max(1),
+            selection,
             fft,
             hann,
             frame_buf: Vec::with_capacity(FFT_SIZE),
-            power_acc: vec![0.0; FFT_SIZE / 2 + 1],
+            power_acc: if selection.spectrum() {
+                vec![0.0; FFT_SIZE / 2 + 1]
+            } else {
+                Vec::new()
+            },
             window_count: 0,
             clip_state: clipping::ClipState::new(CLIP_THRESHOLD),
-            true_peak: TruePeak::new(channels.max(1)),
-            loudness: LoudnessMeter::new(sample_rate, channels),
-            discontinuities: DiscontinuityDetector::new(sample_rate, channels),
-            high_frequency_stereo: HighFrequencyStereoMeter::new(sample_rate, channels),
-            dc_offset: DcOffsetMeter::new(channels),
-            local_phase: LocalPhaseMeter::new(sample_rate, channels),
+            true_peak: (selection.enabled(Kind::Clipping)).then(|| TruePeak::new(channels.max(1))),
+            loudness: (selection.enabled(Kind::Loudness))
+                .then(|| LoudnessMeter::new(sample_rate, channels))
+                .flatten(),
+            discontinuities: (selection.enabled(Kind::Clicks) || selection.enabled(Kind::Dropouts))
+                .then(|| {
+                    DiscontinuityDetector::new_selected(
+                        sample_rate,
+                        channels,
+                        selection.enabled(Kind::Clicks),
+                        selection.enabled(Kind::Dropouts),
+                    )
+                })
+                .flatten(),
+            high_frequency_stereo: (selection.enabled(Kind::HfStereo))
+                .then(|| HighFrequencyStereoMeter::new(sample_rate, channels))
+                .flatten(),
+            dc_offset: (selection.enabled(Kind::DcOffset))
+                .then(|| DcOffsetMeter::new(channels))
+                .flatten(),
+            local_phase: (selection.enabled(Kind::Phase))
+                .then(|| LocalPhaseMeter::new(sample_rate, channels))
+                .flatten(),
             diff_energy: 0.0,
             l_energy: 0.0,
             r_energy: 0.0,
             cross_energy: 0.0,
             identical_frames: 0,
             total_frames: 0,
-            bit_depth: bitdepth::BitDepthAnalyzer::new(channels.max(1)),
-            mdct: Mdct::shared(),
+            bit_depth: selection
+                .bit_depth()
+                .then(|| bitdepth::BitDepthAnalyzer::new(channels.max(1))),
+            mdct: selection.enabled(Kind::Authenticity).then(Mdct::shared),
             mdct_prev: Vec::with_capacity(AAC_N),
             mdct_fill: Vec::with_capacity(AAC_N),
             mdct_have_prev: false,
             mdct_hop: 0,
-            mdct_scratch: vec![0.0; AAC_N],
+            mdct_scratch: if selection.enabled(Kind::Authenticity) {
+                vec![0.0; AAC_N]
+            } else {
+                Vec::new()
+            },
             mdct_frames: 0,
             mdct_dead_frames: 0,
             mdct_cutoff_ratio_sum: 0.0,
@@ -258,12 +294,22 @@ impl StreamAnalyzer {
         // dynamics blocks.
         let mut frame_sumsq = 0.0f64;
         for &s in samples {
-            self.clip_state.push(s);
-            frame_sumsq += (s as f64) * (s as f64);
+            if self.selection.enabled(Kind::Clipping) {
+                self.clip_state.push(s);
+            } else if self.selection.sample_peak() {
+                self.clip_state.push_peak(s);
+            }
+            if self.selection.enabled(Kind::Dynamics) {
+                frame_sumsq += (s as f64) * (s as f64);
+            }
         }
-        self.dyn_block_sumsq += frame_sumsq / samples.len() as f64;
-        self.dyn_block_frames += 1;
-        self.true_peak.push_frame(samples);
+        if self.selection.enabled(Kind::Dynamics) {
+            self.dyn_block_sumsq += frame_sumsq / samples.len() as f64;
+            self.dyn_block_frames += 1;
+        }
+        if let Some(true_peak) = &mut self.true_peak {
+            true_peak.push_frame(samples);
+        }
         if let Some(discontinuities) = &mut self.discontinuities {
             discontinuities.push_frame(samples);
         }
@@ -278,20 +324,29 @@ impl StreamAnalyzer {
         }
 
         // Stereo difference energy (first two channels).
-        if self.channels >= 2 && samples.len() >= 2 {
+        if self.selection.stereo() && self.channels >= 2 && samples.len() >= 2 {
             let l = samples[0] as f64;
             let r = samples[1] as f64;
-            let d = l - r;
-            self.diff_energy += d * d;
             self.l_energy += l * l;
             self.r_energy += r * r;
-            self.cross_energy += l * r;
-            if (l - r).abs() < 1e-9 {
-                self.identical_frames += 1;
+            if self.selection.enabled(Kind::Stereo) {
+                let d = l - r;
+                self.diff_energy += d * d;
+                if d.abs() < 1e-9 {
+                    self.identical_frames += 1;
+                }
+            }
+            if self.selection.enabled(Kind::Phase) {
+                self.cross_energy += l * r;
             }
         }
 
-        self.bit_depth.push_frame(int_samples);
+        if let Some(depth) = &mut self.bit_depth {
+            depth.push_frame(int_samples);
+        }
+        if !self.selection.spectrum() && self.mdct.is_none() {
+            return;
+        }
 
         // Mono downmix into the FFT buffer.
         let mut mono = 0.0f32;
@@ -299,13 +354,18 @@ impl StreamAnalyzer {
             mono += s;
         }
         mono /= samples.len().max(1) as f32;
-        self.frame_buf.push(mono);
+        if self.selection.spectrum() {
+            self.frame_buf.push(mono);
+        }
         if self.frame_buf.len() == FFT_SIZE {
             self.process_window();
             self.frame_buf.clear();
         }
 
         // Feed the same mono sample to the MDCT pipeline (frame = 2N, hop = N).
+        if self.mdct.is_none() {
+            return;
+        }
         self.mdct_fill.push(mono);
         if self.mdct_fill.len() == AAC_N {
             self.mdct_hop += 1;
@@ -330,7 +390,9 @@ impl StreamAnalyzer {
         frame.extend_from_slice(&self.mdct_prev);
         frame.extend_from_slice(&self.mdct_fill);
 
-        let m = self.mdct; // &'static, cheap to copy
+        let Some(m) = self.mdct else {
+            return;
+        };
         m.forward(&frame, &mut self.mdct_scratch);
 
         let mut peak = 0.0f32;
@@ -381,7 +443,9 @@ impl StreamAnalyzer {
             .zip(self.hann.iter())
             .map(|(&s, &w)| Complex { re: s * w, im: 0.0 })
             .collect();
-        self.fft.process(&mut buf);
+        if let Some(fft) = &self.fft {
+            fft.process(&mut buf);
+        }
         for (bin, c) in buf.iter().take(self.power_acc.len()).enumerate() {
             self.power_acc[bin] += (c.re as f64).powi(2) + (c.im as f64).powi(2);
         }
@@ -399,11 +463,18 @@ impl StreamAnalyzer {
             self.process_window();
         }
 
-        let spectrum_db = spectrum::average_to_db(&self.power_acc, self.window_count);
-        let (cutoff_hz, cutoff_ratio) =
-            spectrum::detect_cutoff(&spectrum_db, sample_rate, FFT_SIZE);
-        let (cliff_db, above_db) =
-            spectrum::cutoff_context(&spectrum_db, sample_rate, FFT_SIZE, cutoff_hz);
+        let spectrum_db = if self.selection.spectrum() {
+            spectrum::average_to_db(&self.power_acc, self.window_count)
+        } else {
+            Vec::new()
+        };
+        let (cutoff_hz, cutoff_ratio, cliff_db, above_db) = if self.selection.spectrum() {
+            let (hz, ratio) = spectrum::detect_cutoff(&spectrum_db, sample_rate, FFT_SIZE);
+            let (cliff, above) = spectrum::cutoff_context(&spectrum_db, sample_rate, FFT_SIZE, hz);
+            (hz, ratio, cliff, above)
+        } else {
+            (0.0, 0.0, 0.0, 0.0)
+        };
 
         // Dynamics: flush a meaningful trailing partial block (>= 1/4 length),
         // then compare the peak with the RMS of the loudest 20% of blocks.
@@ -411,13 +482,19 @@ impl StreamAnalyzer {
             self.dyn_blocks
                 .push(self.dyn_block_sumsq / self.dyn_block_frames as f64);
         }
-        let mut clipping = self.clip_state.finish(self.channels, self.total_frames);
+        let mut clipping = if self.selection.sample_peak() {
+            self.clip_state.finish(self.channels, self.total_frames)
+        } else {
+            ClippingInfo::unmeasured()
+        };
         // True peak from the 4x-oversampled stream. It can legitimately sit a
         // hair above the sample peak on any material, and above 1.0 (positive
         // dBTP) on loud masters — that's the inter-sample clipping signal.
-        clipping.true_peak = self.true_peak.peak();
-        clipping.true_peak_dbtp = self.true_peak.peak_dbtp();
-        let dr_db = {
+        if let Some(true_peak) = &self.true_peak {
+            clipping.true_peak = true_peak.peak();
+            clipping.true_peak_dbtp = true_peak.peak_dbtp();
+        }
+        let dr_db = if self.selection.enabled(Kind::Dynamics) {
             let mut blocks = self.dyn_blocks.clone();
             blocks.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
             let top = ((blocks.len() as f64 * DYN_TOP_FRACTION).ceil() as usize).max(1);
@@ -432,9 +509,11 @@ impl StreamAnalyzer {
                     None
                 }
             }
+        } else {
+            None
         };
 
-        let fake_stereo = if self.channels >= 2 {
+        let fake_stereo = if self.selection.enabled(Kind::Stereo) && self.channels >= 2 {
             super::stereo::is_fake(
                 self.diff_energy,
                 self.l_energy,
@@ -445,13 +524,16 @@ impl StreamAnalyzer {
         } else {
             false
         };
-        let phase = super::stereo::analyze_phase(self.l_energy, self.r_energy, self.cross_energy);
+        let phase = self
+            .selection
+            .enabled(Kind::Phase)
+            .then(|| super::stereo::analyze_phase(self.l_energy, self.r_energy, self.cross_energy));
         let high_frequency_stereo = self
             .high_frequency_stereo
             .take()
             .and_then(HighFrequencyStereoMeter::finish);
 
-        let measured_depth = self.bit_depth.finish(declared_bits);
+        let measured_depth = self.bit_depth.and_then(|depth| depth.finish(declared_bits));
         let real_bit_depth = measured_depth.map(|(bits, _)| bits);
         let bit_depth_evidence = measured_depth.map(|(_, evidence)| evidence);
 
@@ -490,9 +572,9 @@ impl StreamAnalyzer {
             spectrum_db,
             clipping,
             fake_stereo,
-            phase_correlation: phase.correlation,
-            phase_inverted: phase.likely_inverted,
-            stereo_balance: if self.channels == 2 {
+            phase_correlation: phase.as_ref().and_then(|phase| phase.correlation),
+            phase_inverted: phase.is_some_and(|phase| phase.likely_inverted),
+            stereo_balance: if self.selection.enabled(Kind::Stereo) && self.channels == 2 {
                 super::stereo::analyze_balance(self.l_energy, self.r_energy)
             } else {
                 None

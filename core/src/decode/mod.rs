@@ -36,9 +36,13 @@ pub mod stream;
 
 use crate::analysis::analyzer::StreamAnalyzer;
 
+pub(crate) use dsd::decode_and_analyze_dsd_selected;
+pub(crate) use flac::decode_and_analyze_flac_selected;
+pub(crate) use stream::decode_and_analyze_selected;
+
 pub use container::{detect_container, ext_canonical};
 pub use dsd::decode_and_analyze_dsd;
-pub use flac::{decode_and_analyze_flac, decode_flac_to_pcm};
+pub use flac::{decode_and_analyze_flac, decode_flac_to_pcm, flac_md5_signature, verify_flac_md5};
 pub use flac_md5::FlacMd5Status;
 pub use playback::{decode_to_pcm, PcmAudio, PcmStreamDecoder};
 pub use probe::{probe_info, BasicInfo};

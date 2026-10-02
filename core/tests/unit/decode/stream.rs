@@ -82,6 +82,8 @@ fn truncated_pcm_cannot_receive_a_whole_file_padding_verdict() {
     let len = file.metadata().expect("WAV length").len();
     file.set_len(len - 3).expect("remove final sample");
     assert!(decode_and_analyze(&path).is_err());
+    let selection = crate::AnalysisSelection::from_names(["loudness"]).expect("known analysis");
+    assert!(decode_and_analyze_selected(&path, selection).is_err());
 }
 
 #[test]

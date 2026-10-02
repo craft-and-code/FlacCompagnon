@@ -4,6 +4,7 @@ use std::path::Path;
 
 mod args;
 mod display;
+mod integrity;
 mod progress;
 mod reports;
 
@@ -50,6 +51,9 @@ fn run(args: Args) -> Result<(), String> {
     let cached = progress::with_loading("Reading saved results…", || {
         reports::cached(&paths, &destinations, &args)
     })?;
+    if args.md5_only() {
+        return integrity::run(&paths, &cached, &args);
+    }
     let mut failed = false;
     for (folder, paths, destination) in groups {
         let mut files = Vec::with_capacity(paths.len());
@@ -57,8 +61,8 @@ fn run(args: Args) -> Result<(), String> {
         for (index, path) in paths.iter().enumerate() {
             let existing = cached
                 .get(&reports::path_key(path))
-                .filter(|file| reports::matches(file, path));
-            let file = if let Some(file) = existing {
+                .filter(|file| reports::matches_requested(file, path, &args));
+            let mut file = if let Some(file) = existing {
                 eprintln!(
                     "  ▸ [{}/{}] Reusing {}",
                     index + 1,
@@ -69,10 +73,14 @@ fn run(args: Args) -> Result<(), String> {
             } else {
                 changed = true;
                 progress::with_analysis(path, index, paths.len(), || {
-                    core::analyze_file(path, &options)
+                    core::analyze_file_selected(path, &options, args.selection())
                 })
             };
-            failed |= file.error.is_some();
+            let original_coverage = file.analyses_run.clone();
+            file.restrict_to(args.selection());
+            changed |= original_coverage != file.analyses_run;
+            failed |= file.error.is_some()
+                || matches!(file.flac_md5, Some(core::FlacMd5Status::Mismatch));
             if args.show_results || !args.analyses.is_empty() {
                 display::display(&file, &args);
             }

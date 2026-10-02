@@ -192,3 +192,17 @@ fn subthreshold_impulses_and_gaps_outside_duration_bounds_are_not_flagged() {
         );
     }
 }
+
+#[test]
+fn click_selection_does_not_construct_dropout_detectors() {
+    let detector = DiscontinuityDetector::new_selected(44_100, 2, true, false).expect("supported");
+    assert!(detector
+        .channels
+        .iter()
+        .all(|channel| channel.clicks.is_some() && channel.dropouts.is_none()));
+    let detector = DiscontinuityDetector::new_selected(44_100, 2, false, true).expect("supported");
+    assert!(detector
+        .channels
+        .iter()
+        .all(|channel| channel.clicks.is_none() && channel.dropouts.is_some()));
+}

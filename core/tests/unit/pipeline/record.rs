@@ -8,7 +8,7 @@ fn a_file_that_cannot_be_decoded_still_gets_size_and_fingerprints() {
     let path = dir.path().join("not-audio.flac");
     std::fs::write(&path, b"this is not a FLAC file").expect("write");
 
-    let r = skeleton(&path);
+    let r = skeleton(&path, true);
     assert_eq!(r.file_name, "not-audio.flac");
     assert_eq!(r.size_bytes, 23);
     assert!(r.modified_unix.is_some());
@@ -26,7 +26,7 @@ fn a_file_that_cannot_be_decoded_still_gets_size_and_fingerprints() {
 #[test]
 fn a_missing_file_leaves_the_optional_fields_empty() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let r = skeleton(&dir.path().join("absent.flac"));
+    let r = skeleton(&dir.path().join("absent.flac"), true);
     assert_eq!(r.size_bytes, 0);
     assert!(r.modified_unix.is_none());
     assert!(r.file_md5.is_none());

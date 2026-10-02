@@ -2,22 +2,7 @@
 
 use std::path::PathBuf;
 
-const ANALYSES: &[&str] = &[
-    "authenticity",
-    "bit-depth",
-    "spectrum",
-    "stereo",
-    "phase",
-    "hf-stereo",
-    "clipping",
-    "loudness",
-    "dynamics",
-    "clicks",
-    "dropouts",
-    "dc-offset",
-    "flac-md5",
-    "fingerprints",
-];
+use flaccompagnon_core::{selection::ANALYSES, AnalysisSelection};
 
 #[derive(Default)]
 pub(crate) struct Args {
@@ -85,10 +70,28 @@ impl Args {
         if args.json.is_some() && args.json_layout.is_some() {
             return Err("choose --json PATH or --json-layout, not both".into());
         }
+        if !args.analyses.is_empty() && (args.json.is_some() || args.json_layout.is_some()) {
+            return Err(
+                "--analysis cannot be combined with --json or --json-layout: JSON reports require all analyses. Remove --analysis to export a complete report, or remove the JSON option to run only the selected analyses."
+                    .into(),
+            );
+        }
         if args.targets.is_empty() {
             return Err("give at least one audio file or folder".to_string());
         }
         Ok(Some(args))
+    }
+
+    pub(crate) fn selection(&self) -> AnalysisSelection {
+        if self.analyses.is_empty() {
+            AnalysisSelection::all()
+        } else {
+            AnalysisSelection::from_names(&self.analyses).unwrap_or_default()
+        }
+    }
+
+    pub(crate) fn md5_only(&self) -> bool {
+        self.analyses == ["flac-md5"] && self.json.is_none() && self.json_layout.is_none()
     }
 
     pub(crate) fn selected(&self, name: &str) -> bool {
@@ -122,7 +125,7 @@ pub(crate) fn help() {
     for (option, description) in [
         (
             "-a, --analysis NAME",
-            "Select terminal fields (repeatable; implies --show-results)",
+            "Run selected analyses (repeatable; implies --show-results)",
         ),
         (
             "--show-results",
@@ -145,7 +148,7 @@ pub(crate) fn help() {
     ] {
         println!("  {option:<29} {description}");
     }
-    println!("\nAnalyses: {}\n\nJSON always contains the full report. Existing valid results are reused.\nAlbum grouping uses audio folders; CD/Disc subfolders share their parent.", ANALYSES.join(", "));
+    println!("\nAnalyses: {}\n\nFLAC MD5 alone runs integrity checks via 'flac -t' when available on PATH,\notherwise via the internal Rust verifier.\nJSON always contains the full report and runs all analyses.\n--analysis cannot be combined with --json or --json-layout.\nExisting valid results are reused.\nAlbum grouping uses audio folders; CD/Disc subfolders share their parent.", ANALYSES.join(", "));
 }
 
 #[cfg(test)]

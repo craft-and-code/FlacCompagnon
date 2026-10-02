@@ -68,6 +68,10 @@ impl ClippingInfo {
 /// The complete analysis result for one file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileAnalysis {
+    /// Explicit measurement coverage for a partial result. `None` means a
+    /// complete legacy/default analysis, including in reports written before this field existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub analyses_run: Option<Vec<String>>,
     /// Absolute path to the analyzed file.
     pub path: String,
     /// File name alone, without its directory (kept alongside `path` since

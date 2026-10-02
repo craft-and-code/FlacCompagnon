@@ -243,7 +243,7 @@ cargo run --release -p flaccompagnon-cli -- ~/Music/Album --json ~/Music/Album/F
 cargo run --release -p flaccompagnon-cli -- track.flac --analysis loudness --analysis phase
 ```
 
-The installed executable is named `flaccompagnon`. `--analysis` selects which measurements to display in the terminal; the engine still computes the complete analysis, and a saved JSON report always includes every result. Use `flaccompagnon --help` for the available names and scan options.
+The installed executable is named `flaccompagnon`. `--analysis` runs only the selected measurements and their necessary dependencies when no JSON output is requested. Combine names with commas or repeat the option. Without `--analysis`, the engine runs every analysis. JSON exports always contain every measurement; combining `--analysis` with `--json` or `--json-layout` is rejected before scanning. Use `--show-results` to display the complete analysis while exporting JSON. A standalone `-a flac-md5` check uses `flac -t` when the optional `flac` executable is on `PATH`, and the internal Rust verifier otherwise. Use `flaccompagnon --help` for the available names and scan options.
 
 [Aède](https://craft-and-code.github.io/aede/) uses this Rust engine directly through `flaccompagnon-core`. Its `aede analyze [folder…] --json` command groups tracks by album and saves one FlacCompagnon report in each album folder. Aède stores the measurements with their FlacCompagnon source attribution; it can also import an existing report with `aede import`.
 
@@ -364,12 +364,12 @@ Before tagging, commit the intended release with matching versions in `Cargo.tom
 
 **Every release asset names its product first**, so the graphical application and the command-line archive are distinct before the platform suffix:
 
-| Your system                | File to download                                     |
-| -------------------------- | ---------------------------------------------------- |
-| Windows 10/11 (64-bit)     | `FlacCompagnon-App_<version>_Windows-x64.msi`        |
-| macOS (Apple Silicon)      | `FlacCompagnon-App_<version>_macOS-AppleSilicon.dmg` |
-| Linux (glibc 2.35+, 64-bit) | `FlacCompagnon-App_<version>_x86_64.AppImage`  |
-| Linux (Debian / Ubuntu)    | `FlacCompagnon-App_<version>_Linux-x86_64.deb`       |
+| Your system                 | File to download                                     |
+| --------------------------- | ---------------------------------------------------- |
+| Windows 10/11 (64-bit)      | `FlacCompagnon-App_<version>_Windows-x64.msi`        |
+| macOS (Apple Silicon)       | `FlacCompagnon-App_<version>_macOS-AppleSilicon.dmg` |
+| Linux (glibc 2.35+, 64-bit) | `FlacCompagnon-App_<version>_x86_64.AppImage`        |
+| Linux (Debian / Ubuntu)     | `FlacCompagnon-App_<version>_Linux-x86_64.deb`       |
 
 Linux builds require glibc 2.35 or later (for example Ubuntu 22.04 or later). Before upload, the release workflow repairs and verifies the AppImage launch permissions, checks its glibc requirements, and opens the packaged application under a virtual display.
 

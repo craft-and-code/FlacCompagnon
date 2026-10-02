@@ -112,9 +112,9 @@ for (const lang of ["fr", "en"]) {
   }
 }
 // Keep the published option table in sync with the actual command parser.
-const cliSource = await readFile(resolve(import.meta.dirname, "../cli/src/args.rs"), "utf8");
+const cliSource = await readFile(resolve(import.meta.dirname, "../core/src/selection/mod.rs"), "utf8");
 const analysisList = cliSource.match(/const ANALYSES:.*?= &\[([\s\S]*?)\];/);
-assert.ok(analysisList, "Cannot find the CLI analysis list in cli/src/args.rs");
+assert.ok(analysisList, "Cannot find the analysis list in core/src/selection/mod.rs");
 const analysisNames = [...analysisList[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 assert.ok(analysisNames.length, "The CLI analysis list is empty");
 for (const lang of ["fr", "en"]) {

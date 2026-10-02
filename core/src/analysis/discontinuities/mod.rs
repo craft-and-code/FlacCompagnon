@@ -66,8 +66,8 @@ pub struct DiscontinuityAnalysis {
 }
 
 struct Channel {
-    clicks: clicks::ClickDetector,
-    dropouts: dropouts::DropoutDetector,
+    clicks: Option<clicks::ClickDetector>,
+    dropouts: Option<dropouts::DropoutDetector>,
 }
 
 /// Bounded-memory streaming detector with about 5 ms of context on each side.
@@ -83,6 +83,16 @@ impl DiscontinuityDetector {
     /// Support 8–768 kHz and 1–32 channels. Bounds limit allocations made from
     /// untrusted container headers; an unsupported stream has no reading.
     pub fn new(sample_rate: u32, channels: usize) -> Option<Self> {
+        Self::new_selected(sample_rate, channels, true, true)
+    }
+
+    /// Construct only the requested discontinuity detectors.
+    pub fn new_selected(
+        sample_rate: u32,
+        channels: usize,
+        clicks: bool,
+        dropouts: bool,
+    ) -> Option<Self> {
         if !(8_000..=768_000).contains(&sample_rate) || !(1..=32).contains(&channels) {
             return None;
         }
@@ -91,8 +101,9 @@ impl DiscontinuityDetector {
         Some(Self {
             channels: (1..=channels)
                 .map(|channel| Channel {
-                    clicks: clicks::ClickDetector::new(sample_rate, channel as u16),
-                    dropouts: dropouts::DropoutDetector::new(sample_rate, channel as u16),
+                    clicks: clicks.then(|| clicks::ClickDetector::new(sample_rate, channel as u16)),
+                    dropouts: dropouts
+                        .then(|| dropouts::DropoutDetector::new(sample_rate, channel as u16)),
                 })
                 .collect(),
             result: DiscontinuityAnalysis::default(),
@@ -112,10 +123,12 @@ impl DiscontinuityDetector {
             return;
         }
         for (channel, &sample) in self.channels.iter_mut().zip(samples) {
-            channel.clicks.push(sample as f64, &mut self.result.clicks);
-            channel
-                .dropouts
-                .push(sample as f64, &mut self.result.dropouts);
+            if let Some(clicks) = &mut channel.clicks {
+                clicks.push(sample as f64, &mut self.result.clicks);
+            }
+            if let Some(dropouts) = &mut channel.dropouts {
+                dropouts.push(sample as f64, &mut self.result.dropouts);
+            }
         }
         self.frames += 1;
     }
@@ -127,7 +140,9 @@ impl DiscontinuityDetector {
             return None;
         }
         for channel in &mut self.channels {
-            channel.clicks.finish(&mut self.result.clicks);
+            if let Some(clicks) = &mut channel.clicks {
+                clicks.finish(&mut self.result.clicks);
+            }
         }
         Some(self.result)
     }

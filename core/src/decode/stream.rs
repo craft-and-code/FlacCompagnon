@@ -18,6 +18,13 @@ use crate::AnalysisError;
 
 /// Decode `path` and run streaming analysis over its samples.
 pub fn decode_and_analyze(path: &Path) -> Result<DecodeOutcome, AnalysisError> {
+    decode_and_analyze_selected(path, crate::AnalysisSelection::all())
+}
+
+pub(crate) fn decode_and_analyze_selected(
+    path: &Path,
+    selection: crate::AnalysisSelection,
+) -> Result<DecodeOutcome, AnalysisError> {
     let mut probed = probe(path, true)?;
     let sample_rate = probed.sample_rate()?;
     let channels = probed.channels()?;
@@ -42,7 +49,7 @@ pub fn decode_and_analyze(path: &Path) -> Result<DecodeOutcome, AnalysisError> {
         .filter(|b| (1..=32).contains(b))
         .map(|b| 32 - b);
 
-    let mut analyzer = StreamAnalyzer::new(channels, sample_rate);
+    let mut analyzer = StreamAnalyzer::new_selected(channels, sample_rate, selection);
     let mut buf = InterleavedBuf::<f32>::default();
     let mut int_buf = InterleavedBuf::<i32>::default();
     let mut int_packet: Vec<i32> = Vec::new();
@@ -82,12 +89,11 @@ pub fn decode_and_analyze(path: &Path) -> Result<DecodeOutcome, AnalysisError> {
                 // a buffer reused across packets rather than a fresh Vec each
                 // time (this runs per packet for the length of the file).
                 int_packet.clear();
-                if let (true, Some(shift)) = (is_int, int_shift) {
+                if let (true, Some(shift)) = (is_int && selection.bit_depth(), int_shift) {
                     int_packet.extend(int_buf.fill(decoded.clone()).iter().map(|&s| s >> shift));
                 }
                 let f32_samples = buf.fill(decoded);
-                let ints_ready = !int_packet.is_empty();
-                saw_integer |= ints_ready;
+                saw_integer |= is_int;
 
                 let n_frames = f32_samples.len() / channels;
                 let mut int_frames = int_packet.chunks_exact(channels);

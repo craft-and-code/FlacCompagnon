@@ -31,6 +31,22 @@ pub fn decode_and_analyze_dsd(
     channels: usize,
     decoded_rate: u32,
 ) -> Result<DecodeOutcome, AnalysisError> {
+    decode_and_analyze_dsd_selected(
+        ffmpeg,
+        path,
+        channels,
+        decoded_rate,
+        crate::AnalysisSelection::all(),
+    )
+}
+
+pub(crate) fn decode_and_analyze_dsd_selected(
+    ffmpeg: &str,
+    path: &Path,
+    channels: usize,
+    decoded_rate: u32,
+    selection: crate::AnalysisSelection,
+) -> Result<DecodeOutcome, AnalysisError> {
     if channels == 0 {
         return Err(AnalysisError::Decode("DSD: zero channels".into()));
     }
@@ -52,7 +68,7 @@ pub fn decode_and_analyze_dsd(
         .take()
         .ok_or_else(|| AnalysisError::Decode("ffmpeg produced no output pipe".into()))?;
 
-    let mut analyzer = StreamAnalyzer::new(channels, decoded_rate);
+    let mut analyzer = StreamAnalyzer::new_selected(channels, decoded_rate, selection);
     let mut carry: Vec<u8> = Vec::new();
     let mut buf = vec![0u8; PIPE_CHUNK];
     let mut frame = vec![0f32; channels];

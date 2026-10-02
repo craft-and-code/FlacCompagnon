@@ -81,6 +81,22 @@ pub(crate) fn matches(file: &FileAnalysis, path: &Path) -> bool {
         && file.modified_unix == modified
 }
 
+pub(crate) fn matches_requested(file: &FileAnalysis, path: &Path, args: &Args) -> bool {
+    if !matches(file, path) || !file.covers_selection(args.selection()) {
+        return false;
+    }
+    let requires_md5 = args.verify_flac_md5
+        && args.selection().enabled(core::AnalysisKind::FlacMd5)
+        && path
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("flac"));
+    !requires_md5
+        || matches!(
+            file.flac_md5,
+            Some(core::FlacMd5Status::Match | core::FlacMd5Status::NoSignature)
+        )
+}
+
 pub(crate) fn cached(
     paths: &[PathBuf],
     destinations: &[&Path],
@@ -130,7 +146,9 @@ pub(crate) fn cached(
             Ok(report) => {
                 for file in report.files {
                     let key = path_key(Path::new(&file.path));
-                    files.insert(key, file);
+                    if matches_requested(&file, Path::new(&file.path), args) {
+                        files.insert(key, file);
+                    }
                 }
             }
             Err(error) if destinations.contains(&candidate.as_path()) => {

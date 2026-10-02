@@ -4,6 +4,7 @@ use crate::{ClippingInfo, FileAnalysis};
 
 fn sample_file() -> FileAnalysis {
     FileAnalysis {
+        analyses_run: None,
         path: "/music/a.flac".into(),
         file_name: "a.flac".into(),
         format: "FLAC".into(),

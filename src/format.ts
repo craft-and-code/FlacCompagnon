@@ -355,6 +355,11 @@ function tagSearchFields(tag: TagSet | null | undefined): string[] {
   ].filter((value): value is string => Boolean(value));
 }
 
+// Reports saved before selective execution contain every analysis.
+export function analysisWasRun(file: FileAnalysis, name: string): boolean {
+  return file.analyses_run == null || file.analyses_run.includes(name);
+}
+
 /// Searchable row values and embedded tags, kept as individual fields. A row
 /// is searchable by its analysis data while its tags load, then by both.
 export function fileSearchFields(f: FileAnalysis, tag?: TagSet | null): string[] {
@@ -386,7 +391,7 @@ export function fileSearchFields(f: FileAnalysis, tag?: TagSet | null): string[]
       : "",
     f.discontinuities?.clicks.count ? `${f.discontinuities.clicks.count} impulses` : "",
     f.discontinuities?.dropouts.count ? `${f.discontinuities.dropouts.count} dropouts` : "",
-    f.clipping.clipped ? `${f.clipping.clip_events} clip events clipping` : "no clipping",
+    analysisWasRun(f, "clipping") ? (f.clipping.clipped ? `${f.clipping.clip_events} clip events clipping` : "no clipping") : "",
     Number.isFinite(f.clipping.true_peak_dbtp)
       ? `${f.clipping.true_peak_dbtp.toFixed(1)} dbtp true peak`
       : "",

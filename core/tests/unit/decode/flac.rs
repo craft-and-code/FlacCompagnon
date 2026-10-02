@@ -52,6 +52,7 @@ fn missing_flac_frames_are_rejected_even_without_md5_verification() {
     std::fs::write(&path, bytes).expect("write truncated declaration");
     assert!(decode_and_analyze_flac(&path, false).is_err());
     assert!(decode_flac_to_pcm(&path).is_err());
+    assert!(verify_flac_md5(&path, true).is_err());
 }
 
 #[test]
@@ -64,6 +65,7 @@ fn inconsistent_flac_channels_return_an_error_instead_of_panicking() {
     std::fs::write(&path, bytes).expect("write contradictory header");
     assert!(decode_and_analyze_flac(&path, false).is_err());
     assert!(decode_flac_to_pcm(&path).is_err());
+    assert!(verify_flac_md5(&path, true).is_err());
 }
 
 #[test]
@@ -86,6 +88,7 @@ fn metadata_only_flac_is_rejected() {
     std::fs::write(&path, bytes).expect("write metadata-only fixture");
     assert!(decode_and_analyze_flac(&path, false).is_err());
     assert!(decode_flac_to_pcm(&path).is_err());
+    assert!(verify_flac_md5(&path, true).is_err());
 }
 
 /// The fused FLAC path feeds the analyzer with `s * (1 / 2^(bits-1))` as
@@ -124,4 +127,49 @@ fn bytes_per_sample_matches_the_spec() {
     for (bits, expected) in [(8u32, 1usize), (12, 2), (16, 2), (20, 3), (24, 3), (32, 4)] {
         assert_eq!(bits.div_ceil(8) as usize, expected, "bits={bits}");
     }
+}
+
+#[test]
+fn integrity_only_verifies_reference_encoder_md5_without_analyzer() {
+    let dir = tempfile::tempdir().expect("temporary directory");
+    let path = dir.path().join("integrity.flac");
+    for bits in [16, 20, 24] {
+        let samples = [123, -456, 0, 789].repeat(256);
+        let bytes = encoded_flac(&samples, 2, bits);
+        std::fs::write(&path, &bytes).expect("FLAC fixture");
+        assert_eq!(
+            verify_flac_md5(&path, true).expect("valid FLAC"),
+            FlacMd5Status::Match
+        );
+        assert!(decode_flac(&path, true, None)
+            .expect("valid FLAC")
+            .analyzer
+            .is_none());
+        let mut altered = bytes;
+        altered[26] ^= 1; // STREAMINFO's MD5, not any encoded audio sample.
+        std::fs::write(&path, altered).expect("altered signature");
+        assert_eq!(
+            verify_flac_md5(&path, true).expect("decodable audio"),
+            FlacMd5Status::Mismatch
+        );
+        assert_eq!(
+            verify_flac_md5(&path, false).expect("unverified audio"),
+            FlacMd5Status::Present
+        );
+    }
+}
+
+#[test]
+fn integrity_only_decodes_unsigned_flac_and_rejects_garbage() {
+    let dir = tempfile::tempdir().expect("temporary directory");
+    let path = dir.path().join("unsigned.flac");
+    let mut bytes = encoded_flac(&[123; 128], 1, 16);
+    bytes[26..42].fill(0);
+    std::fs::write(&path, bytes).expect("unsigned FLAC");
+    assert_eq!(
+        verify_flac_md5(&path, true).expect("valid audio"),
+        FlacMd5Status::NoSignature
+    );
+    std::fs::write(&path, b"not a FLAC").expect("garbage fixture");
+    assert!(verify_flac_md5(&path, true).is_err());
 }

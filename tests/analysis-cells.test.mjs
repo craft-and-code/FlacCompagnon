@@ -30,6 +30,16 @@ const {
 );
 const render = (key, file) => renderToStaticMarkup(ALL_COLUMNS.find((c) => c.key === key).render(file, null));
 
+test("partial reports show unrequested measurements as unavailable", () => {
+  const file = { analyses_run: ["bit-depth"], real_bit_depth: 16,
+    clipping: { clipped: false }, detections: { summary: "Clean" },
+    discontinuities: { clicks: { count: 0, events: [] } } };
+  for (const key of ["clipping", "clicks", "detections", "truePeak", "loudness"]) {
+    assert.match(render(key, file), />—</);
+  }
+  assert.match(render("realBits", file), /16/);
+});
+
 test("columns after the FLAC MD5 signature start hidden without overriding a saved choice", () => {
   const signature = ALL_COLUMNS.findIndex((column) => column.key === "md5");
   const later = ALL_COLUMNS.slice(signature + 1);

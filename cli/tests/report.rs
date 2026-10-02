@@ -20,8 +20,7 @@ fn cli_json_round_trips_as_a_desktop_report() {
     writer.finalize().expect("complete WAV");
 
     let result = Command::new(env!("CARGO_BIN_EXE_flaccompagnon"))
-        .arg("--analysis")
-        .arg("loudness")
+        .arg("--show-results")
         .arg("--json")
         .arg(&output)
         .arg(&audio)
@@ -34,7 +33,7 @@ fn cli_json_round_trips_as_a_desktop_report() {
     );
     assert!(
         String::from_utf8_lossy(&result.stdout).contains("Loudness:"),
-        "explicit analysis selection enables terminal results"
+        "--show-results enables terminal results alongside JSON export"
     );
     assert!(
         String::from_utf8_lossy(&result.stderr).contains("[1/1]"),
@@ -159,4 +158,53 @@ fn malformed_destination_requires_force() {
     assert_eq!(std::fs::read_to_string(&output).unwrap(), "garbage");
     let result = run(&["--json", output.to_str().unwrap(), "--force"], dir.path());
     assert!(result.status.success());
+}
+
+#[test]
+fn selected_results_follow_progress_without_repeating_the_file_path() {
+    let dir = tempfile::tempdir().expect("temporary directory");
+    let audio = dir.path().join("track.wav");
+    silent_audio(&audio);
+    let result = run(&["--analysis", "flac-md5"], &audio);
+    assert!(result.status.success());
+    let results = String::from_utf8_lossy(&result.stdout);
+    let progress = String::from_utf8_lossy(&result.stderr);
+    let path = audio.to_string_lossy();
+    assert_eq!(results.trim(), "FLAC MD5: N/A");
+    assert!(
+        !results.contains(path.as_ref()),
+        "results repeat the progress path"
+    );
+    assert_eq!(progress.matches(path.as_ref()).count(), 1);
+}
+
+#[test]
+fn selected_analyses_with_json_fail_before_scanning_or_changing_reports() {
+    let dir = tempfile::tempdir().expect("directory");
+    let report = dir.path().join("report.json");
+    std::fs::write(&report, b"existing report").expect("report fixture");
+    for options in [
+        vec!["--json", "report.json"],
+        vec!["-j", "new.json"],
+        vec!["--json-layout", "album"],
+        vec!["--json-layout=artist"],
+    ] {
+        let result = Command::new(env!("CARGO_BIN_EXE_flaccompagnon"))
+            .current_dir(dir.path())
+            .args(["--force", "-a", "loudness,phase"])
+            .args(options)
+            .arg("missing-audio.flac")
+            .output()
+            .expect("CLI");
+        assert_eq!(result.status.code(), Some(2));
+        assert!(result.stdout.is_empty());
+        let error = String::from_utf8_lossy(&result.stderr);
+        assert!(error.contains("JSON reports require all analyses"));
+        assert!(!error.contains("Analyzing ") && !error.contains("Finding audio files"));
+        assert_eq!(
+            std::fs::read(&report).expect("untouched report"),
+            b"existing report"
+        );
+        assert_eq!(std::fs::read_dir(dir.path()).expect("directory").count(), 1);
+    }
 }

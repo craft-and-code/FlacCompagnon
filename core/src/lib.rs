@@ -85,15 +85,17 @@ pub mod hash;
 pub mod pipeline;
 pub mod report;
 pub mod scan;
+pub mod selection;
 pub mod transcode;
 pub mod types;
 
 pub use analysis::detections::Detections;
 pub use decode::{probe_info, BasicInfo, FlacMd5Status};
 pub use hash::{file_digest, FileDigest};
-pub use pipeline::{analyze_file, analyze_file_cancellable};
+pub use pipeline::{analyze_file, analyze_file_cancellable, analyze_file_selected};
 pub use scan::{
     analyze_folder, display_root, folder_report, gather_targets, is_supported_audio,
     list_audio_files, SUPPORTED_EXTENSIONS,
 };
+pub use selection::{AnalysisKind, AnalysisSelection};
 pub use types::{AnalysisError, ClippingInfo, FileAnalysis, FolderReport, ScanOptions};

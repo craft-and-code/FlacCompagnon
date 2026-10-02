@@ -29,10 +29,8 @@ impl ClipState {
 
     /// Feed one sample (any channel).
     pub fn push(&mut self, sample: f32) {
+        self.push_peak(sample);
         let a = sample.abs();
-        if a > self.peak {
-            self.peak = a;
-        }
         if a >= self.threshold {
             self.clipped_samples += 1;
             self.current_run += 1;
@@ -42,6 +40,11 @@ impl ClipState {
         } else {
             self.current_run = 0;
         }
+    }
+
+    /// Track only the sample peak required by dynamics and authenticity.
+    pub fn push_peak(&mut self, sample: f32) {
+        self.peak = self.peak.max(sample.abs());
     }
 
     /// Consume the accumulated state into a final [`ClippingInfo`].

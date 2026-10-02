@@ -2,6 +2,8 @@
 
 The **CLI** is FlacCompagnon without the graphical window: type a command in Terminal or PowerShell, give it a file or folder, and read the results there. It uses the same Rust analysis engine and the same JSON report schema as the desktop app. It reads your audio without changing it.
 
+When only `-a flac-md5` is selected without `--json` or `--json-layout`, the CLI decodes and verifies FLAC integrity only. It skips spectral analyses, transcoding detection and whole-file fingerprints. A failed MD5 comparison or decode returns a nonzero exit status. Other explicit selections also run only their requested measurements. JSON output keeps the complete analysis. Integrity-only checks use `flac -t` when the optional `flac` executable is on `PATH`, and the internal Rust verifier otherwise.
+
 ## Install and check
 
 On the [GitHub Releases page](https://github.com/craft-and-code/FlacCompagnon/releases), choose a standalone archive named `FlacCompagnon-CLI_<version>_<platform>.tar.gz` or `.zip`. The graphical application files begin with `FlacCompagnon-App`, so the two downloads are distinguishable at a glance. The platforms are macOS Apple Silicon, Linux x86_64 and Windows x64.
@@ -42,7 +44,7 @@ You can mix several files and folders. To inspect only the named folder level:
 flaccompagnon "Music/Album A" "Music/Album B" --no-recursive
 ```
 
-## Choose the results shown
+## Choose the analyses to run
 
 ```sh
 flaccompagnon "Music/Album" --analysis loudness
@@ -50,7 +52,7 @@ flaccompagnon "Music/Album" --analysis phase --analysis hf-stereo
 flaccompagnon "Music/Album" -a clipping,clicks,dropouts
 ```
 
-**Selection currently filters terminal output only.** The engine still computes the complete analysis. It does not shorten processing to just the requested measurement, and a saved JSON always contains the full report.
+**Without a JSON export, selection controls execution as well as terminal output.** Only the requested measurements and their necessary dependencies run. Commas and repeated `--analysis` options combine any number of measurements. For example, `-a flac-md5,loudness` decodes once to verify audio integrity and measure loudness, without spectral or transcoding analysis. No selection means every analysis. `--json` and `--json-layout` require every analysis and cannot be combined with `--analysis` (`-a`). The CLI rejects this combination before scanning with exit code 2; it does not silently expand your selection.
 
 | Name           | Terminal results                                            |
 | -------------- | ----------------------------------------------------------- |
@@ -79,10 +81,10 @@ flaccompagnon "Music/Album" --json "Music/Album/FlacCompagnon.json"
 
 The schema is the desktop app's complete, versioned `flaccompagnon-report` format. Drop the JSON onto the desktop results list to reopen the saved analysis without re-decoding the audio. A report is a snapshot: it does not update itself after audio is edited, and saved paths can become stale when files move. See [file fingerprints](fingerprints.md) for identity and relocation limits.
 
-You can request concise terminal output while saving all measurements:
+JSON exports always require all analyses. To display the complete measurements while saving them, use `--show-results`:
 
 ```sh
-flaccompagnon "Music/Album" -a loudness,phase -j "Music/Album/FlacCompagnon.json"
+flaccompagnon "Music/Album" --show-results -j "Music/Album/FlacCompagnon.json"
 ```
 
 ## One report per album with Aède
@@ -114,20 +116,20 @@ Discovery uses the explicit `--ffmpeg` path first, then the `FLACCOMPAGNON_FFMPE
 flaccompagnon [OPTIONS] <FILE|FOLDER>...
 ```
 
-| Option                | Effect                                                                    |
-| --------------------- | ------------------------------------------------------------------------- |
-| `-a, --analysis NAME` | Select terminal fields; repeat or separate names with commas              |
-| `--show-results` | Print terminal measurements (default: progress only) |
-| `--force` | Reanalyze files and replace selected reports |
-| `--json-layout album\|artist` | Save one report per album in its folder or parent |
-| `-j, --json PATH`     | Write the complete JSON report                                            |
-| `--recursive`         | Include subfolders (default)                                              |
-| `--no-recursive`      | Stay at the named folder level                                            |
-| `--no-flac-md5`       | Read stored FLAC signatures without verifying decoded audio against them  |
-| `--ffmpeg PATH`       | Choose the FFmpeg executable for DSD decoding                             |
-| `-h, --help`          | Print help                                                                |
-| `-v, -V, --version`       | Print the version (use on its own)                                        |
-| `--`                  | Treat all remaining arguments as paths, including names starting with `-` |
+| Option                        | Effect                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------- |
+| `-a, --analysis NAME`         | Run selected analyses; repeat or separate names with commas               |
+| `--show-results`              | Print terminal measurements (default: progress only)                      |
+| `--force`                     | Reanalyze files and replace selected reports                              |
+| `--json-layout album\|artist` | Save one report per album in its folder or parent                         |
+| `-j, --json PATH`             | Run all analyses and write the complete JSON report                       |
+| `--recursive`                 | Include subfolders (default)                                              |
+| `--no-recursive`              | Stay at the named folder level                                            |
+| `--no-flac-md5`               | Read stored FLAC signatures without verifying decoded audio against them  |
+| `--ffmpeg PATH`               | Choose the FFmpeg executable for DSD decoding                             |
+| `-h, --help`                  | Print help                                                                |
+| `-v, -V, --version`           | Print the version (use on its own)                                        |
+| `--`                          | Treat all remaining arguments as paths, including names starting with `-` |
 
 ## Exit codes and automation
 
@@ -159,7 +161,7 @@ flaccompagnon "Music/Artist" --json-layout album --force
 flaccompagnon "Music/Album" --show-results
 ```
 
-`album` saves `<album>.json` inside each album folder; `artist` saves the same separate album reports in their parent folder. Audio files are grouped by directory; numbered `CD`, `Disc` and `Disk` subfolders share their parent album. This filesystem grouping does not use tags. `--json-layout` enables saving and cannot be combined with `--json PATH`.
+`album` saves `<album>.json` inside each album folder; `artist` saves the same separate album reports in their parent folder. Audio files are grouped by directory; numbered `CD`, `Disc` and `Disk` subfolders share their parent album. This filesystem grouping does not use tags. `--json-layout` enables saving and cannot be combined with `--json PATH` or `--analysis`.
 
 Even without saving, existing FlacCompagnon reports beside albums or in their parent folders can supply successful results. Files absent from reports, changed files and previous errors are analyzed. Reports are snapshots checked by path, size and modification time; use `--force` if those metadata stayed unchanged despite an audio edit or to recompute with a newer engine. `--analysis` also enables terminal results and filters their fields.
 

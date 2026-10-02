@@ -3,7 +3,7 @@
 use crate::args::Args;
 use flaccompagnon_core::{decode::FlacMd5Status, FileAnalysis};
 
-fn flac_md5_label(status: Option<&FlacMd5Status>) -> String {
+pub(crate) fn flac_md5_label(status: Option<&FlacMd5Status>) -> String {
     let Some(status) = status else {
         return "N/A".to_string();
     };
@@ -13,7 +13,6 @@ fn flac_md5_label(status: Option<&FlacMd5Status>) -> String {
 }
 
 pub(crate) fn display(file: &FileAnalysis, args: &Args) {
-    println!("{}", file.path);
     if let Some(error) = &file.error {
         println!("  Error: {error}");
         return;

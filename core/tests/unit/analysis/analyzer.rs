@@ -41,3 +41,39 @@ fn dr_of_silence_is_none() {
     let summary = a.finish(44_100, None);
     assert!(summary.dr_db.is_none());
 }
+
+#[test]
+fn loudness_with_md5_constructs_and_runs_only_the_loudness_meter() {
+    let selection = crate::AnalysisSelection::from_names(["loudness", "flac-md5"]).expect("names");
+    let mut analyzer = StreamAnalyzer::new_selected(2, 44_100, selection);
+    assert!(analyzer.loudness.is_some());
+    assert!(analyzer.fft.is_none() && analyzer.hann.is_empty() && analyzer.power_acc.is_empty());
+    assert!(analyzer.mdct.is_none() && analyzer.mdct_scratch.is_empty());
+    assert!(analyzer.true_peak.is_none() && analyzer.bit_depth.is_none());
+    assert!(analyzer.discontinuities.is_none() && analyzer.local_phase.is_none());
+    assert!(analyzer.high_frequency_stereo.is_none() && analyzer.dc_offset.is_none());
+    for i in 0..176_400 {
+        let sample = (2.0 * std::f32::consts::PI * 1_000.0 * i as f32 / 44_100.0).sin() * 0.1;
+        analyzer.push_frame(&[sample, sample], Some(&[123, 123]));
+    }
+    assert_eq!(analyzer.window_count, 0);
+    assert_eq!(analyzer.mdct_hop, 0);
+    assert_eq!(analyzer.dyn_block_frames, 0);
+    assert_eq!(analyzer.l_energy, 0.0);
+    let summary = analyzer.finish(44_100, Some(16));
+    assert!(summary.integrated_lufs.is_some());
+    assert!(summary.spectrum_db.is_empty());
+    assert!(summary.real_bit_depth.is_none());
+    assert_eq!(summary.clipping.peak, 0.0);
+}
+
+#[test]
+fn three_measurements_do_not_construct_other_meters() {
+    let selection = crate::AnalysisSelection::from_names(["bit-depth", "phase", "fingerprints"])
+        .expect("names");
+    let analyzer = StreamAnalyzer::new_selected(2, 44_100, selection);
+    assert!(analyzer.bit_depth.is_some() && analyzer.local_phase.is_some());
+    assert!(analyzer.loudness.is_none() && analyzer.true_peak.is_none());
+    assert!(analyzer.fft.is_none() && analyzer.mdct.is_none());
+    assert!(analyzer.high_frequency_stereo.is_none() && analyzer.discontinuities.is_none());
+}

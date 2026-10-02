@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { loadTypeScript } from "./load-typescript.mjs";
 
-const { fileSearchFields, matchesSearch } = await loadTypeScript(new URL("../src/format.ts", import.meta.url));
+const { analysisWasRun, fileSearchFields, matchesSearch } = await loadTypeScript(new URL("../src/format.ts", import.meta.url));
 
 const sampleFile = {
   file_name: "Untitled.flac",
@@ -24,6 +24,15 @@ const sampleFile = {
   file_crc32: null,
   error: null,
 };
+
+test("partial reports do not advertise unmeasured clipping as clear", () => {
+  const partial = { ...sampleFile, analyses_run: ["bit-depth"], clipping: { clipped: false, true_peak_dbtp: null } };
+  assert.equal(analysisWasRun(partial, "bit-depth"), true);
+  assert.equal(analysisWasRun(partial, "clipping"), false);
+  assert.equal(analysisWasRun(sampleFile, "clipping"), true);
+  assert.equal(matchesSearch(fileSearchFields(partial), "no clipping"), false);
+  assert.equal(matchesSearch(fileSearchFields(sampleFile), "no clipping"), true);
+});
 
 test("a full name cannot be assembled from unrelated fields", () => {
   assert.equal(matchesSearch(["Zakk", "Wylde"], "Zakk Wylde"), false);

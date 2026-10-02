@@ -39,17 +39,13 @@ use crate::AnalysisError;
 /// and a discarded output to serve this caller. The two share a library, not
 /// a reason to change.
 pub fn decode_flac_to_pcm(path: &Path) -> Result<crate::decode::PcmAudio, AnalysisError> {
-    let mut reader = claxon::FlacReader::open(path)
-        .map_err(|e| AnalysisError::Decode(format!("flac open failed: {e}")))?;
+    let mut reader = open_flac(path)?;
     let info = reader.streaminfo();
     let (sample_rate, channels, bits) = (
         info.sample_rate,
         info.channels as usize,
         info.bits_per_sample,
     );
-    if sample_rate == 0 || channels == 0 || bits == 0 || bits > 32 {
-        return Err(AnalysisError::Decode("invalid FLAC stream info".into()));
-    }
     let scale = 1.0f32 / (1u64 << (bits - 1)) as f32;
 
     let mut samples: Vec<f32> = Vec::new();
@@ -104,17 +100,82 @@ pub fn decode_and_analyze_flac(
     path: &Path,
     verify_md5: bool,
 ) -> Result<(DecodeOutcome, FlacMd5Status), AnalysisError> {
-    let mut reader = claxon::FlacReader::open(path)
+    decode_and_analyze_flac_selected(path, verify_md5, crate::AnalysisSelection::all())
+}
+
+pub(crate) fn decode_and_analyze_flac_selected(
+    path: &Path,
+    verify_md5: bool,
+    selection: crate::AnalysisSelection,
+) -> Result<(DecodeOutcome, FlacMd5Status), AnalysisError> {
+    let decoded = decode_flac(path, verify_md5, Some(selection))?;
+    let analyzer = decoded.analyzer.ok_or_else(|| {
+        AnalysisError::Decode("FLAC analysis did not produce measurements".into())
+    })?;
+    Ok((
+        DecodeOutcome {
+            format: "FLAC".to_string(),
+            codec: None,
+            sample_rate: decoded.sample_rate,
+            channels: decoded.channels,
+            declared_bits: Some(decoded.bits),
+            duration_secs: decoded.duration_secs,
+            analyzer,
+        },
+        decoded.md5,
+    ))
+}
+
+/// Verify only the decoded FLAC audio signature, without spectral analysis or
+/// whole-file fingerprints. Missing signatures still require a successful decode.
+pub fn verify_flac_md5(path: &Path, verify: bool) -> Result<FlacMd5Status, AnalysisError> {
+    Ok(decode_flac(path, verify, None)?.md5)
+}
+
+/// Inspect the stored FLAC MD5 without decoding. `Present` is not proof of
+/// integrity; callers must still verify every frame before reporting a match.
+pub fn flac_md5_signature(path: &Path) -> Result<FlacMd5Status, AnalysisError> {
+    let reader = open_flac(path)?;
+    Ok(if reader.streaminfo().md5sum == [0; 16] {
+        FlacMd5Status::NoSignature
+    } else {
+        FlacMd5Status::Present
+    })
+}
+
+fn open_flac(path: &Path) -> Result<claxon::FlacReader<std::fs::File>, AnalysisError> {
+    let reader = claxon::FlacReader::open(path)
         .map_err(|e| AnalysisError::Decode(format!("flac open failed: {e}")))?;
+    let info = reader.streaminfo();
+    if info.sample_rate == 0
+        || info.channels == 0
+        || info.bits_per_sample == 0
+        || info.bits_per_sample > 32
+    {
+        return Err(AnalysisError::Decode("invalid FLAC stream info".into()));
+    }
+    Ok(reader)
+}
+
+struct FlacDecoded {
+    sample_rate: u32,
+    channels: usize,
+    bits: u32,
+    duration_secs: f64,
+    analyzer: Option<StreamAnalyzer>,
+    md5: FlacMd5Status,
+}
+
+fn decode_flac(
+    path: &Path,
+    verify_md5: bool,
+    selection: Option<crate::AnalysisSelection>,
+) -> Result<FlacDecoded, AnalysisError> {
+    let mut reader = open_flac(path)?;
     let info = reader.streaminfo();
     let sample_rate = info.sample_rate;
     let channels = info.channels as usize;
     let bits = info.bits_per_sample;
-    // Guards the shifts and the per-sample byte width below; a STREAMINFO
-    // claiming 0 or > 32 bits is either corrupt or hostile.
-    if sample_rate == 0 || channels == 0 || bits == 0 || bits > 32 {
-        return Err(AnalysisError::Decode("invalid FLAC stream info".into()));
-    }
     let total_frames_hint = info.samples;
     let stored = info.md5sum;
     let has_signature = stored != [0u8; 16];
@@ -123,7 +184,8 @@ pub fn decode_and_analyze_flac(
     let bytes_per_sample = bits.div_ceil(8) as usize;
     let mut hasher = (has_signature && verify_md5).then(Md5::new);
 
-    let mut analyzer = StreamAnalyzer::new(channels, sample_rate);
+    let mut analyzer =
+        selection.map(|selection| StreamAnalyzer::new_selected(channels, sample_rate, selection));
     let mut frame_f32 = vec![0.0f32; channels];
     let mut frame_i32 = vec![0i32; channels];
     let mut byte_row: Vec<u8> = Vec::new();
@@ -146,14 +208,18 @@ pub fn decode_and_analyze_flac(
         for t in 0..n {
             for c in 0..channels {
                 let s = block_sample(&block, c, t)?;
-                frame_i32[c] = s;
-                frame_f32[c] = s as f32 * scale;
+                if selection.is_some() {
+                    frame_i32[c] = s;
+                    frame_f32[c] = s as f32 * scale;
+                }
                 if hasher.is_some() {
                     let le = (s as u32).to_le_bytes();
                     byte_row.extend_from_slice(&le[..bytes_per_sample]);
                 }
             }
-            analyzer.push_frame(&frame_f32, Some(&frame_i32));
+            if let Some(analyzer) = &mut analyzer {
+                analyzer.push_frame(&frame_f32, Some(&frame_i32));
+            }
             frame_count += 1;
         }
         if let Some(h) = &mut hasher {
@@ -181,18 +247,14 @@ pub fn decode_and_analyze_flac(
         .map(|n| n as f64 / sample_rate as f64)
         .unwrap_or(frame_count as f64 / sample_rate as f64);
 
-    Ok((
-        DecodeOutcome {
-            format: "FLAC".to_string(),
-            codec: None, // container already says everything this field would
-            sample_rate,
-            channels,
-            declared_bits: Some(bits),
-            duration_secs,
-            analyzer,
-        },
-        md5_status,
-    ))
+    Ok(FlacDecoded {
+        sample_rate,
+        channels,
+        bits,
+        duration_secs,
+        analyzer,
+        md5: md5_status,
+    })
 }
 
 fn validate_block_channels(

@@ -15,6 +15,7 @@ indicatif = "0.18"
 flaccompagnon-core = { path = "../core" }
 
 [dev-dependencies]
+flacenc = "0.5"
 indicatif = { version = "0.18", features = ["in_memory"] }
 tempfile = "3"
 hound = "3"
