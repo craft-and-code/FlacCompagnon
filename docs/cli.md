@@ -77,7 +77,9 @@ flaccompagnon "Music/Album" -a clipping,clicks,dropouts
 flaccompagnon "Music/Album" --json "Music/Album/FlacCompagnon.json"
 ```
 
-`--json` requires a **file path**, not just a folder or a flag. The parent folder must already exist. Valid measurements in existing reports are reused when audio size and modification time agree. Add `--force` to reanalyze and replace the chosen report. A malformed destination requires `--force`. This command produces one report covering all selected audio files; use `--json-layout album` or `--json-layout artist` to split several albums into separate reports.
+`--json` requires a **file path with a `.json` extension**, not just a folder or a flag. The parent folder must already exist. Valid measurements in existing reports are reused when audio size and modification time agree. Add `--force` to reanalyze and replace the chosen report. A malformed destination requires `--force`. This command produces one report covering all selected audio files; use `--json-layout album` or `--json-layout artist` to split several albums into separate reports.
+
+Symbolic links and special files are refused as destinations, even with `--force`. Reports are replaced atomically, so a failed write does not truncate the previous report. Imports accept regular files up to 64 MiB; unusable neighbouring JSON files are skipped during cache discovery.
 
 The schema is the desktop app's complete, versioned `flaccompagnon-report` format. Drop the JSON onto the desktop results list to reopen the saved analysis without re-decoding the audio. A report is a snapshot: it does not update itself after audio is edited, and saved paths can become stale when files move. See [file fingerprints](fingerprints.md) for identity and relocation limits.
 

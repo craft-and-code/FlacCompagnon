@@ -67,3 +67,47 @@ fn benign_material_matches_sample_peak() {
     let ratio = tp.peak() / sample_peak;
     assert!((0.98..=1.05).contains(&ratio), "ratio {ratio}");
 }
+
+#[test]
+fn final_samples_receive_the_full_reconstruction_filter() {
+    // Independent zero-stuffing/convolution reference: derive the Blackman
+    // sinc kernel, rather than reusing the production polyphase tap table.
+    let mut taps: Vec<f64> = (0..48)
+        .map(|k| {
+            let x = (k as f64 - 23.5) / 4.0;
+            let sinc = (std::f64::consts::PI * x).sin() / (std::f64::consts::PI * x);
+            let phase = std::f64::consts::TAU * k as f64 / 47.0;
+            sinc * (0.42 - 0.5 * phase.cos() + 0.08 * (2.0 * phase).cos())
+        })
+        .collect();
+    for phase in 0..4 {
+        let gain: f64 = taps.iter().skip(phase).step_by(4).sum();
+        for tap in taps.iter_mut().skip(phase).step_by(4) {
+            *tap /= gain;
+        }
+    }
+    let samples = [0.9f64, 0.9];
+    let mut reconstructed = vec![0.0f64; 4 * samples.len() + taps.len()];
+    for (frame, sample) in samples.iter().enumerate() {
+        for (tap, weight) in taps.iter().enumerate() {
+            reconstructed[frame * 4 + tap] += sample * weight;
+        }
+    }
+    let reference = reconstructed.iter().map(|s| s.abs()).fold(0.0f64, f64::max);
+    assert!(reference > 1.09);
+
+    let mut meter = TruePeak::new(1);
+    for sample in samples {
+        meter.push_frame(&[sample as f32]);
+    }
+    meter.flush_tail();
+    assert!((f64::from(meter.peak()) - reference).abs() < 0.0002);
+}
+
+#[test]
+fn true_peak_never_underreports_a_stored_impulse() {
+    let mut meter = TruePeak::new(1);
+    meter.push_frame(&[1.0]);
+    meter.flush_tail();
+    assert!(meter.peak() >= 1.0);
+}

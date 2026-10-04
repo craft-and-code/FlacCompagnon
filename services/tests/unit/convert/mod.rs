@@ -43,3 +43,29 @@ fn dsd_is_rejected_without_decoding() {
     assert!(matches!(err, ConvertError::Unsupported(_, _)), "{err:?}");
     assert!(!dest.exists());
 }
+
+#[test]
+fn converting_a_file_onto_itself_cannot_destroy_the_source() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("source.wav");
+    let spec = hound::WavSpec {
+        channels: 1,
+        sample_rate: 44_100,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let mut writer = hound::WavWriter::create(&source, spec).unwrap();
+    for sample in [0i16, 100, -100, 0] {
+        writer.write_sample(sample).unwrap();
+    }
+    writer.finalize().unwrap();
+    let original = std::fs::read(&source).unwrap();
+    let settings = ConvertSettings {
+        format: ConvertFormat::Wav,
+        bitrate_kbps: None,
+        flac_effort: FlacEffort::default(),
+        preserve_modtime: false,
+    };
+    assert!(convert_file(&source, &source, &settings, &|| false).is_err());
+    assert_eq!(std::fs::read(&source).unwrap(), original);
+}

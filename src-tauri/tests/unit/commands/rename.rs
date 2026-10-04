@@ -51,3 +51,11 @@ fn rejects_dot_and_dotdot() {
     assert!(validate_stem(".").is_err());
     assert!(validate_stem("..").is_err());
 }
+
+#[cfg(windows)]
+#[test]
+fn rejects_a_drive_prefix_that_would_replace_the_original_parent() {
+    for stem in ["C:track", "D:other", "track:stream"] {
+        assert!(validate_stem(stem).is_err());
+    }
+}

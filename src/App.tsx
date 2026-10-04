@@ -73,7 +73,7 @@ export function App() {
   const spectrogram = useSpectrogramSize();
 
   const cache = useTagCache();
-  const { clear: clearCache, invalidate } = cache;
+  const { clear: clearCache, invalidate, retain: retainCache } = cache;
 
   // Selection and caches follow the file list: a row that no longer exists
   // can't stay selected, and a cleared list drops its cached tags entirely.
@@ -91,6 +91,7 @@ export function App() {
     () => analysis.orderedFiles.map((f) => f.path),
     [analysis.orderedFiles],
   );
+  useEffect(() => retainCache(new Set(orderedPaths)), [orderedPaths, retainCache]);
   // Whether the listed files are still on disk. Frontend-only and never
   // exported — see useMissingFiles.ts for why it stays out of `FileAnalysis`.
   const presence = useMissingFiles({
@@ -336,6 +337,10 @@ export function App() {
     },
   });
   useConvertProgress(convert.updateProgress);
+  // Pointer overlays do not intercept native menu events or keyboard input.
+  // All entry points share the toolbar's availability state.
+  const appBusy = analysis.busy || convert.busy;
+  const shortcutOptions = { enabled: !appBusy };
 
   // Fires once per batch, on the busy -> idle transition (success, failure,
   // or cancel all end up here the same way, via `useConvertPanel`'s own
@@ -366,7 +371,7 @@ export function App() {
     report: analysis.report,
     orderedFiles: analysis.orderedFiles,
     targets: analysis.targets,
-    busy: analysis.busy,
+    busy: appBusy,
     tags: cache.tags,
     onToast: showToast,
   });
@@ -407,7 +412,7 @@ export function App() {
     }),
     [exports, analysis, playback, spectrogram.setSize],
   );
-  useMenuActions(menuActions);
+  useMenuActions(menuActions, !appBusy);
 
   const pickFolder = useCallback(async () => {
     const dir = await open({ directory: true, multiple: false });
@@ -444,7 +449,7 @@ export function App() {
     if (selection.selectedPaths.length === 0) return;
     ev.preventDefault();
     deleteSelected();
-  });
+  }, shortcutOptions);
 
   // Up/Down move the selection one row through the *displayed* order, so the
   // keyboard follows the search filter and any manual drag-reorder rather
@@ -483,7 +488,7 @@ export function App() {
     });
     // Offscreen rows need not have a DOM node: the table knows their offsets.
     resultsTableRef.current?.scrollToPath(path);
-  });
+  }, shortcutOptions);
 
   // Ctrl/Cmd+A selects every track; Ctrl/Cmd+Shift+A — there's no single
   // conventional shortcut for "deselect all", but Shift reversing a
@@ -498,7 +503,7 @@ export function App() {
     ev.preventDefault();
     if (ev.shiftKey) guardedDeselectAll();
     else guardedSelectAll();
-  });
+  }, shortcutOptions);
 
   const onPlaylistConfirm = useCallback(
     (format: PlaylistFormat) => {
@@ -578,7 +583,7 @@ export function App() {
   return (
     <div id="app">
       <TopBar
-        busy={analysis.busy}
+        busy={appBusy}
         hasReport={hasResults}
         canGenerateSpectrograms={analysis.targets.length > 0}
         ffmpegAvailable={ffmpegAvailable}

@@ -6,6 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: ubuntu-22.04
@@ -42,11 +45,23 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install frontend dependencies
-        run: npm install
+        run: npm ci
+
+      - name: Audit frontend dependencies
+        run: npm audit
+
+      - name: Install Rust dependency auditor
+        run: cargo install cargo-audit --locked --version 0.22.2
+
+      - name: Audit Rust dependencies
+        run: cargo audit
+
+      - name: Rust formatting
+        run: cargo fmt --all --check
 
       # `--workspace`, not `-p flaccompagnon-core`: the Tauri crate has unit
       # tests of its own (path validation in `commands/rename.rs`, the worker
@@ -55,9 +70,9 @@ jobs:
       # compile `#[cfg(test)]` code, so they were only ever exercised on the
       # maintainer's machine.
       - name: Unit + integration tests (whole workspace)
-        run: cargo test --workspace --verbose
+        run: cargo test --workspace --locked --verbose
 
-      # CLAUDE.md requires clippy to be clean, warnings included — but nothing
+      # AGENTS.md requires clippy to be clean, warnings included — but nothing
       # enforced it here, so the rule rested entirely on remembering to run it.
       # `--all-targets` matters as much as the step itself: plain `cargo
       # clippy` skips everything under `#[cfg(test)]`, which in a repo that
@@ -70,7 +85,7 @@ jobs:
       # question, a scoped `#[allow]` with a comment — never to quietly drop
       # this flag.
       - name: Lints (clippy, tests included)
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       - name: Build frontend (typecheck + bundle)
         run: npm run build
@@ -78,11 +93,19 @@ jobs:
       - name: AppImage packaging regression tests
         run: python3 -m unittest discover -s tests -p "appimage*_test.py"
 
-      - name: Search regression tests
-        run: npm run test:search
+      - name: Frontend and site regression tests
+        run: npm test
 
-      - name: Table window regression tests
-        run: npm run test:table
+      - name: Documentation formatting
+        run: npm run check:markdown
+
+      - name: Build and validate documentation site
+        run: npm run build:site
+
+      - name: Build API documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --locked --no-deps
 
       - name: Compile the whole workspace (core, services, CLI, desktop)
-        run: cargo build --workspace
+        run: cargo build --workspace --locked

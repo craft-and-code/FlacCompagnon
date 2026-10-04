@@ -1,6 +1,30 @@
 # Frontend regressions
 
-Run `npm run test:search` and `npm run test:table` for the pure logic checks.
+Run `npm test` for the complete JavaScript regression suite (frontend and site).
+It includes search, table windowing, analysis cells, detection labels, stereo
+labels and asynchronous state. `npm run test:search` and `npm run test:table`
+remain available for focused checks.
+
+Native menu and keyboard routing tests verify that the toolbar's unavailable
+state also prevents Reset, exports and table shortcuts during backend tasks,
+while preserving keyboard ownership for text fields and modal dialogs.
+
+The asynchronous state tests control the completion order of backend reads.
+They cover stale tag/cover responses after save, reset or removal; completed
+saves that must not refetch removed rows; initial prefetch after import; overlapping
+filesystem checks; delayed playback/lookup responses; edits made during a save;
+cover drops across selection changes; storage failures; and duplicate column
+preferences. They use the production state controllers without
+an audio device, network access or a Tauri runtime.
+
+Run `node tests/benchmark-row-reorder.mjs` from the repository root to compare
+the pre-audit row reorder logic with the production helpers. The synthetic
+case has 10,000 paths, 5,000 selected paths, one warmup and ten measured
+iterations. It checks that both versions produce the same order and reports
+their mean durations. One local run measured 201.8 ms before and 0.79 ms after
+replacing repeated array membership scans with sets. These numbers describe
+the reorder logic alone; they exclude React rendering, native drag events,
+audio reads and IPC, and do not predict desktop interaction latency.
 
 For browser performance and interaction checks, run
 `node tests/build-table-performance.mjs`, then serve the printed temporary

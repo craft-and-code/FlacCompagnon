@@ -20,6 +20,8 @@ Each row represents one track. Visible columns can show the format, sample rate,
 
 > **On-screen cue:** use the small magnifier on a row to reveal the file in Finder or Explorer. The nearby play button starts that track.
 
+To rename a track, select its row, then click its name again. **Enter** applies the new name while keeping the extension; **Escape** cancels. Renaming never replaces an existing destination.
+
 To understand a column, open its article in [Analyses](index.md). Every article explains what the measurement observes and its limitations.
 
 ## Edit tags and artwork
@@ -34,6 +36,10 @@ Artwork follows the role chosen in the list beneath the cover, such as _Front co
 - use the export button below the image to extract it next to the audio files;
 - use the trash button to stage its deletion.
 
+Local and embedded artwork is limited to 12 MiB and 64 megapixels. Resize an oversized image before adding it.
+
+Image headers must provide valid dimensions. Classic TIFF is supported; BigTIFF, TIFF files with SubIFDs and BMP files wrapping JPEG/PNG are refused. This checks image geometry without decoding the complete raster.
+
 Changes remain pending until you select **Save**. **Reset** only cancels pending changes.
 
 ## Convert a selection
@@ -44,13 +50,13 @@ Drop files or a folder directly on this panel to make an independent conversion 
 
 Choose the output format, then the options available for it. Lossy formats expose a bitrate; FLAC exposes encoding effort. **Also copy other files** keeps covers, playlists and other non-audio files alongside the converted tracks.
 
-When the list and settings are right, select **Convert** and choose a destination folder. FlacCompagnon leaves the analysis list intact: conversion does not erase or replace the originals.
+When the list and settings are right, select **Convert** and choose a destination folder. FlacCompagnon leaves the analysis list intact: conversion does not erase or replace the originals. Choose an empty folder for a new conversion: existing output files are preserved, duplicate output names are rejected and symbolic links cannot redirect output outside the chosen folder. **Also copy other files** also preserves existing outputs and skips the output folder when it is inside the source folder.
 
 ## Listen to a track
 
 The bottom bar is the player. Click a row’s play button, or select tracks and use the main button in the bar.
 
-Previous and next follow the selection when there is one. Without a selection, they follow the currently displayed list. Use the slider for volume and the progress bar to move through the track.
+The playback queue is captured when playback starts: several selected tracks play in display order; one selected track starts there and continues down the list; no selection starts at the top. Changing the selection while playing does not change that queue. Previous and next follow the captured queue. Use the slider for volume and the progress bar to move through the track.
 
 Listening is particularly useful after a finding: locate the section an analysis highlights, then compare it with what you actually hear.
 
@@ -65,3 +71,7 @@ Enter several words to keep tracks containing each word in one piece of informat
 Use **Save…** to save a report. The JSON keeps analysis results and the displayed track order; you can drop it back into FlacCompagnon later without running the analysis again.
 
 For automated use, see [Using the CLI](cli.md). It provides the same analyses from a terminal and can write the same JSON format.
+
+Imported reports must be regular files no larger than 64 MiB. Report, playlist and artwork exports replace their destination atomically and reject symbolic links.
+
+If tracks are missing, use the presence check, then the **Locate** folder button that appears, to search another folder. Matching uses file names and folder suffixes, not audio fingerprints; equal-ranking candidates remain missing. Reanalyze relocated files before trusting their old measurements.

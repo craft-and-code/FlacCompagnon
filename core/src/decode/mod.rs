@@ -35,6 +35,8 @@ pub mod probe;
 pub mod stream;
 
 use crate::analysis::analyzer::StreamAnalyzer;
+use std::ffi::OsStr;
+use std::process::Command;
 
 pub(crate) use dsd::decode_and_analyze_dsd_selected;
 pub(crate) use flac::decode_and_analyze_flac_selected;
@@ -47,6 +49,17 @@ pub use flac_md5::FlacMd5Status;
 pub use playback::{decode_to_pcm, PcmAudio, PcmStreamDecoder};
 pub use probe::{probe_info, BasicInfo};
 pub use stream::decode_and_analyze;
+
+/// Start an FFmpeg command restricted to local files and pipes.
+///
+/// Container probing can otherwise follow embedded network references even
+/// when its initial input is a local file. Analysis and spectrogram callers
+/// share this restriction, then append their own input/output arguments.
+pub fn local_ffmpeg_command(program: impl AsRef<OsStr>) -> Command {
+    let mut command = Command::new(program);
+    command.args(["-protocol_whitelist", "file,pipe"]);
+    command
+}
 
 /// Result of decoding a file: metadata plus a fully-fed analyzer ready for
 /// [`StreamAnalyzer::finish`].

@@ -89,6 +89,66 @@ fn lowercase_v_shows_version() {
 }
 
 #[test]
+fn json_destination_cannot_replace_audio_even_with_force() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = dir.path().join("track.wav");
+    silent_audio(&audio);
+    let original = std::fs::read(&audio).unwrap();
+    let result = run(&["--json", audio.to_str().unwrap(), "--force"], &audio);
+    assert_eq!(result.status.code(), Some(2));
+    assert_eq!(std::fs::read(&audio).unwrap(), original);
+}
+
+#[cfg(unix)]
+#[test]
+fn json_destination_cannot_follow_a_symlink_even_with_force() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = dir.path().join("track.wav");
+    let destination = dir.path().join("report.json");
+    silent_audio(&audio);
+    let original = std::fs::read(&audio).unwrap();
+    std::os::unix::fs::symlink(&audio, &destination).unwrap();
+    let result = run(
+        &["--json", destination.to_str().unwrap(), "--force"],
+        &audio,
+    );
+    assert_eq!(result.status.code(), Some(1));
+    assert!(!String::from_utf8_lossy(&result.stderr).contains("Analyzing "));
+    assert_eq!(std::fs::read(&audio).unwrap(), original);
+}
+
+#[test]
+fn reused_results_still_update_an_export_when_the_requested_files_change() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = dir.path().join("first.wav");
+    let second = dir.path().join("second.wav");
+    let destination = dir.path().join("report.json");
+    silent_audio(&first);
+    silent_audio(&second);
+    let options = ["--json", destination.to_str().unwrap()];
+    assert!(run(&options, dir.path()).status.success());
+    let result = run(&options, &first);
+    assert!(result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("Reusing "));
+    let saved = report::read_json(&destination).unwrap();
+    assert_eq!(saved.files.len(), 1);
+    assert_eq!(saved.files[0].path, first.to_string_lossy());
+}
+
+#[test]
+fn oversized_unrelated_json_does_not_prevent_audio_analysis() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = dir.path().join("track.wav");
+    silent_audio(&audio);
+    std::fs::File::create(dir.path().join("large.json"))
+        .unwrap()
+        .set_len(report::MAX_JSON_BYTES + 1)
+        .unwrap();
+    let result = run(&["-a", "flac-md5"], &audio);
+    assert!(result.status.success());
+}
+
+#[test]
 fn saved_results_are_reused_until_force_or_audio_changes() {
     let dir = tempfile::tempdir().unwrap();
     let album = dir.path().join("Album");

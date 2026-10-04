@@ -27,7 +27,6 @@
 import { useEffect, useState } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 
-import type { CoverArt } from "../types";
 import * as api from "../api";
 import { IMAGE_EXT_LIST, isAudioPath, isImagePath } from "../format";
 import { dropZoneAt, isInsideViewport, type DropZoneKind } from "./dropZones";
@@ -153,14 +152,12 @@ export function useNativeDrop({
               );
               return;
             }
-            tagPanelRef.current?.setCoverLoading(true);
+            const panel = tagPanelRef.current;
+            if (!panel) return;
             try {
-              const cover: CoverArt = await api.readCoverImage(paths[0]);
-              tagPanelRef.current?.stageCover(cover);
+              await panel.importCover(api.readCoverImage(paths[0]));
             } catch (e) {
               onToast(String(e), "error");
-            } finally {
-              tagPanelRef.current?.setCoverLoading(false);
             }
             return;
           }

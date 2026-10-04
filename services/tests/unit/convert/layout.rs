@@ -13,7 +13,8 @@ fn mirrors_the_source_structure_under_the_new_root() {
         src("/music/Album/01 track.mp3", "/music"),
         src("/music/Album/Disc 2/02 track.mp3", "/music"),
     ];
-    let got = plan_batch(&sources, Path::new("/export"), ConvertFormat::Flac);
+    let got =
+        plan_batch(&sources, Path::new("/export"), ConvertFormat::Flac).expect("valid output plan");
     assert_eq!(
         got,
         vec![
@@ -34,7 +35,8 @@ fn a_dropped_folder_survives_even_when_it_holds_a_single_album() {
         src("/music/Band/Album/01.flac", "/music"),
         src("/music/Band/Album/02.flac", "/music"),
     ];
-    let got = plan_batch(&sources, Path::new("/export"), ConvertFormat::Opus);
+    let got =
+        plan_batch(&sources, Path::new("/export"), ConvertFormat::Opus).expect("valid output plan");
     assert_eq!(
         got,
         vec![
@@ -53,7 +55,8 @@ fn unrelated_drops_do_not_grow_a_shared_prefix() {
         src("/music/A/01.flac", "/music"),
         src("/elsewhere/B/01.flac", "/elsewhere"),
     ];
-    let got = plan_batch(&sources, Path::new("/export"), ConvertFormat::Mp3);
+    let got =
+        plan_batch(&sources, Path::new("/export"), ConvertFormat::Mp3).expect("valid output plan");
     assert_eq!(
         got,
         vec![
@@ -68,14 +71,16 @@ fn unrelated_drops_do_not_grow_a_shared_prefix() {
 #[test]
 fn dropped_files_land_flat_in_the_destination() {
     let sources = vec![src("/music/Album/01 track.flac", "/music/Album")];
-    let got = plan_batch(&sources, Path::new("/export"), ConvertFormat::Wav);
+    let got =
+        plan_batch(&sources, Path::new("/export"), ConvertFormat::Wav).expect("valid output plan");
     assert_eq!(got, vec![PathBuf::from("/export/01 track.wav")]);
 }
 
 #[test]
 fn falls_back_to_the_file_name_for_a_path_outside_its_base() {
     let sources = vec![src("/elsewhere/loose.wav", "/music/Album")];
-    let got = plan_batch(&sources, Path::new("/export"), ConvertFormat::Wav);
+    let got =
+        plan_batch(&sources, Path::new("/export"), ConvertFormat::Wav).expect("valid output plan");
     assert_eq!(got, vec![PathBuf::from("/export/loose.wav")]);
 }
 
@@ -167,4 +172,94 @@ fn overlapping_drops_copy_each_file_once() {
     // The outermost base wins, so the dropped `Band` folder survives.
     assert_eq!(covers[0], &out.join("Band/Album/cover.jpg"));
     assert!(!out.join("Album/cover.jpg").exists());
+}
+
+#[test]
+fn parent_traversal_cannot_escape_the_output_root() {
+    let sources = vec![src("/music/../outside.wav", "/music")];
+    assert!(plan_batch(&sources, Path::new("/export"), ConvertFormat::Flac).is_err());
+}
+
+#[test]
+fn sources_with_the_same_output_name_are_rejected() {
+    let sources = vec![
+        src("/music/track.wav", "/music"),
+        src("/music/track.mp3", "/music"),
+    ];
+    assert!(plan_batch(&sources, Path::new("/export"), ConvertFormat::Flac).is_err());
+}
+
+#[test]
+fn passthrough_does_not_recurse_into_output_inside_input() {
+    let dir = tempfile::tempdir().unwrap();
+    let music = dir.path().join("music");
+    let output = music.join("export");
+    std::fs::create_dir_all(&output).unwrap();
+    std::fs::write(music.join("track.wav"), b"audio").unwrap();
+    std::fs::write(music.join("cover.jpg"), b"cover").unwrap();
+    std::fs::write(output.join("earlier.txt"), b"prior output").unwrap();
+    let sources = vec![ConvertSource {
+        path: music.join("track.wav"),
+        base: music,
+    }];
+    assert_eq!(
+        passthrough_files(&sources, &output).unwrap(),
+        vec![output.join("cover.jpg")]
+    );
+    assert!(!output.join("export").exists());
+}
+
+#[test]
+fn passthrough_cannot_overwrite_a_converted_track() {
+    let dir = tempfile::tempdir().unwrap();
+    let music = dir.path().join("music");
+    let output = dir.path().join("output");
+    std::fs::create_dir_all(&music).unwrap();
+    std::fs::create_dir_all(&output).unwrap();
+    std::fs::write(music.join("track.wav"), b"source").unwrap();
+    std::fs::write(music.join("track.flac"), b"neighbour").unwrap();
+    std::fs::write(output.join("track.flac"), b"converted audio").unwrap();
+    let sources = vec![ConvertSource {
+        path: music.join("track.wav"),
+        base: music,
+    }];
+    assert!(passthrough_files(&sources, &output).unwrap().is_empty());
+    assert_eq!(
+        std::fs::read(output.join("track.flac")).unwrap(),
+        b"converted audio"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn conversion_output_cannot_escape_through_a_descendant_symlink() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("output");
+    let outside = dir.path().join("outside");
+    std::fs::create_dir_all(&out).unwrap();
+    std::fs::create_dir_all(&outside).unwrap();
+    std::os::unix::fs::symlink(&outside, out.join("Album")).unwrap();
+    let sources = vec![src("/music/Album/track.wav", "/music")];
+    assert!(plan_batch(&sources, &out, ConvertFormat::Flac).is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn passthrough_output_cannot_escape_through_a_descendant_symlink() {
+    let dir = tempfile::tempdir().unwrap();
+    let music = dir.path().join("music");
+    let out = dir.path().join("output");
+    let outside = dir.path().join("outside");
+    std::fs::create_dir_all(music.join("Album")).unwrap();
+    std::fs::create_dir_all(&out).unwrap();
+    std::fs::create_dir_all(&outside).unwrap();
+    std::fs::write(music.join("Album/track.wav"), b"audio").unwrap();
+    std::fs::write(music.join("Album/cover.png"), b"cover").unwrap();
+    std::os::unix::fs::symlink(&outside, out.join("Album")).unwrap();
+    let sources = vec![ConvertSource {
+        path: music.join("Album/track.wav"),
+        base: music,
+    }];
+    assert!(passthrough_files(&sources, &out).is_err());
+    assert!(!outside.join("cover.png").exists());
 }

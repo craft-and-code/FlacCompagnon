@@ -15,6 +15,7 @@ import * as api from "../api";
 import type { TagFieldValue } from "./TagField";
 import { TAG_TEXT_FIELDS, type TagTextField } from "./tagLayout";
 import { compilationValue, fieldValues } from "./tagSelection";
+import { DraftRevision } from "./draftRevision";
 
 /// A `TagEdits` where every field is "Unset" (untouched) — the starting point
 /// for any write that only means to touch a couple of fields, rather than
@@ -64,15 +65,15 @@ export function useTagEditor({ paths, tagSets, onSaved, onToast }: UseTagEditorA
   // header comment), so this buffer is what actually reaches Save/Reset.
   const [extraEdits, setExtraEditsState] = useState<Record<string, FieldEdit>>({});
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   // Selecting different files discards whatever was half-typed for the
   // previous ones. Without this the buffer would survive the selection change
   // and Save would write it to files the user never edited — the exact
   // clobbering the "only send what was touched" design exists to prevent.
-  const selectionKey = paths.join("|");
-  const lastSelection = useRef(selectionKey);
-  if (lastSelection.current !== selectionKey) {
-    lastSelection.current = selectionKey;
+  const selectionKey = JSON.stringify(paths);
+  const revision = useRef(new DraftRevision(selectionKey));
+  if (revision.current.setScope(selectionKey)) {
     setEdits({});
     setCompilationEdit(null);
     setPictureEdits({});
@@ -102,16 +103,19 @@ export function useTagEditor({ paths, tagSets, onSaved, onToast }: UseTagEditorA
     Object.keys(extraEdits).length > 0;
 
   const setField = useCallback((field: TagTextField, value: string) => {
+    revision.current.touch();
     setEdits((prev) => ({ ...prev, [field]: value }));
   }, []);
 
   /// Stages a whole online-lookup result at once — same buffer, so Save and
   /// Reset treat it like any other pending edit.
   const setFields = useCallback((patch: Partial<Record<TagTextField, string>>) => {
+    revision.current.touch();
     setEdits((prev) => ({ ...prev, ...patch }));
   }, []);
 
   const stageCover = useCallback((cover: CoverArt, pictureType: string) => {
+    revision.current.touch();
     setPictureEdits((prev) => ({
       ...prev,
       [pictureType]: {
@@ -129,6 +133,7 @@ export function useTagEditor({ paths, tagSets, onSaved, onToast }: UseTagEditorA
 
   /// Delete only the selected role, preserving the other embedded pictures.
   const clearCover = useCallback((pictureType: string) => {
+    revision.current.touch();
     setPictureEdits((prev) => ({
       ...prev,
       [pictureType]: {
@@ -143,14 +148,21 @@ export function useTagEditor({ paths, tagSets, onSaved, onToast }: UseTagEditorA
   /// same buffer the panel's own Save/Reset already govern (see
   /// ExtendedTagsModal's file header comment for why).
   const mergeExtraEdits = useCallback((patch: Record<string, FieldEdit>) => {
+    revision.current.touch();
     setExtraEditsState((prev) => ({ ...prev, ...patch }));
   }, []);
 
   const reset = useCallback(() => {
+    revision.current.touch();
     setEdits({});
     setCompilationEdit(null);
     setPictureEdits({});
     setExtraEditsState({});
+  }, []);
+
+  const setCompilation = useCallback((value: boolean) => {
+    revision.current.touch();
+    setCompilationEdit(value);
   }, []);
 
   const buildEdits = useCallback((): TagEdits => {
@@ -170,9 +182,11 @@ export function useTagEditor({ paths, tagSets, onSaved, onToast }: UseTagEditorA
   }, [edits, compilationEdit, pictureEdits, extraEdits]);
 
   const save = useCallback(async () => {
-    if (paths.length === 0 || !dirty || saving) return;
+    if (paths.length === 0 || !dirty || savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     const target = paths;
+    const savedRevision = revision.current.capture();
     try {
       const summary = await api.writeTagsBatch(target, buildEdits());
       if (summary.failed > 0) {
@@ -183,14 +197,17 @@ export function useTagEditor({ paths, tagSets, onSaved, onToast }: UseTagEditorA
       } else {
         onToast(`${summary.written} track${summary.written === 1 ? "" : "s"} updated`);
       }
-      reset();
+      // Preserve a newer draft, including one for a different selection.
+      // Partial failures also keep the edits available for a deliberate retry.
+      if (summary.failed === 0 && revision.current.isCurrent(savedRevision)) reset();
       onSaved(target);
     } catch (e) {
       onToast(String(e), "error");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
-  }, [paths, dirty, saving, buildEdits, onToast, onSaved, reset]);
+  }, [paths, dirty, buildEdits, onToast, onSaved, reset]);
 
   return {
     values,
@@ -201,7 +218,7 @@ export function useTagEditor({ paths, tagSets, onSaved, onToast }: UseTagEditorA
     saving,
     setField,
     setFields,
-    setCompilation: setCompilationEdit,
+    setCompilation,
     stageCover,
     clearCover,
     mergeExtraEdits,

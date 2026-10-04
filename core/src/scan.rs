@@ -50,7 +50,11 @@ const GENERATED_DIRS: [&str; 2] = ["spectrograms", "spectres"];
 pub fn is_supported_audio(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
-        .map(|e| SUPPORTED_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
+        .map(|e| {
+            SUPPORTED_EXTENSIONS
+                .iter()
+                .any(|known| e.eq_ignore_ascii_case(known))
+        })
         .unwrap_or(false)
 }
 
@@ -61,16 +65,26 @@ pub fn list_audio_files(root: &Path, recursive: bool) -> Vec<PathBuf> {
     let mut paths: Vec<PathBuf> = walkdir::WalkDir::new(root)
         .max_depth(depth)
         .into_iter()
+        // Prune generated trees before descending: filtering their files
+        // afterwards still walks every generated asset on each library scan.
+        .filter_entry(|entry| {
+            !entry
+                .path()
+                .components()
+                .any(|c| GENERATED_DIRS.iter().any(|d| c.as_os_str() == *d))
+        })
         // A directory we cannot read (permissions, a broken symlink) is
         // skipped rather than failing the scan: one unreadable folder must
         // not cost the user the rest of their library.
         .filter_map(Result::ok)
-        .map(|e| e.into_path())
-        .filter(|p| p.is_file() && is_supported_audio(p))
-        .filter(|p| {
-            !p.components()
-                .any(|c| GENERATED_DIRS.iter().any(|d| c.as_os_str() == *d))
+        .filter(|entry| {
+            // WalkDir already obtained this type. Only symlink targets need
+            // another metadata lookup to preserve the accepted-file behavior.
+            (entry.file_type().is_file()
+                || (entry.file_type().is_symlink() && entry.path().is_file()))
+                && is_supported_audio(entry.path())
         })
+        .map(|e| e.into_path())
         .collect();
     paths.sort();
     paths

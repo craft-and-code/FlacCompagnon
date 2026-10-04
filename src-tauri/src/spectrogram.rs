@@ -146,6 +146,13 @@ pub fn render(
     info: Option<&BasicInfo>,
     size: SpectrogramSize,
 ) -> Result<(), String> {
+    if !output
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("png"))
+    {
+        return Err("Spectrogram destination must use a .png extension.".to_string());
+    }
+    flaccompagnon_core::report::validate_destination(output).map_err(|e| e.to_string())?;
     let input_s = input.to_string_lossy().to_string();
     let output_s = output.to_string_lossy().to_string();
 
@@ -167,25 +174,32 @@ pub fn render(
 }
 
 fn run(ffmpeg: &str, input: &str, filter: &str, output: &str) -> Result<(), String> {
-    let out = Command::new(ffmpeg)
+    let out = flaccompagnon_core::decode::local_ffmpeg_command(ffmpeg)
         .args([
             "-hide_banner",
             "-loglevel",
             "error",
-            "-y",
             "-i",
             input,
             "-lavfi",
             filter,
             "-frames:v",
             "1",
-            output,
+            "-f",
+            "image2pipe",
+            "-c:v",
+            "png",
+            "pipe:1",
         ])
+        .stdin(Stdio::null())
         .output()
         .map_err(|e| format!("failed to run ffmpeg: {e}"))?;
 
     if out.status.success() {
-        Ok(())
+        // ffmpeg never opens the destination: an existing link cannot point
+        // it at an audio file, and failed renders keep the previous PNG intact.
+        flaccompagnon_core::report::write_atomic_bytes(Path::new(output), &out.stdout)
+            .map_err(|e| e.to_string())
     } else {
         Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
     }

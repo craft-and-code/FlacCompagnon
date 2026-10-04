@@ -1,4 +1,9 @@
+use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+use lofty::picture::{MimeType, Picture};
+use lofty::tag::Tag;
+
 use super::super::{copy_tags, read_tags, write_tags, TagEdits};
+use super::image::decode_cover;
 use super::*;
 
 /// A byte-minimal PNG: real 8-byte signature and an `IHDR` chunk carrying
@@ -203,4 +208,72 @@ fn unrecognized_picture_type_falls_back_to_other() {
         .next()
         .expect("cover art should be present");
     assert_eq!(cover.picture_type, "Other");
+}
+
+#[test]
+fn a_cover_larger_than_the_limit_is_rejected_before_encoding() {
+    assert!(cover_from_bytes(vec![0; MAX_COVER_BYTES + 1], "oversized").is_err());
+}
+
+#[test]
+fn an_image_with_excessive_pixel_dimensions_is_rejected() {
+    assert!(cover_from_bytes(tiny_png(100_000, 100_000), "huge dimensions").is_err());
+}
+
+#[test]
+fn oversized_base64_cover_edits_do_not_allocate_decoded_bytes() {
+    let encoded = "A".repeat(MAX_COVER_BYTES.div_ceil(3) * 4 + 4);
+    assert!(decode_cover(&encoded, "oversized edit").is_err());
+}
+
+#[test]
+fn an_unrecognized_image_is_rejected_without_panicking() {
+    for bytes in [vec![], vec![0xff], b"not an image".to_vec()] {
+        assert!(cover_from_bytes(bytes, "malformed").is_err());
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn exporting_a_cover_cannot_overwrite_audio_through_a_symlink() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = dir.path().join("track.flac");
+    let cover = dir.path().join("cover.png");
+    std::fs::write(&audio, b"audio data").unwrap();
+    std::os::unix::fs::symlink(&audio, &cover).unwrap();
+    assert!(write_cover_file(&cover, &B64.encode(tiny_png(1, 1))).is_err());
+    assert_eq!(std::fs::read(audio).unwrap(), b"audio data");
+}
+
+#[test]
+fn oversized_embedded_cover_dimensions_are_rejected_before_base64_encoding() {
+    let mut tag = Tag::new(lofty::tag::TagType::VorbisComments);
+    tag.push_picture(
+        Picture::unchecked(tiny_png(100_000, 100_000))
+            .mime_type(MimeType::Png)
+            .build(),
+    );
+    assert!(extract_all(&tag, "embedded cover").is_err());
+}
+
+#[test]
+fn exporting_a_cover_to_an_audio_path_cannot_destroy_the_audio() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = dir.path().join("track.flac");
+    std::fs::write(&audio, b"original audio").unwrap();
+    assert!(write_cover_file(&audio, &B64.encode(tiny_png(1, 1))).is_err());
+    assert_eq!(std::fs::read(audio).unwrap(), b"original audio");
+}
+
+#[cfg(unix)]
+#[test]
+fn named_pipe_cover_is_rejected_without_waiting_for_a_writer() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("cover.png");
+    assert!(std::process::Command::new("mkfifo")
+        .arg(&path)
+        .status()
+        .unwrap()
+        .success());
+    assert!(read_cover_file(&path).is_err());
 }

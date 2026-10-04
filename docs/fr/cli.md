@@ -77,7 +77,9 @@ flaccompagnon "Music/Album" -a clipping,clicks,dropouts
 flaccompagnon "Music/Album" --json "Music/Album/FlacCompagnon.json"
 ```
 
-`--json` exige un **chemin de fichier**, pas seulement un dossier ou une option sans valeur. Le dossier parent doit déjà exister. Les résultats valides de fichiers inchangés sont réutilisés. `--force` refait les analyses et remplace le rapport sélectionné. Un JSON de destination invalide nécessite cette option. Un seul rapport regroupe tous les fichiers audio sélectionnés : `--json-layout album` ou `--json-layout artist` permet de créer un rapport par album.
+`--json` exige un **chemin de fichier avec l’extension `.json`**, pas seulement un dossier ou une option sans valeur. Le dossier parent doit déjà exister. Les résultats valides de fichiers inchangés sont réutilisés. `--force` refait les analyses et remplace le rapport sélectionné. Un JSON de destination invalide nécessite cette option. Un seul rapport regroupe tous les fichiers audio sélectionnés : `--json-layout album` ou `--json-layout artist` permet de créer un rapport par album.
+
+Les destinations qui sont des liens symboliques ou des fichiers spéciaux sont refusées, même avec `--force`. Les rapports sont remplacés de façon atomique : un échec d’écriture ne tronque pas le rapport précédent. L’import accepte uniquement des fichiers ordinaires de 64 Mio au maximum ; les JSON voisins non exploitables sont ignorés pendant la recherche de résultats en cache.
 
 Le schéma est le format complet et versionné `flaccompagnon-report` de l’application. Déposez le JSON sur sa liste de résultats pour rouvrir l’analyse sans redécoder le son. Le rapport est un instantané : il ne s’actualise pas après une modification du son et ses chemins peuvent devenir obsolètes après un déplacement. Consultez les [empreintes de fichiers](fingerprints.md) pour les possibilités et limites d’identification.
 

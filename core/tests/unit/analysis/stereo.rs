@@ -51,6 +51,23 @@ fn identical_channels_are_fake() {
 }
 
 #[test]
+fn identical_silent_channels_do_not_create_a_fake_stereo_finding() {
+    assert!(!is_fake(0.0, 0.0, 0.0, 1000, 1000));
+    assert!(!is_fake(0.0, 0.0, 0.0, 0, 0));
+    // Preserve exact-dual-mono readings even below the approximate-energy gate.
+    assert!(is_fake(0.0, 1e-30, 1e-30, 1000, 1000));
+}
+
+#[test]
+fn invalid_energies_cannot_create_a_fake_stereo_finding() {
+    for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0] {
+        assert!(!is_fake(invalid, 1.0, 1.0, 1000, 1000));
+        assert!(!is_fake(0.0, invalid, 1.0, 1000, 1000));
+        assert!(!is_fake(0.0, 1.0, invalid, 1000, 1000));
+    }
+}
+
+#[test]
 fn decorrelated_channels_are_real() {
     // Large difference energy relative to signal.
     assert!(!is_fake(150.0, 100.0, 100.0, 0, 1000));

@@ -11,7 +11,7 @@ use symphonia::core::audio::AudioBufferRef;
 use symphonia::core::errors::Error as SymError;
 
 use super::container::{codec_label, format_label};
-use super::probe::{probe, InterleavedBuf};
+use super::probe::{probe, validate_decoded_spec, validate_pcm_samples, InterleavedBuf};
 use super::{validate_decoded_frames, DecodeOutcome};
 use crate::analysis::analyzer::StreamAnalyzer;
 use crate::AnalysisError;
@@ -73,12 +73,7 @@ pub(crate) fn decode_and_analyze_selected(
 
         match decoder.decode(&packet) {
             Ok(decoded) => {
-                if decoded.spec().rate != sample_rate || decoded.spec().channels.count() != channels
-                {
-                    return Err(AnalysisError::Decode(
-                        "stream changed during analysis".into(),
-                    ));
-                }
+                validate_decoded_spec(&decoded, sample_rate, channels)?;
                 // Float sources carry no meaningful integer bit depth.
                 let is_int = !matches!(&decoded, AudioBufferRef::F32(_) | AudioBufferRef::F64(_));
                 if is_int && declared_bits.is_some() && int_shift.is_none() {
@@ -93,6 +88,9 @@ pub(crate) fn decode_and_analyze_selected(
                     int_packet.extend(int_buf.fill(decoded.clone()).iter().map(|&s| s >> shift));
                 }
                 let f32_samples = buf.fill(decoded);
+                if !is_int {
+                    validate_pcm_samples(f32_samples)?;
+                }
                 saw_integer |= is_int;
 
                 let n_frames = f32_samples.len() / channels;

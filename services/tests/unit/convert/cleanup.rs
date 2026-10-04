@@ -106,3 +106,32 @@ fn never_touches_anything_outside_the_output_root() {
     );
     assert!(outside.exists());
 }
+
+#[test]
+fn parent_traversal_cannot_delete_a_file_outside_the_output_root() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("output");
+    std::fs::create_dir_all(&root).unwrap();
+    let outside = dir.path().join("keep.flac");
+    std::fs::write(&outside, b"keep").unwrap();
+    let escaped = root.join("../keep.flac");
+    assert_eq!(undo_batch(&[escaped], &HashSet::new(), &root), 0);
+    assert_eq!(std::fs::read(outside).unwrap(), b"keep");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_replaced_output_directory_cannot_delete_an_unrelated_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("output");
+    let outside = dir.path().join("outside");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::create_dir_all(&outside).unwrap();
+    std::fs::write(outside.join("keep.flac"), b"keep").unwrap();
+    std::os::unix::fs::symlink(&outside, root.join("Album")).unwrap();
+    assert_eq!(
+        undo_batch(&[root.join("Album/keep.flac")], &HashSet::new(), &root),
+        0
+    );
+    assert_eq!(std::fs::read(outside.join("keep.flac")).unwrap(), b"keep");
+}

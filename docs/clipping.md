@@ -4,9 +4,11 @@ The clipping analysis finds runs of stored PCM samples at or very near full scal
 
 ## Calculation
 
-Every decoded sample in every channel is tested against an absolute normalized threshold of `0.9997`. The analyzer counts all samples at or above that magnitude. A run becomes one clip event only when it reaches three consecutive threshold-crossing samples; longer runs remain one event. This prevents a single legitimate peak sample from being labelled as a clipped plateau.
+Every decoded sample in every channel is tested against an absolute normalized threshold of `0.9997`. The analyzer counts all samples at or above that magnitude. A run on one channel becomes one clip event only when it reaches three consecutive threshold-crossing samples on that channel; longer runs remain one event. This prevents a single legitimate peak sample from being labelled as a clipped plateau.
 
-The result contains a boolean clipping indication, the number of events, the number of clipped samples, and the ordinary sample peak. The event stream follows the decoded interleaved sample order, so simultaneous full-scale runs in separate channels are represented by the actual stored sequence rather than guessed as one acoustic event.
+The result contains a boolean clipping indication, the number of events, the number of clipped samples, and the ordinary sample peak. Runs are tracked independently on each channel. A quiet right channel cannot interrupt a left-channel plateau, and adjacent full-scale samples on different channels cannot create a run. Simultaneous clipping on both stereo channels counts as two channel events.
+
+The sample-peak payload is capped at full scale, or 0 dBFS. Float PCM can exceed that magnitude; its actual level is retained by the true-peak meter and used separately for DR. A floating-point run above the threshold can trigger this counter without having a flat top.
 
 ## Interpretation and limits
 
@@ -24,5 +26,7 @@ cargo test -p flaccompagnon-core analysis::clipping
 ffmpeg -n -f lavfi -i 'aevalsrc=0.5*sin(2*PI*1000*t):s=48000:d=5' -c:a pcm_s24le clean-level.wav
 ffmpeg -n -f lavfi -i 'aevalsrc=clip(1.5*sin(2*PI*1000*t)\,-1\,1):s=48000:d=5' -c:a pcm_s24le clipped-level.wav
 ```
+
+Unit regressions also check asymmetric stereo clipping, isolated touches spread across channels and long runs counted once per channel.
 
 Import both files. The second should report clipping events and many clipped samples. Zoom into its waveform in Audacity to see the flat peaks.

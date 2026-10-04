@@ -12,6 +12,8 @@ DR = 20 × log10(sample peak / RMS of loudest blocks)
 
 This follows the basic idea of comparing peak level with loud-passage RMS. It deliberately uses a fixed frame count, so the block duration varies with sample rate; at 96 kHz it is about 1.37 seconds rather than three.
 
+Float PCM can store magnitudes above full scale. DR uses their actual sample peak without clamping it to 1.0, so multiplying the entire signal by a constant gain does not change its crest factor.
+
 ## Interpretation
 
 Higher values mean more crest factor in the selected loud passages. The interface uses a green cue at 12 dB and above and a warning cue below 8 dB. Values between these boundaries are descriptive. A high DR value does not prove that a master is preferable, and a low value does not prove clipping or poor audio quality.
@@ -29,5 +31,7 @@ For perceived programme loudness use [Integrated loudness](integrated-loudness.m
 ```sh
 cargo test -p flaccompagnon-core analysis::analyzer
 ```
+
+Analytical tests cover the 3.0103 dB crest factor of a sine, including float peaks of 0.9 and 1.8, plus an independently specified six-block fixture whose loudest 20% is two blocks.
 
 A useful manual comparison is a quiet sine and the same sine with a short high-level burst. The burst should increase sample peak much more than the loudest-block RMS, increasing the displayed DR. This demonstrates the defined calculation rather than an external standard.

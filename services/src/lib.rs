@@ -8,6 +8,7 @@
 pub mod convert;
 pub mod playlist;
 pub mod relocate;
+pub mod rename;
 pub mod tags;
 
 /// Shared read-only decoder used by conversion.

@@ -5,7 +5,7 @@
 //! is deliberately a manual action — it writes files, and analysis on its own
 //! never does.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use flaccompagnon_core as core;
 use serde::Serialize;
@@ -31,6 +31,24 @@ const NO_FFMPEG: &str = "ffmpeg was not found on your system. Install it and try
      (macOS: `brew install ffmpeg`, Debian/Ubuntu: `sudo apt install ffmpeg`, \
      Windows: `choco install ffmpeg`). You can also set the FLACCOMPAGNON_FFMPEG \
      environment variable to its full path.";
+
+// This generated directory is chosen by the app, not by a destination picker.
+// A pre-existing link must not redirect output into another folder.
+fn output_directory(parent: &Path) -> std::io::Result<PathBuf> {
+    let directory = parent.join("spectrograms");
+    match std::fs::create_dir(&directory) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+        Err(error) => return Err(error),
+    }
+    if !directory.symlink_metadata()?.file_type().is_dir() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Spectrogram output folder must be a directory, not a symbolic link or file.",
+        ));
+    }
+    Ok(directory)
+}
 
 /// Render a spectrogram PNG for every audio file implied by `targets`.
 #[tauri::command]
@@ -75,11 +93,13 @@ pub async fn generate_spectrograms(
             );
 
             let parent = p.parent().unwrap_or_else(|| Path::new("."));
-            let spectrogram_dir = parent.join("spectrograms");
-            if let Err(e) = std::fs::create_dir_all(&spectrogram_dir) {
-                errors.push(format!("{}: {e}", file_name(p)));
-                continue;
-            }
+            let spectrogram_dir = match output_directory(parent) {
+                Ok(directory) => directory,
+                Err(e) => {
+                    errors.push(format!("{}: {e}", file_name(p)));
+                    continue;
+                }
+            };
             let dir_str = spectrogram_dir.to_string_lossy().to_string();
             if !spectrogram_dirs.contains(&dir_str) {
                 spectrogram_dirs.push(dir_str);
@@ -120,3 +140,7 @@ pub async fn generate_spectrograms(
 
     Ok(summary)
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/commands/spectrograms.rs"]
+mod tests;

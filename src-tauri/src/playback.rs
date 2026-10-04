@@ -17,9 +17,9 @@
 //! it never leaves the thread that created it: one dedicated "audio thread",
 //! started once from Tauri's `setup` hook, owns every `Stream` for its
 //! entire lifetime and is only ever talked to through a channel of [`Cmd`]s.
-//! `play`/`stop`/`pause`/`resume`/`seek` (called from the matching
-//! `*_playback` Tauri commands, inside `spawn_blocking`) just send a command
-//! and block on a one-shot reply.
+//! `request_play` and `stop` queue commands before scheduling blocking work;
+//! stop also invalidates pending play requests. Waiting for a play result,
+//! pause, resume or seek happens inside `spawn_blocking`, off the async runtime.
 //!
 //! Pause and resume are `cpal::Stream::pause()`/`play()` — the stream itself
 //! stays open, so resuming is instant and the decode buffer keeps whatever
@@ -42,7 +42,7 @@
 //!
 //! # Size
 //!
-//! Over CLAUDE.md's 300-line ceiling, deliberately. This is one subsystem
+//! Over AGENTS.md's 300-line ceiling, deliberately. This is one subsystem
 //! held together by a thread-ownership rule, not a collection of functions: a
 //! `cpal::Stream` is not safely `Send` on every backend, so it must never
 //! leave the thread that built it. Every piece here — the command channel,
@@ -71,7 +71,35 @@ enum Cmd {
 }
 
 static SENDER: OnceLock<mpsc::Sender<Cmd>> = OnceLock::new();
-static REQUEST_SEQ: AtomicU64 = AtomicU64::new(0);
+static REQUEST_SEQ: PlaybackIntent = PlaybackIntent(AtomicU64::new(0));
+
+struct PlaybackIntent(AtomicU64);
+
+impl PlaybackIntent {
+    fn next(&self) -> u64 {
+        self.0.fetch_add(1, Ordering::SeqCst).wrapping_add(1)
+    }
+
+    fn is_current(&self, request_id: u64) -> bool {
+        self.0.load(Ordering::SeqCst) == request_id
+    }
+}
+
+/// A play request already queued on the audio thread, ready to wait off-runtime.
+pub struct PlayRequest {
+    request_id: u64,
+    reply: mpsc::Receiver<Result<(), String>>,
+}
+
+impl PlayRequest {
+    /// Wait for this queued request to start or fail, returning its event ID.
+    pub fn wait(self) -> Result<u64, String> {
+        self.reply
+            .recv()
+            .map_err(|_| "Playback engine did not respond.".to_string())??;
+        Ok(self.request_id)
+    }
+}
 
 /// Playback volume, 0.0–1.0, applied as a plain gain multiplier in the
 /// output callback. Stored as the bit pattern of an `f32` (`AtomicU32` has no
@@ -200,6 +228,10 @@ fn audio_thread(rx: mpsc::Receiver<Cmd>, app: AppHandle) {
                 let _ = reply.send(result);
             }
             Cmd::Play(path, request_id, reply) => {
+                if !REQUEST_SEQ.is_current(request_id) {
+                    let _ = reply.send(Err("Playback request was superseded.".to_string()));
+                    continue;
+                }
                 // Stop whatever was playing — and tell its decode thread to
                 // stop feeding a buffer nothing is reading anymore — before
                 // starting the next one.
@@ -207,6 +239,10 @@ fn audio_thread(rx: mpsc::Receiver<Cmd>, app: AppHandle) {
                     track.cancel_decode.store(true, Ordering::SeqCst);
                 }
                 match build_stream(&path, app.clone(), request_id) {
+                    Ok(built) if !REQUEST_SEQ.is_current(request_id) => {
+                        built.cancel_decode.store(true, Ordering::SeqCst);
+                        let _ = reply.send(Err("Playback request was superseded.".to_string()));
+                    }
                     Ok(built) => match built.stream.play() {
                         Ok(()) => {
                             current = Some(PlayingTrack {
@@ -231,24 +267,25 @@ fn audio_thread(rx: mpsc::Receiver<Cmd>, app: AppHandle) {
     }
 }
 
-/// Ask the audio thread to play `path`, blocking for the outcome. Returns
-/// the request id used to match the eventual `playback://finished` event.
-pub fn play(path: PathBuf) -> Result<u64, String> {
+/// Queue `path` before any blocking worker is scheduled. The caller waits
+/// separately so a slow worker cannot deliver an old play after a newer stop.
+pub fn request_play(path: PathBuf) -> Result<PlayRequest, String> {
     let sender = SENDER.get().ok_or("Playback engine not started.")?;
-    let request_id = REQUEST_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
+    let request_id = REQUEST_SEQ.next();
     let (reply_tx, reply_rx) = mpsc::channel();
     sender
         .send(Cmd::Play(path, request_id, reply_tx))
         .map_err(|_| "Playback engine is not running.".to_string())?;
-    reply_rx
-        .recv()
-        .map_err(|_| "Playback engine did not respond.".to_string())??;
-    Ok(request_id)
+    Ok(PlayRequest {
+        request_id,
+        reply: reply_rx,
+    })
 }
 
 /// Ask the audio thread to stop whatever is currently playing.
 pub fn stop() -> Result<(), String> {
     let sender = SENDER.get().ok_or("Playback engine not started.")?;
+    REQUEST_SEQ.next();
     sender
         .send(Cmd::Stop)
         .map_err(|_| "Playback engine is not running.".to_string())
@@ -318,7 +355,7 @@ impl SampleSource {
             SampleSource::Streaming(buf) => {
                 let samples = buf.samples.lock().unwrap();
                 let total = samples.len();
-                let end = (pos + out.len()).min(total);
+                let end = pos.saturating_add(out.len()).min(total);
                 let n = end.saturating_sub(pos);
                 if n > 0 {
                     out[..n].copy_from_slice(&samples[pos..end]);
@@ -327,7 +364,7 @@ impl SampleSource {
             }
             SampleSource::Static(samples) => {
                 let total = samples.len();
-                let end = (pos + out.len()).min(total);
+                let end = pos.saturating_add(out.len()).min(total);
                 let n = end.saturating_sub(pos);
                 if n > 0 {
                     out[..n].copy_from_slice(&samples[pos..end]);
@@ -340,7 +377,7 @@ impl SampleSource {
                 *s = 0.0;
             }
         }
-        (n, done && pos + n >= total)
+        (n, done && pos.saturating_add(n) >= total)
     }
 }
 
@@ -528,7 +565,7 @@ fn try_build_stream(
                 let frame_pos = *p;
                 let flat_pos = frame_pos.saturating_mul(channels);
                 let (n, drained) = source.read(flat_pos, data);
-                *p = frame_pos + n / channels;
+                *p = frame_pos.saturating_add(n / channels);
                 (drained, *p)
             };
 
@@ -578,6 +615,10 @@ fn try_build_stream(
         None,
     )
 }
+
+#[cfg(test)]
+#[path = "../tests/unit/playback.rs"]
+mod tests;
 
 /// Convert `pcm` from its own sample rate / channel count to the device's
 /// output rate and channel count.

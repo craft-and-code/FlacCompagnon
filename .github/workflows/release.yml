@@ -39,7 +39,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
@@ -93,7 +93,7 @@ jobs:
           automake --version | head -1
 
       - name: Install frontend dependencies
-        run: npm install
+        run: npm ci
 
       # Build only — the artifacts are renamed below so every download says
       # which platform it is for, then uploaded in a separate step.
@@ -103,7 +103,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} -- --locked
 
       - name: Collect artifact paths
         shell: bash
@@ -211,7 +211,7 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
       - name: Build the standalone CLI
-        run: cargo build --release -p flaccompagnon-cli --target ${{ matrix.target }}
+        run: cargo build --locked --release -p flaccompagnon-cli --target ${{ matrix.target }}
       - name: Package the CLI
         shell: bash
         env:

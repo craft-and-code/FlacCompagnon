@@ -292,11 +292,12 @@ impl StreamAnalyzer {
 
         // Clipping + peak (per channel), and the frame's mean square for the
         // dynamics blocks.
+        if self.selection.enabled(Kind::Clipping) {
+            self.clip_state.push_frame(samples);
+        }
         let mut frame_sumsq = 0.0f64;
         for &s in samples {
-            if self.selection.enabled(Kind::Clipping) {
-                self.clip_state.push(s);
-            } else if self.selection.sample_peak() {
+            if !self.selection.enabled(Kind::Clipping) && self.selection.sample_peak() {
                 self.clip_state.push_peak(s);
             }
             if self.selection.enabled(Kind::Dynamics) {
@@ -482,6 +483,7 @@ impl StreamAnalyzer {
             self.dyn_blocks
                 .push(self.dyn_block_sumsq / self.dyn_block_frames as f64);
         }
+        let dynamics_peak = self.clip_state.unclamped_peak();
         let mut clipping = if self.selection.sample_peak() {
             self.clip_state.finish(self.channels, self.total_frames)
         } else {
@@ -490,21 +492,28 @@ impl StreamAnalyzer {
         // True peak from the 4x-oversampled stream. It can legitimately sit a
         // hair above the sample peak on any material, and above 1.0 (positive
         // dBTP) on loud masters — that's the inter-sample clipping signal.
-        if let Some(true_peak) = &self.true_peak {
+        if let Some(true_peak) = &mut self.true_peak {
+            true_peak.flush_tail();
             clipping.true_peak = true_peak.peak();
             clipping.true_peak_dbtp = true_peak.peak_dbtp();
         }
         let dr_db = if self.selection.enabled(Kind::Dynamics) {
-            let mut blocks = self.dyn_blocks.clone();
-            blocks.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
-            let top = ((blocks.len() as f64 * DYN_TOP_FRACTION).ceil() as usize).max(1);
-            let loud: Vec<f64> = blocks.into_iter().take(top).collect();
-            if loud.is_empty() {
+            self.dyn_blocks
+                .sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+            let top = ((self.dyn_blocks.len() as f64 * DYN_TOP_FRACTION).ceil() as usize).max(1);
+            let (sum, count) = self
+                .dyn_blocks
+                .iter()
+                .take(top)
+                .fold((0.0, 0usize), |(sum, count), power| {
+                    (sum + power, count + 1)
+                });
+            if count == 0 {
                 None
             } else {
-                let rms = (loud.iter().sum::<f64>() / loud.len() as f64).sqrt();
-                if rms > 1e-9 && clipping.peak > 0.0 {
-                    Some((20.0 * (clipping.peak as f64 / rms).log10()) as f32)
+                let rms = (sum / count as f64).sqrt();
+                if rms > 1e-9 && dynamics_peak > 0.0 {
+                    Some((20.0 * (dynamics_peak as f64 / rms).log10()) as f32)
                 } else {
                     None
                 }

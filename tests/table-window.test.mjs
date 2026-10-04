@@ -5,6 +5,9 @@ import { loadTypeScript } from "./load-typescript.mjs";
 const { rowOffsets, tableWindow, windowIndices, nearestRowScroll } = await loadTypeScript(
   new URL("../src/components/tableWindow.ts", import.meta.url),
 );
+const { draggedPaths, reorderPaths } = await loadTypeScript(
+  new URL("../src/components/rowReorder.ts", import.meta.url),
+);
 
 test("clearing a filter keeps rendering bounded for ten thousand files", () => {
   for (const count of [20, 2000, 10000]) {
@@ -61,4 +64,23 @@ test("keyboard navigation reveals a wrapped row after its height is measured", (
   assert.equal(nearestRowScroll(600, 680, 36, 600), 80);
   assert.equal(nearestRowScroll(36, 72, 80, 600), 36);
   assert.equal(nearestRowScroll(100, 136, 36, 600), 36);
+});
+
+test("dragged selections preserve display order independently of click order", () => {
+  assert.deepEqual(draggedPaths(["a", "b", "c", "d"], ["d", "b"], "b"), ["b", "d"]);
+  assert.deepEqual(draggedPaths(["a", "b", "c", "d"], ["d", "b"], "a"), ["a"]);
+  assert.deepEqual(reorderPaths(["a", "b", "c", "d"], ["b", "d"], { path: "a", before: true }), ["b", "d", "a", "c"]);
+  assert.deepEqual(reorderPaths(["a", "b", "c", "d"], ["b", "d"], { path: "c", before: false }), ["a", "c", "b", "d"]);
+  assert.equal(reorderPaths(["a", "b"], ["a"], { path: "a", before: true }), null);
+});
+
+test("large selection reorder does not exceed the JavaScript argument limit", () => {
+  const order = Array.from({ length: 200000 }, (_, index) => `file-${index}`);
+  const moving = draggedPaths(order, order.slice(0, -1), order[0]);
+  const result = reorderPaths(order, moving, { path: order.at(-1), before: false });
+  assert.equal(result.length, order.length);
+  assert.equal(result[0], order.at(-1));
+  assert.equal(result[1], order[0]);
+  assert.equal(result.at(-1), order.at(-2));
+  assert.equal(new Set(result).size, order.length);
 });

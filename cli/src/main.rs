@@ -48,6 +48,10 @@ fn run(args: Args) -> Result<(), String> {
         .iter()
         .filter_map(|(_, _, dest)| dest.as_deref())
         .collect();
+    for destination in &destinations {
+        core::report::validate_destination(destination)
+            .map_err(|error| format!("{}: {error}", destination.display()))?;
+    }
     let cached = progress::with_loading("Reading saved results…", || {
         reports::cached(&paths, &destinations, &args)
     })?;
@@ -91,7 +95,7 @@ fn run(args: Args) -> Result<(), String> {
         }
         let report = core::folder_report(&folder, files);
         if let Some(dest) = destination {
-            if changed || !dest.exists() {
+            if changed || reports::snapshot_changed(&dest, &report)? {
                 core::report::write_json(&dest, &report)
                     .map_err(|error| format!("{}: {error}", dest.display()))?;
                 eprintln!("Saved {}", dest.display());

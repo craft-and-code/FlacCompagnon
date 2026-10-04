@@ -14,6 +14,7 @@
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use flaccompagnon_services::convert::{self, ConvertSettings};
 use serde::{Deserialize, Serialize};
@@ -64,7 +65,7 @@ pub struct ConvertSummary {
 /// itself recreated at the destination. Recording it here is the whole point:
 /// once the folders are expanded, nothing downstream can tell what was
 /// dropped, and deriving a root from the files instead flattens the very case
-/// this exists for (see `core::convert::layout`).
+/// this exists for (see `services::convert::layout`).
 #[tauri::command]
 pub async fn list_convert_sources(targets: Vec<String>) -> Result<Vec<SourceEntry>, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -129,7 +130,8 @@ pub async fn convert_files(
         .collect();
     let total = sources.len();
     let output_root_path = PathBuf::from(&output_root);
-    let destinations = convert::plan_batch(&sources, &output_root_path, settings.format);
+    let destinations = convert::plan_batch(&sources, &output_root_path, settings.format)
+        .map_err(|error| error.to_string())?;
     // Taken before a single file is written, so a cancellation can tell the
     // outputs *this* batch created from ones that were already sitting in the
     // chosen folder (an earlier run, most likely) and must survive it — see
@@ -147,6 +149,8 @@ pub async fn convert_files(
 
     reset_cancel();
     let app_bg = app.clone();
+    let created = Arc::new(Mutex::new(Vec::new()));
+    let created_bg = Arc::clone(&created);
     let outcomes = tauri::async_runtime::spawn_blocking(move || {
         parallel_map_ordered(
             &pairs,
@@ -155,7 +159,16 @@ pub async fn convert_files(
             // between files: a hi-res track takes seconds to decode and
             // re-encode, and without this Cancel wouldn't be felt until every
             // worker's current file had run to completion.
-            |(src, dest)| convert::convert_file(src, dest, &settings, &cancelled),
+            |(src, dest)| {
+                let outcome = convert::convert_file(src, dest, &settings, &cancelled);
+                if outcome.is_ok() {
+                    created_bg
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .push(dest.clone());
+                }
+                outcome
+            },
             |done, (src, _)| {
                 let _ = app_bg.emit(
                     "convert://progress",
@@ -177,7 +190,8 @@ pub async fn convert_files(
     // in the output folder is the worst of both — so they go before the error
     // does.
     let Some(outcomes) = outcomes else {
-        convert::undo_batch(&destinations, &preexisting, &output_root_path);
+        let created = created.lock().unwrap_or_else(|e| e.into_inner());
+        convert::undo_batch(&created, &preexisting, &output_root_path);
         return Err("cancelled".to_string());
     };
 
@@ -199,7 +213,12 @@ pub async fn convert_files(
         // No exclusion list to assemble here anymore: `passthrough_files`
         // takes the sources themselves and derives both what to sweep and
         // what to skip, so the two cannot drift apart.
-        match convert::passthrough_files(&sources, &output_root_path) {
+        let copy_result = tauri::async_runtime::spawn_blocking(move || {
+            convert::passthrough_files(&sources, &output_root_path)
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+        match copy_result {
             Ok(written) => copied = written.len(),
             Err(e) => errors.push(format!("copy: {e}")),
         }

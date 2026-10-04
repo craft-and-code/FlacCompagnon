@@ -20,6 +20,8 @@ Chaque ligne représente une piste. Les colonnes visibles décrivent par exemple
 
 > **Repère à l’écran :** utilisez la petite loupe d’une ligne pour retrouver le fichier dans le Finder ou l’Explorateur. Le bouton de lecture voisin lance directement cette piste.
 
+Pour renommer une piste, sélectionnez sa ligne, puis cliquez à nouveau sur son nom. **Enter** applique le nouveau nom en conservant l’extension ; **Escape** annule. Le renommage ne remplace jamais un fichier de destination existant.
+
 Pour comprendre une colonne, ouvrez l’article correspondant dans la section [Analyses](index.md). Chaque article explique ce que la mesure regarde et ses limites.
 
 ## Modifier les tags et les images
@@ -34,6 +36,10 @@ L’image suit le rôle choisi dans la liste sous la jaquette, par exemple _Fron
 - utiliser le bouton d’export sous l’image pour l’extraire près des fichiers audio ;
 - utiliser la corbeille pour préparer sa suppression.
 
+Les images locales et intégrées sont limitées à 12 Mio et 64 millions de pixels. Une image trop grande doit être redimensionnée avant d’être ajoutée.
+
+L’en-tête doit fournir des dimensions valides. Le TIFF classique est pris en charge ; BigTIFF, les TIFF avec SubIFDs et les BMP contenant un JPEG/PNG sont refusés. Ce contrôle lit la géométrie de l’image sans décoder tous ses pixels.
+
 Les changements restent en attente tant que vous n’avez pas choisi **Save**. Le bouton **Reset** annule seulement les changements en attente.
 
 ## Convertir une sélection
@@ -44,13 +50,13 @@ Déposez directement des fichiers ou un dossier dans ce volet pour créer une li
 
 Choisissez le format voulu, puis les options proposées pour ce format. Pour les formats avec perte, le débit est disponible ; pour FLAC, l’effort d’encodage est proposé. L’option **Also copy other files** conserve à côté les jaquettes, listes de lecture et autres fichiers non audio.
 
-Quand la liste et les réglages vous conviennent, sélectionnez **Convert** et choisissez le dossier de destination. FlacCompagnon laisse la liste d’analyse intacte : convertir n’efface ni ne remplace les originaux.
+Quand la liste et les réglages vous conviennent, sélectionnez **Convert** et choisissez le dossier de destination. FlacCompagnon laisse la liste d’analyse intacte : convertir n’efface ni ne remplace les originaux. Choisissez un dossier vide pour une nouvelle conversion : les fichiers existants sont conservés, les noms de sortie en doublon sont refusés et les liens symboliques ne permettent pas de sortir du dossier de destination. **Also copy other files** conserve également les sorties existantes et évite de recopier le dossier de sortie lorsqu’il se trouve dans le dossier source.
 
 ## Écouter une piste
 
 La barre inférieure est le lecteur. Cliquez sur le bouton lecture d’une ligne, ou sélectionnez des pistes puis utilisez le bouton principal de la barre.
 
-Les boutons précédent et suivant suivent la sélection lorsqu’il y en a une. Sans sélection, ils suivent la liste actuellement affichée. Le curseur permet de régler le volume ; la barre de progression permet de se déplacer dans le morceau.
+La file de lecture est fixée au lancement : plusieurs pistes sélectionnées jouent dans l’ordre affiché ; une seule sélection démarre à cette piste puis poursuit la liste ; aucune sélection démarre en haut de la liste. Modifier la sélection pendant la lecture ne change pas la file en cours. Les boutons précédent et suivant suivent cette file. Le curseur permet de régler le volume ; la barre de progression permet de se déplacer dans le morceau.
 
 Cette écoute est particulièrement utile après une alerte : repérez le passage indiqué par l’analyse, puis comparez-le à ce que vous entendez réellement.
 
@@ -65,3 +71,7 @@ Saisissez plusieurs mots pour garder les pistes qui contiennent chacun de ces mo
 Utilisez **Save…** pour enregistrer un rapport. Le JSON conserve les résultats d’analyse et l’ordre affiché des pistes ; il peut être rouvert par glisser-déposer dans FlacCompagnon sans relancer l’analyse.
 
 Pour les traitements automatisés, consultez aussi [Utiliser la CLI](cli.md). Elle permet les mêmes analyses depuis un terminal et peut écrire ce même format JSON.
+
+Les rapports importés doivent être des fichiers ordinaires de 64 Mio au maximum. Les exports de rapports, playlists et images remplacent leur destination de façon atomique et refusent les liens symboliques.
+
+Si des pistes sont introuvables, utilisez le contrôle de présence, puis le bouton de dossier **Locate** qui apparaît, pour chercher dans un autre dossier. La recherche compare les noms de fichiers et les suffixes de dossiers, pas les empreintes audio : les correspondances à égalité restent introuvables. Réanalysez les fichiers retrouvés avant de vous fier à leurs anciennes mesures.

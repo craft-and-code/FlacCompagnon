@@ -8,7 +8,7 @@
 //! No shell is ever involved — every path goes through `Command::arg`, so a
 //! file name containing quotes, spaces or `;` is just a file name.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use flaccompagnon_core as core;
@@ -19,22 +19,22 @@ use flaccompagnon_core as core;
 pub fn reveal_in_folder(path: String) -> Result<(), String> {
     // Only reveal paths that actually exist — this avoids handing garbage to
     // the OS file manager, which reports it far less clearly than we can.
-    if !Path::new(&path).exists() {
-        return Err("File not found.".to_string());
-    }
+    // Absolute paths cannot be interpreted as file-manager options, even if
+    // a loaded report contains a relative name beginning with a dash.
+    let path = browser_path(&path, "File")?;
     #[cfg(target_os = "macos")]
     {
         spawn(Command::new("open").arg("-R").arg(&path))?;
     }
     #[cfg(target_os = "windows")]
     {
-        spawn(Command::new("explorer").arg(format!("/select,{path}")))?;
+        spawn(Command::new("explorer").arg(format!("/select,{}", path.display())))?;
     }
     #[cfg(target_os = "linux")]
     {
         // No portable "select the file" across Linux file managers; open the
         // containing directory instead.
-        let p = Path::new(&path);
+        let p = path.as_path();
         spawn(Command::new("xdg-open").arg(p.parent().unwrap_or(p)))?;
     }
     Ok(())
@@ -44,7 +44,8 @@ pub fn reveal_in_folder(path: String) -> Result<(), String> {
 /// [`reveal_in_folder`], which selects a file within its *parent*.
 #[tauri::command]
 pub fn open_folder(path: String) -> Result<(), String> {
-    if !Path::new(&path).is_dir() {
+    let path = browser_path(&path, "Folder")?;
+    if !path.is_dir() {
         return Err("Folder not found.".to_string());
     }
     #[cfg(target_os = "macos")]
@@ -55,6 +56,10 @@ pub fn open_folder(path: String) -> Result<(), String> {
     let mut cmd = Command::new("xdg-open");
 
     spawn(cmd.arg(&path))
+}
+
+fn browser_path(path: &str, kind: &str) -> Result<PathBuf, String> {
+    std::fs::canonicalize(path).map_err(|_| format!("{kind} not found."))
 }
 
 /// Launch `cmd` and forget about it: these open a GUI application, so waiting

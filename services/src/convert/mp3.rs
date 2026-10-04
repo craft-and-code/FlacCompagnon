@@ -19,8 +19,8 @@
 //! constant bitrate at the requested [`Bitrate`] preset, the closest match to
 //! the `bitrate_kbps` setting the caller asked for.
 
-use std::mem::MaybeUninit;
 use std::path::Path;
+use std::{borrow::Cow, mem::MaybeUninit};
 
 use mp3lame_encoder::{Bitrate, Builder, FlushNoGap, InterleavedPcm};
 
@@ -50,9 +50,14 @@ pub(super) fn encode(pcm: &PcmAudio, dest: &Path, bitrate_kbps: u32) -> Result<(
 
     let target_rate = nearest_supported_rate(pcm.sample_rate);
     let resampled = if target_rate == pcm.sample_rate {
-        pcm.samples.clone()
+        Cow::Borrowed(pcm.samples.as_slice())
     } else {
-        super::resample_linear(&pcm.samples, pcm.channels, pcm.sample_rate, target_rate)
+        Cow::Owned(super::resample_linear(
+            &pcm.samples,
+            pcm.channels,
+            pcm.sample_rate,
+            target_rate,
+        ))
     };
 
     let mut encoder = Builder::new()

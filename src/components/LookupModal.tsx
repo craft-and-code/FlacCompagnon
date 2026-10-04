@@ -20,6 +20,14 @@ import "./LookupModal.css";
 // sessions. Its absence just means Discogs is skipped, not an error.
 const DISCOGS_TOKEN_KEY = "flaccompagnon.discogsToken";
 
+function storedToken(): string {
+  try {
+    return localStorage.getItem(DISCOGS_TOKEN_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 export interface LookupModalProps {
   open: boolean;
   onClose: () => void;
@@ -58,9 +66,7 @@ export function LookupModal({
   onToast,
 }: LookupModalProps) {
   const [query, setQuery] = useState("");
-  const [discogsToken, setDiscogsToken] = useState(
-    () => localStorage.getItem(DISCOGS_TOKEN_KEY) ?? "",
-  );
+  const [discogsToken, setDiscogsToken] = useState(storedToken);
   const [matchedByExistingId, setMatchedByExistingId] = useState(false);
   const [selectedTrackIndex, setSelectedTrackIndex] = useState<number | null>(null);
 
@@ -96,6 +102,7 @@ export function LookupModal({
   // behind an open pop-in can't retrigger a search.
   useEffect(() => {
     if (!open) return;
+    let closed = false;
     reset();
     setMatchedByExistingId(false);
     setSelectedTrackIndex(null);
@@ -113,14 +120,18 @@ export function LookupModal({
         year: null,
         track_count: null,
       }).then((ok) => {
-        if (!ok) {
+        if (!closed && !ok) {
           setMatchedByExistingId(false);
           prefillAndMaybeSearch();
         }
       });
-      return;
+    } else {
+      prefillAndMaybeSearch();
     }
-    prefillAndMaybeSearch();
+    return () => {
+      closed = true;
+      reset();
+    };
   }, [open]);
 
   const onPick = (candidate: LookupCandidate) => {
@@ -142,7 +153,11 @@ export function LookupModal({
   const onTokenChange = (token: string) => {
     const trimmed = token.trim();
     setDiscogsToken(trimmed);
-    localStorage.setItem(DISCOGS_TOKEN_KEY, trimmed);
+    try {
+      localStorage.setItem(DISCOGS_TOKEN_KEY, trimmed);
+    } catch {
+      // Disabled storage still allows a token for the current session.
+    }
   };
 
   return (

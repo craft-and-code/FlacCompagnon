@@ -20,7 +20,7 @@ use symphonia::core::codecs::Decoder;
 use symphonia::core::errors::Error as SymError;
 use symphonia::core::formats::FormatReader;
 
-use super::probe::{probe, InterleavedBuf};
+use super::probe::{probe, validate_decoded_spec, validate_pcm_samples, InterleavedBuf};
 use crate::AnalysisError;
 
 /// Fully-decoded PCM audio: interleaved `f32` samples in `[-1.0, 1.0]`, at the
@@ -118,7 +118,11 @@ impl PcmStreamDecoder {
                 Err(SymError::IoError(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
                     return Ok(None)
                 }
-                Err(SymError::ResetRequired) => return Ok(None),
+                Err(SymError::ResetRequired) => {
+                    return Err(AnalysisError::Decode(
+                        "stream changed during playback".into(),
+                    ));
+                }
                 Err(e) => return Err(AnalysisError::Decode(format!("packet error: {e}"))),
             };
             if packet.track_id() != self.track_id {
@@ -126,7 +130,12 @@ impl PcmStreamDecoder {
             }
 
             match self.decoder.decode(&packet) {
-                Ok(decoded) => return Ok(Some(self.buf.fill(decoded).to_vec())),
+                Ok(decoded) => {
+                    validate_decoded_spec(&decoded, self.sample_rate, self.channels)?;
+                    let samples = self.buf.fill(decoded);
+                    validate_pcm_samples(samples)?;
+                    return Ok(Some(samples.to_vec()));
+                }
                 Err(SymError::DecodeError(_)) => continue, // skip a corrupt packet
                 Err(SymError::IoError(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
                     return Ok(None)

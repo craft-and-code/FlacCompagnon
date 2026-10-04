@@ -160,7 +160,7 @@ export interface FileAnalysis {
 }
 
 // One file's move, found by `relocate_paths` — mirrors Rust's
-// `core::relocate::Relocation`.
+// `services::relocate::Relocation`.
 export interface Relocation {
   from: string;
   to: string;
@@ -277,7 +277,7 @@ export interface TagEdits {
 }
 
 // One entry in the extended-tags pop-in's "+" picker — mirrors Rust's
-// `core::tags::AddableTag`.
+// `services::tags::AddableTag`.
 export interface AddableTag {
   key: string;
   label: string;
@@ -348,7 +348,7 @@ export type PlaylistFormat = "Simple" | "Extended";
 
 // --- Conversion (ConvertPanel) ------------------------------------------------
 
-// Mirrors Rust's `core::convert::ConvertFormat` (`#[serde(rename_all =
+// Mirrors Rust's `services::convert::ConvertFormat` (`#[serde(rename_all =
 // "lowercase")]` on a unit-only enum serializes as a plain string).
 export type ConvertFormat = "flac" | "opus" | "mp3" | "wav";
 
@@ -356,7 +356,7 @@ export type ConvertFormat = "flac" | "opus" | "mp3" | "wav";
 // Deliberately not libFLAC's -0..-8: this app encodes with `flacenc`, whose
 // knobs are its own, so those labels would promise an equivalence the output
 // does not have. Every level is lossless — only the time spent and the
-// resulting size change. Mirrors Rust's `core::convert::FlacEffort`.
+// resulting size change. Mirrors Rust's `services::convert::FlacEffort`.
 export type FlacEffort = "fast" | "balanced" | "maximum";
 
 export interface ConvertSettings {

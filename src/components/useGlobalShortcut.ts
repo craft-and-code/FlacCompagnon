@@ -16,22 +16,8 @@
 //     would delete the selection underneath it instead.
 
 import { useEffect, useRef } from "react";
-
-export interface GlobalShortcutOptions {
-  /// Ignore keystrokes entirely while false. A shortcut belonging to a pop-in
-  /// should only be live while that pop-in is on screen — leaving it bound and
-  /// checking inside the handler works too, but then every keystroke in the
-  /// app runs code that only ever wanted to do nothing.
-  enabled?: boolean;
-  /// The shortcut belongs to a modal rather than to the page behind it.
-  ///
-  /// The "a modal owns the keyboard" guard exists to stop the table's own
-  /// shortcuts firing underneath an open pop-in. A pop-in's *own* shortcuts
-  /// are the thing that guard is protecting, so they have to opt out of it —
-  /// otherwise arrow keys and Delete inside the extended-tags editor would be
-  /// swallowed by the very rule meant to keep them safe from the table.
-  insideModal?: boolean;
-}
+import { dispatchGlobalShortcut, type GlobalShortcutOptions } from "./globalShortcut";
+export type { GlobalShortcutOptions } from "./globalShortcut";
 
 /// Run `onKey` for keystrokes that are not meant for a text field, and (unless
 /// `insideModal`) not meant for an open modal.
@@ -55,18 +41,9 @@ export function useGlobalShortcut(
 
   useEffect(() => {
     const listener = (ev: KeyboardEvent) => {
-      if (!ev || !ev.target) return;
-      if (!state.current.enabled) return;
-      const target = ev.target as HTMLElement;
-      if (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
-      ) {
-        return;
-      }
-      if (!state.current.insideModal && document.querySelector(".cover-modal")) return;
-      handler.current(ev);
+      dispatchGlobalShortcut(ev, handler.current, state.current, () =>
+        document.querySelector(".cover-modal") != null,
+      );
     };
     document.addEventListener("keydown", listener);
     return () => document.removeEventListener("keydown", listener);

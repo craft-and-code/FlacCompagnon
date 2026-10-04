@@ -6,47 +6,19 @@
 // from a missing key ("not fetched yet"), which is what lets the table render
 // placeholders immediately instead of blocking on a batch read.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { CoverArt, TagSet } from "../types";
 import * as api from "../api";
+import { TagCache, type TagCacheSnapshot } from "./tagCache";
 
 export function useTagCache() {
-  const [tags, setTags] = useState<Map<string, TagSet | null>>(new Map());
-  const [covers, setCovers] = useState<Map<string, CoverArt | null>>(new Map());
-  // Paths already requested, so overlapping renders don't fire duplicate
-  // batches for the same files while the first is still in flight.
-  const inFlight = useRef(new Set<string>());
-
-  const fetchMissing = useCallback(async (paths: string[]) => {
-    const missing = paths.filter((p) => !inFlight.current.has(p));
-    if (missing.length === 0) return;
-    for (const p of missing) inFlight.current.add(p);
-
-    let results;
-    try {
-      results = await api.readTagsBatch(missing);
-    } catch {
-      // Best-effort: a failed batch just leaves placeholders showing. Allow a
-      // later attempt rather than marking these as permanently fetched.
-      for (const p of missing) inFlight.current.delete(p);
-      return;
-    }
-
-    setTags((prev) => {
-      const next = new Map(prev);
-      for (const r of results) next.set(r.path, r.tags);
-      return next;
-    });
-    setCovers((prev) => {
-      const next = new Map(prev);
-      for (const r of results) {
-        const pictures = r.tags?.pictures ?? [];
-        next.set(r.path, pictures.find((p) => p.picture_type === "CoverFront") ?? pictures[0] ?? null);
-      }
-      return next;
-    });
-  }, []);
+  const [{ tags, covers }, setSnapshot] = useState<TagCacheSnapshot>(() => ({
+    tags: new Map<string, TagSet | null>(),
+    covers: new Map<string, CoverArt | null>(),
+  }));
+  const [cache] = useState(() => new TagCache(api.readTagsBatch, setSnapshot));
+  const fetchMissing = useCallback((paths: string[]) => cache.fetchMissing(paths), [cache]);
 
   /// Re-read these paths from disk — used after a successful tag write.
   ///
@@ -55,28 +27,12 @@ export function useTagCache() {
   /// save doesn't do, so dropping the entries alone would leave the panel
   /// showing nothing until the selection changed.
   const invalidate = useCallback(
-    (paths: string[]) => {
-      for (const p of paths) inFlight.current.delete(p);
-      setTags((prev) => {
-        const next = new Map(prev);
-        for (const p of paths) next.delete(p);
-        return next;
-      });
-      setCovers((prev) => {
-        const next = new Map(prev);
-        for (const p of paths) next.delete(p);
-        return next;
-      });
-      void fetchMissing(paths);
-    },
-    [fetchMissing],
+    (paths: string[]) => cache.invalidate(paths),
+    [cache],
   );
 
-  const clear = useCallback(() => {
-    inFlight.current.clear();
-    setTags(new Map());
-    setCovers(new Map());
-  }, []);
+  const clear = useCallback(() => cache.clear(), [cache]);
+  const retain = useCallback((present: Set<string>) => cache.retain(present), [cache]);
 
   /// Tags for a selection, with unreadable/unsupported files dropped.
   const tagSetsFor = useCallback(
@@ -85,7 +41,7 @@ export function useTagCache() {
     [tags],
   );
 
-  return { tags, covers, fetchMissing, invalidate, clear, tagSetsFor };
+  return { tags, covers, fetchMissing, invalidate, clear, retain, tagSetsFor };
 }
 
 /// Keeps the cache filled for whatever paths are currently on screen.

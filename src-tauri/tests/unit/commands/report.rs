@@ -40,3 +40,22 @@ fn report_write_error_names_the_report_and_destination() {
     #[cfg(target_os = "macos")]
     assert!(message.contains("Files & Folders"));
 }
+
+#[test]
+fn an_audio_destination_name_cannot_overwrite_the_original_track() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = dir.path().join("track.wav");
+    std::fs::write(&audio, b"original audio").unwrap();
+    let report = FolderReport {
+        root: "/music".to_string(),
+        files: vec![],
+        has_flac: false,
+    };
+    tauri::async_runtime::block_on(save_report_json(
+        audio.to_string_lossy().into_owned(),
+        report,
+    ))
+    .unwrap();
+    assert!(dir.path().join("track.json").exists());
+    assert_eq!(std::fs::read(audio).unwrap(), b"original audio");
+}

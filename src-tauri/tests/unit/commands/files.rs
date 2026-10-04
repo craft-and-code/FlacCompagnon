@@ -25,3 +25,14 @@ fn only_the_absent_paths_come_back() {
 fn an_empty_request_is_an_empty_answer() {
     assert!(missing_paths(Vec::new()).is_empty());
 }
+#[test]
+fn relative_file_manager_arguments_cannot_be_interpreted_as_options() {
+    let current = std::env::current_dir().unwrap();
+    let dir = tempfile::tempdir_in(&current).unwrap();
+    let file = dir.path().join("-R");
+    std::fs::write(&file, b"audio").unwrap();
+    let relative = file.strip_prefix(&current).unwrap();
+    let resolved = browser_path(relative.to_str().unwrap(), "File").unwrap();
+    assert!(resolved.is_absolute());
+    assert_eq!(resolved, file.canonicalize().unwrap());
+}

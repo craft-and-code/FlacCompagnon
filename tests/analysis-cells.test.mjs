@@ -9,6 +9,8 @@ const { outputFiles } = await build({
       export { sortFiles } from "./src/components/tableSort";
       export { reconcile } from "./src/components/useColumnPrefs";
       export { SPECTROGRAM_SIZE_STORAGE_KEY, readSpectrogramSize, writeSpectrogramSize } from "./src/components/useSpectrogramSize";
+      export { LookupModal } from "./src/components/LookupModal";
+      export { createElement } from "react";
       export { renderToStaticMarkup } from "react-dom/server";`,
     resolveDir: process.cwd(),
   },
@@ -25,6 +27,8 @@ const {
   SPECTROGRAM_SIZE_STORAGE_KEY,
   readSpectrogramSize,
   writeSpectrogramSize,
+  LookupModal,
+  createElement,
 } = await import(
   `data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString("base64")}`
 );
@@ -51,6 +55,29 @@ test("columns after the FLAC MD5 signature start hidden without overriding a sav
 
   const saved = reconcile({ order: ALL_COLUMNS.map((column) => column.key), hidden: [] });
   assert.ok(later.every((column) => !saved.hidden.has(column.key)));
+});
+
+test("duplicate saved column keys cannot render the same column twice", () => {
+  const keys = ALL_COLUMNS.map((column) => column.key);
+  const state = reconcile({ order: [keys[0], keys[0], ...keys], hidden: [] });
+  assert.deepEqual(state.order, keys);
+});
+
+test("disabled local storage does not crash the online lookup panel", () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    get() { throw new Error("storage disabled"); },
+  });
+  try {
+    assert.equal(renderToStaticMarkup(createElement(LookupModal, {
+      open: false, onClose() {}, selectedPaths: [], existingReleaseId: null,
+      prefill: { artist: "", album: "" }, onApply() {}, onToast() {},
+    })), "");
+  } finally {
+    if (previous) Object.defineProperty(globalThis, "localStorage", previous);
+    else delete globalThis.localStorage;
+  }
 });
 
 test("spectrogram size accepts only supported values and persists the menu choice", () => {

@@ -13,7 +13,10 @@ const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
 /// hundred KB; Discogs' originals can be much larger. Whatever comes back is
 /// base64'd and handed to the webview, so an unbounded download would be a
 /// memory blowup driven by a third-party response.
-const MAX_COVER_BYTES: usize = 12 * 1024 * 1024;
+const MAX_COVER_BYTES: usize = flaccompagnon_services::tags::cover::MAX_COVER_BYTES;
+/// A detailed release is much smaller than this even with a large track list;
+/// malformed API responses must not allocate without a bound either.
+const MAX_JSON_BYTES: usize = 4 * 1024 * 1024;
 
 /// MusicBrainz's usage policy requires a descriptive User-Agent with a way to
 /// reach the developer; Discogs asks for the same courtesy.
@@ -29,6 +32,9 @@ pub(super) fn user_agent() -> String {
 pub(super) fn http_client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
         .timeout(REQUEST_TIMEOUT)
+        // Applied to redirects as well as the original URL, so artwork hosted
+        // elsewhere cannot downgrade a request to cleartext HTTP.
+        .https_only(true)
         .build()
         .map_err(|e| format!("Could not create the HTTP client: {e}"))
 }
@@ -43,9 +49,33 @@ pub(super) async fn parse_json_response(
     if !resp.status().is_success() {
         return Err(format!("{provider} returned {}", resp.status()));
     }
-    resp.json()
+    let bytes = read_bounded_response(resp, MAX_JSON_BYTES)
         .await
+        .map_err(|e| format!("{provider} response could not be read: {e}"))?;
+    serde_json::from_slice(&bytes)
         .map_err(|e| format!("{provider} response was not valid JSON: {e}"))
+}
+
+async fn read_bounded_response(
+    mut resp: reqwest::Response,
+    limit: usize,
+) -> Result<Vec<u8>, String> {
+    if resp.content_length().is_some_and(|len| len > limit as u64) {
+        return Err("response exceeds the size limit".to_string());
+    }
+    let mut bytes = Vec::new();
+    while let Some(chunk) = resp.chunk().await.map_err(|e| e.to_string())? {
+        append_bounded(&mut bytes, &chunk, limit)?;
+    }
+    Ok(bytes)
+}
+
+fn append_bounded(bytes: &mut Vec<u8>, chunk: &[u8], limit: usize) -> Result<(), String> {
+    if chunk.len() > limit.saturating_sub(bytes.len()) {
+        return Err("response exceeds the size limit".to_string());
+    }
+    bytes.extend_from_slice(chunk);
+    Ok(())
 }
 
 /// Best-effort image download — used for both providers' cover art. `None`
@@ -67,18 +97,10 @@ pub(super) async fn fetch_cover(client: &reqwest::Client, url: &str) -> Option<C
     if !resp.status().is_success() {
         return None;
     }
-    // Reject an oversized image up front when the server declares its size,
-    // so the common case never starts the download at all.
-    if let Some(len) = resp.content_length() {
-        if len > MAX_COVER_BYTES as u64 {
-            return None;
-        }
-    }
-    let bytes = resp.bytes().await.ok()?;
-    // A server can lie about (or omit) Content-Length, so the real size is
-    // checked again once the body is in hand.
-    if bytes.len() > MAX_COVER_BYTES {
-        return None;
-    }
-    flaccompagnon_services::tags::cover_from_bytes(bytes.to_vec(), url).ok()
+    let bytes = read_bounded_response(resp, MAX_COVER_BYTES).await.ok()?;
+    flaccompagnon_services::tags::cover_from_bytes(bytes, url).ok()
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/lookup/http.rs"]
+mod tests;

@@ -18,7 +18,10 @@ audiopus = "0.2"
 ogg = "0.9"
 mp3lame-encoder = "0.2"
 walkdir = "2"
+tempfile = "3"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [dev-dependencies]
-tempfile = "3"
 claxon = "0.4"

@@ -267,7 +267,7 @@ pub fn read_tags(path: &Path) -> Result<TagSet, TagError> {
         }
     }
 
-    out.pictures = cover::extract_all(tag);
+    out.pictures = cover::extract_all(tag, &path.display().to_string())?;
 
     Ok(out)
 }

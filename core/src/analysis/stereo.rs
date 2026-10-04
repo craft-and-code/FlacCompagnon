@@ -91,13 +91,21 @@ pub fn is_fake(
     identical_frames: u64,
     total_frames: u64,
 ) -> bool {
-    if total_frames == 0 {
+    let sig_energy = l_energy + r_energy;
+    if total_frames == 0
+        || !diff_energy.is_finite()
+        || !sig_energy.is_finite()
+        || diff_energy < 0.0
+        || l_energy < 0.0
+        || r_energy < 0.0
+        || sig_energy == 0.0
+    {
         return false;
     }
+    // Equality of two silent channels is not evidence of a mono programme.
     if identical_frames == total_frames {
         return true;
     }
-    let sig_energy = l_energy + r_energy;
     if sig_energy <= f64::EPSILON {
         return false; // both channels silent
     }

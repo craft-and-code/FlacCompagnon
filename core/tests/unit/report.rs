@@ -1,5 +1,6 @@
 use super::*;
 use crate::analysis::detections::Detections;
+use crate::FlacMd5Status;
 use crate::{ClippingInfo, FileAnalysis};
 
 fn sample_file() -> FileAnalysis {

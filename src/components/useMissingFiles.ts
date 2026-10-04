@@ -12,9 +12,11 @@
 // commands/files.rs) — no decoding, so it stays cheap enough to run on a
 // whole library at once.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import * as api from "../api";
+import { FilePresence, filePresenceKey, type FilePresenceSnapshot } from "./filePresence";
+import { useLatest } from "./useLatest";
 
 export interface UseMissingFilesArgs {
   /// Every path currently in the table.
@@ -39,87 +41,46 @@ export function useMissingFiles({
   onReappeared,
   onToast,
 }: UseMissingFilesArgs) {
-  const [missing, setMissing] = useState<Set<string>>(() => new Set());
-  const [checking, setChecking] = useState(false);
-
-  // `paths` is a fresh array on every render, so effects and callbacks read it
-  // through a ref instead of listing it as a dependency — otherwise the
-  // automatic check below would re-run on every render forever.
-  const pathsRef = useRef(paths);
-  pathsRef.current = paths;
-
-  // The callbacks go through refs for the same reason, and it is not
-  // defensive: `check` listed them as dependencies, so an inline arrow from
-  // the caller made `check` a new function every render, which retriggered
-  // the effect below, which called `setChecking` — a render loop that showed
-  // up as a refresh button spinning forever and permanently disabled. Reading
-  // them here means a caller cannot cause that by writing perfectly ordinary
-  // JSX.
-  const onReappearedRef = useRef(onReappeared);
-  onReappearedRef.current = onReappeared;
-  const onToastRef = useRef(onToast);
-  onToastRef.current = onToast;
-
-  const check = useCallback(async () => {
-    const current = pathsRef.current;
-    if (current.length === 0) {
-      setMissing(new Set());
-      return;
-    }
-    setChecking(true);
-    try {
-      const now = new Set(await api.missingPaths(current));
-      setMissing((before) => {
-        // Everything that *was* missing and no longer is. These need their
-        // metadata re-read, not just their strike-through removed.
-        const back = [...before].filter((p) => !now.has(p));
-        if (back.length > 0) onReappearedRef.current(back);
-        return now;
-      });
-    } catch (e) {
-      onToastRef.current(String(e), "error");
-    } finally {
-      setChecking(false);
-    }
-    // No dependencies: everything this reads is a ref, so `check` is stable
-    // for the life of the hook and the effect below fires only when the
-    // listing actually changes.
-  }, []);
+  const [{ missing, checking }, setSnapshot] = useState<FilePresenceSnapshot>(() => ({
+    missing: new Set(),
+    checking: false,
+  }));
+  // Inline callbacks must not rebind the request controller or retrigger the
+  // automatic scan on every render.
+  const latest = useLatest({ paths, onReappeared, onToast });
+  const [presence] = useState(() =>
+    new FilePresence(
+      api.missingPaths,
+      setSnapshot,
+      (back) => latest.current.onReappeared(back),
+      (error) => latest.current.onToast(String(error), "error"),
+    ),
+  );
 
   /// The refresh button: same check, plus a spoken result. Silence would be
   /// indistinguishable from a button that does nothing, which is exactly the
   /// complaint this feature exists to answer.
   const refresh = useCallback(async () => {
-    const before = pathsRef.current.length;
-    await check();
-    if (before === 0) return;
-    // Read back through the state setter rather than `missing`, which is the
-    // value captured when this callback was created, not the one just set.
-    setMissing((now) => {
-      onToastRef.current(
+    const current = latest.current.paths;
+    await presence.check(current, (now) =>
+      latest.current.onToast(
         now.size === 0
-          ? `All ${before} file${before === 1 ? "" : "s"} are where they should be.`
-          : `${now.size} of ${before} file${before === 1 ? "" : "s"} could not be found.`,
+          ? `All ${current.length} file${current.length === 1 ? "" : "s"} are where they should be.`
+          : `${now.size} of ${current.length} file${current.length === 1 ? "" : "s"} could not be found.`,
         now.size === 0 ? "info" : "error",
-      );
-      return now;
-    });
-  }, [check]);
+      ),
+    );
+  }, [presence, latest]);
 
   // A reloaded report is the case that motivates all of this: its paths were
   // written at some point in the past and nothing guarantees they still
-  // resolve. Keyed on the listing's identity (its length and first path is
-  // enough to tell one load from another) rather than on `paths` itself,
-  // which changes identity on every render.
-  const signature = `${fromReport}|${paths.length}|${paths[0] ?? ""}`;
+  // resolve. Manual reorder must not cause another filesystem scan.
+  const signature = useMemo(() => filePresenceKey(paths), [paths]);
   useEffect(() => {
-    if (!fromReport) {
-      setMissing(new Set());
-      return;
-    }
-    void check();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature, check]);
+    presence.reset();
+    if (fromReport) void presence.check(latest.current.paths);
+    return () => presence.reset();
+  }, [signature, fromReport, presence, latest]);
 
   return { missing, checking, refresh };
 }

@@ -134,7 +134,7 @@ export function fmtModified(unixSecs: number | null): string {
 
 /// `CoverArt.picture_type` is Rust's `Debug` output for lofty's `PictureType`
 /// enum (e.g. `"CoverFront"`). These keys are exactly the strings
-/// `core::tags::parse_picture_type` understands on the Rust side; anything
+/// `services::tags::parse_picture_type` understands on the Rust side; anything
 /// else falls back to "Other" there too.
 export const PICTURE_TYPE_LABELS: Record<string, string> = {
   CoverFront: "Front cover",

@@ -129,3 +129,28 @@ fn floating_point_audio_has_no_integer_padding_measurement() {
         None
     );
 }
+
+#[test]
+fn non_finite_pcm_is_rejected_by_analysis_and_playback() {
+    let dir = tempfile::tempdir().expect("temporary directory");
+    let path = dir.path().join("non-finite.wav");
+    for sample in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+        let mut writer = hound::WavWriter::create(
+            &path,
+            hound::WavSpec {
+                channels: 1,
+                sample_rate: 48_000,
+                bits_per_sample: 32,
+                sample_format: hound::SampleFormat::Float,
+            },
+        )
+        .expect("WAV writer");
+        for value in [0.25, sample, -0.25] {
+            writer.write_sample(value).expect("float sample");
+        }
+        writer.finalize().expect("finish WAV");
+        let selection = crate::AnalysisSelection::from_names(["clipping"]).expect("known analysis");
+        assert!(decode_and_analyze_selected(&path, selection).is_err());
+        assert!(crate::decode::decode_to_pcm(&path).is_err());
+    }
+}

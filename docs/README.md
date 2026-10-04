@@ -41,10 +41,14 @@ The complete project checks are run from the repository root:
 
 ```sh
 npx tsc --noEmit
+npm test
 npm run build
 npm run check:markdown
-cargo test
-cargo clippy
+npm run build:site
+cargo fmt --all --check
+cargo test --workspace --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --locked --no-deps
 ```
 
 Some reference comparisons require FFmpeg. Those tests are marked ignored so FFmpeg remains optional for ordinary development. Individual pages name the narrowest useful command and their manual audio fixtures.

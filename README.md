@@ -41,6 +41,8 @@ A **search field** above the table filters which rows are shown — type a forma
 
 The **File** column supports Mp3tag/Finder-style inline renaming: click a row to select it, then click its name again (not a double-click) to edit it. Only the file's stem is editable — the extension is fixed and shown next to it as plain text, so a rename can never accidentally turn a `.flac` into a `.mp3` without actually transcoding it. **Enter** renames the file on disk; **Escape**, or clicking anywhere else, discards the edit and leaves the file untouched.
 
+Renaming never replaces an existing destination, including when two requests choose the same name at the same time.
+
 ### 2. File fingerprints (MD5 + CRC32)
 
 Every analyzed file also gets the **MD5 and CRC32 of its bytes** — tags and cover art included — computed in one read alongside its size and modification time. Two hidden-by-default columns, **File MD5** and **File CRC32**, show them; both are in the CSV and JSON reports, and both are searchable, so pasting a CRC32 out of an `.sfv` finds its file.
@@ -156,7 +158,7 @@ A second panel, mirroring the tag panel on the right, converts audio files to an
 - **"Keep original file dates"** stamps each converted file with its source's last-modified date, so the copies sort by date the way the originals did. Applies to every format, not just FLAC — it's a property of the file written, not of the codec.
 - The drop zone animates while a batch runs, and the **whole app is frozen** for the duration (only the panel's own Cancel button stays live) — nothing else needs CPU cycles while your machine is busy encoding, and if a track was playing it's paused automatically first.
 
-Converting never touches your original files — it only ever writes new ones under the destination folder you pick. **DSD sources (`.dsf`/`.dff`) aren't convertible yet** (the fast decode path this feature uses doesn't handle DSD — only the separate ffmpeg-backed analysis path can); a DSD file dropped in reports a clear per-file error rather than being silently skipped. Opus and MP3 only accept a handful of fixed sample rates, so a hi-res source (88.2/96/176.4/192 kHz) is resampled first with a plain linear interpolator — good enough given how much both codecs' own psychoacoustic coding already discards, but not a mastering-grade resampler.
+Converting never touches your original files. It stages each output beside its destination and publishes it only after encoding and metadata copying finish. Existing destination files are never replaced; duplicate output names or paths escaping the chosen output folder are rejected. Choose an empty folder for a new run. Files copied by **Also copy other files** also preserve existing outputs and skip the output subtree when it is inside the source folder. **DSD sources (`.dsf`/`.dff`) aren't convertible yet** (the fast decode path this feature uses doesn't handle DSD — only the separate ffmpeg-backed analysis path can); a DSD file dropped in reports a clear per-file error rather than being silently skipped. Opus and MP3 only accept a handful of fixed sample rates, so a hi-res source (88.2/96/176.4/192 kHz) is resampled first with a plain linear interpolator — good enough given how much both codecs' own psychoacoustic coding already discards, but not a mastering-grade resampler.
 
 ---
 
@@ -289,7 +291,7 @@ All cut-off-based detection assumes genuine music has energy up near Nyquist. Ac
 ### Prerequisites
 
 - [Rust](https://rustup.rs/) (stable) and Cargo.
-- [Node.js](https://nodejs.org/) 18+ and npm.
+- [Node.js](https://nodejs.org/) 22+ and npm.
 - Tauri v2 system dependencies for your OS — see <https://v2.tauri.app/start/prerequisites/> (on Linux: `webkit2gtk`, `libayatana-appindicator`, etc.).
 - **autoconf, automake and libtool** — build-time only, for the Opus encoder. The `audiopus_sys` crate compiles a vendored libopus with the autotools, so `autoreconf` has to be on `PATH` or the build stops at "Failed to autogen Opus". Most Linux setups already have them; macOS does not:
   - macOS: `brew install autoconf automake libtool`
@@ -322,7 +324,7 @@ Nothing links against a system library: the two C codecs used for conversion (li
 ### 1. Install dependencies
 
 ```bash
-npm install
+npm ci
 ```
 
 ### 2. Run in development
@@ -337,7 +339,7 @@ npm run tauri dev
 npm run tauri build
 ```
 
-The installer/app bundle is written to `src-tauri/target/release/bundle/`.
+The installer/app bundle is written to `target/release/bundle/`.
 
 Build the standalone command separately with `cargo build --release -p flaccompagnon-cli`. The binary is `target/release/flaccompagnon` (or `.exe` on Windows).
 
@@ -413,7 +415,26 @@ cargo run --release -p flaccompagnon-core --example probe -- "/path/to/track.fla
 
 It reports the likelihood, the winning sample alignment and the verdict for **both** the AAC and MP3 sweeps, plus per-channel MP3 scores. Use it when the app's Detection column says something surprising — it runs the same detector code, so it separates "the algorithm is wrong" from "the app I am running was built before the algorithm changed". `--release` matters: a debug build takes minutes.
 
-The **network is never touched by the test suite**: the lookup's HTTP calls are not exercised, only the pure input-validation around them, so `cargo test` stays fast and works offline.
+The **network is never touched by the test suite**: lookup tests exercise pure validation and bounded-buffer handling without contacting providers. Dependency audits are separate commands and need network access.
+
+Run the full verification from the repository root:
+
+```sh
+cargo fmt --all --check
+npx tsc --noEmit
+npm run build
+npm test
+python3 -m unittest discover -s tests -p "appimage*_test.py"
+npm run check:markdown
+npm run build:site
+cargo test --workspace --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --locked --no-deps
+```
+
+With FFmpeg installed, also run `cargo test -p flaccompagnon-core --test loudness_reference --test dc_offset -- --ignored` for the independent reference comparisons. [Frontend checks](tests/README.md) describe the browser fixture and performance measurements. `npm test` discovers every `tests/*.test.mjs` suite, including state, detection display, stereo, search, table and website regressions.
+
+The [security and maintenance audit](docs/maintenance-audit.md) records the 4 October 2026 fixes, measured performance improvements and remaining dependency and validation limits.
 
 ---
 
@@ -467,7 +488,7 @@ There are **two** exceptions, both explicit, deliberate actions that never happe
 - The tag panel's **Save** button writes the tags (and cover art) you edited back into the selected files — only the fields you actually changed are written, and the **audio stream itself is never re-encoded or touched**, only the metadata container around it.
 - Renaming a file from the results table (click twice on its name, see [above](#1-authenticity-detections-lossless-audio-checker-model)) changes its name on disk — again, only its name: the audio and its tags are untouched.
 
-If you want the guarantee that nothing can ever be written, simply don't use the tag panel's Save button and don't rename any file — every other feature is read-only.
+Analysis and playback read the original audio only. Saving tags, renumbering tags and renaming tracks are explicit edits; generating spectrograms, exporting artwork, saving reports and playlists, and converting create separate output files at their chosen destinations. CSV and JSON reports, playlists and artwork exports use atomic file replacement and reject symbolic-link destinations. CSV text fields are protected against spreadsheet formulas; JSON preserves their original text.
 
 The **conversion panel** (see [above](#10-conversion)) is a separate case: it always writes **new** files, under a destination folder you explicitly pick each time — the sources it reads from are never modified or moved.
 
@@ -475,22 +496,22 @@ The **conversion panel** (see [above](#10-conversion)) is a separate case: it al
 
 FlacCompagnon works **fully offline**. The single feature that makes a network request is the tag panel's **Search online** button, and only on that click:
 
-- Requests go to **MusicBrainz**, the **Cover Art Archive**, and — only if you configured a token — **Discogs**. Nowhere else.
+- Requests go to **MusicBrainz**, the **Cover Art Archive**, and — only if you configured a token — **Discogs**, plus HTTPS image hosts referenced by those providers, including redirected artwork hosts.
 - What is sent is the **search text** (artist/album, or a release ID already in your tags). **No audio, no file paths, no file contents, and no identifying information about you** ever leave the machine.
 - There is **no telemetry, analytics, crash reporting or update check** anywhere in the app.
 - Your Discogs token is stored locally by the app and is only ever sent to Discogs.
 
-Requests carry a descriptive `User-Agent` (as MusicBrainz's usage policy requires), time out after 20 s, and downloaded cover images are size-capped.
+Requests carry a descriptive `User-Agent`, time out after 20 s and remain on HTTPS through redirects. Provider JSON responses are limited to 4 MiB and cover images to 12 MiB while reading, even without `Content-Length`. Local and embedded artwork use the same 12 MiB limit and a 64-megapixel dimension limit. Report imports are limited to 64 MiB and accept regular files only.
 
 ---
 
 ## Limitations & notes
 
 - **Upsampling** remains a heuristic and can misfire on unusual material; a spectrogram cannot prove the original sample rate. **Transcoding** is a statistical test with known tonal false positives and a provisional calibration. **Upscaling** measures unused integer bits exactly; its additional grid estimate can miss processed sources or flag deliberately grid-like material.
-- **AAC transcode detection covers all bitrates at 44.1/48 kHz** (validated on real 128/192/256/320 kbps AAC→FLAC transcodes against their originals: zero false positives, 24/24 recall, including transient-dense content via the short-block analysis). **MP3 sources** are still only caught through the spectral brick-wall signature, so high-bitrate MP3 (320 kbps) can pass — MP3 uses a different filterbank (hybrid PQMF + 576-point MDCT) and would need its own re-quantization detector.
+- **AAC and MP3 transcode detection use separate codec-lattice searches** at their supported rates. Their calibration is preliminary; the synthetic and encoder regression suites do not establish recall or false-positive rates for a real music library. See [the method and its limits](docs/transcoding.md).
 - Integer bit-depth analysis preserves decoded PCM through 32 bits without a float round-trip. Floating-point sources have no integer precision verdict.
 - FLAC files are decoded **once**: a fused pass feeds the analysis and hashes the MD5 from the same raw integer samples (bit-identical to `flac -t`), so MD5 verification adds only a negligible hashing cost on top of the analysis.
-- Files are analyzed **in parallel**: a worker pool sized to the machine (one worker per CPU core, minus one to keep the UI responsive) processes independent files concurrently, so analyzing an album scales with your core count.
+- The desktop analyzes files **in parallel** with one worker per CPU core minus one, capped by the batch size. The standalone CLI and `core::analyze_folder` process files sequentially. Runtime scaling depends on the detection workload, storage and available memory.
 - **Extended tags only offer a curated list of fields to add**, not a free-text custom key. lofty (the tagging library) can only write one of its own known tag keys, not an arbitrary made-up frame the way some tools' TXXX editors can, so a free-text field would silently do nothing for a name it doesn't recognize.
 - **The online lookup matches by text, not by audio.** It uses an existing MusicBrainz ID when the files carry one, otherwise the tags, otherwise a guess from the file name. It does **not** fingerprint the audio, so a badly-named, untagged file may need the query typed by hand.
 - **Playlists store absolute paths**, so they survive being opened from anywhere on the machine but break if the audio files are moved afterwards.

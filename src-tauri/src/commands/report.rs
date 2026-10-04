@@ -52,16 +52,21 @@ fn report_write_error(path: &Path, format: &str, error: &io::Error) -> String {
 
 /// Write a report selected in the native save dialog, keeping the extension and
 /// operating-system error handling identical for CSV and JSON exports.
-fn save_report(
+async fn save_report(
     dest: String,
     report: FolderReport,
-    extension: &str,
-    format: &str,
+    extension: &'static str,
+    format: &'static str,
     write: fn(&Path, &FolderReport) -> io::Result<()>,
 ) -> Result<String, String> {
     let path = stem_with_ext(&dest, extension)?;
-    write(&path, &report).map_err(|error| report_write_error(&path, format, &error))?;
-    Ok(path.to_string_lossy().to_string())
+    let written = path.to_string_lossy().to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        write(&path, &report).map_err(|error| report_write_error(&path, format, &error))
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    Ok(written)
 }
 
 /// Write only the CSV report for an already-analyzed result — the toolbar's
@@ -69,14 +74,14 @@ fn save_report(
 /// frontend doc comment for why) and the menu bar's standalone "Export CSV".
 #[tauri::command]
 pub async fn save_report_csv(dest: String, report: FolderReport) -> Result<String, String> {
-    save_report(dest, report, "csv", "CSV", core::report::write_csv)
+    save_report(dest, report, "csv", "CSV", core::report::write_csv).await
 }
 
 /// Write only the JSON report — same shape as [`save_report_csv`], for the
 /// menu bar's standalone "Export JSON" (and the second half of "Save…").
 #[tauri::command]
 pub async fn save_report_json(dest: String, report: FolderReport) -> Result<String, String> {
-    save_report(dest, report, "json", "JSON", core::report::write_json)
+    save_report(dest, report, "json", "JSON", core::report::write_json).await
 }
 
 /// Write the table's current order out as a playlist (Simple or Extended
@@ -100,7 +105,7 @@ pub async fn save_playlist(
     let content = flaccompagnon_services::playlist::build_playlist(&entries, format);
     let written = out_path.to_string_lossy().to_string();
     tauri::async_runtime::spawn_blocking(move || {
-        std::fs::write(&out_path, content).map_err(|e| e.to_string())
+        core::report::write_atomic_bytes(&out_path, content.as_bytes()).map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| e.to_string())??;
@@ -113,12 +118,9 @@ pub async fn save_playlist(
 pub async fn load_report(path: String) -> Result<FolderReport, String> {
     // Reading and parsing both block; a large report on a slow disk would
     // otherwise stall the async runtime's thread.
-    tauri::async_runtime::spawn_blocking(move || {
-        let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        core::report::parse_json(&text)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || core::report::read_json(Path::new(&path)))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[cfg(test)]

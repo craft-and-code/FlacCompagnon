@@ -1,63 +1,29 @@
-//! Converting audio files to another format: FLAC, Opus, MP3 or WAV.
+//! Convert PCM audio to FLAC, Opus, MP3, or 16-bit WAV.
 //!
-//! Like [`crate::tags`], this module **does** write to disk beyond the source
-//! file it reads — one converted file per source, plus (optionally, see
-//! [`passthrough_files`]) plain copies of whatever else shares its folder.
-//! That is a deliberate reading of "no I/O beyond the audio files it is
-//! given" (see CLAUDE.md): the files it is *given* are exactly what it
-//! produces output for, the same way `tags::write_tags` reads that rule as
-//! covering writes to the files it is asked to tag, not just reads.
+//! Analysis remains in `flaccompagnon-core`; this services module owns the
+//! files it writes. Each conversion finishes audio encoding, metadata copying,
+//! and optional timestamp preservation in a temporary file beside its output.
+//! Publishing never replaces an existing file, including a source file, and
+//! failed or cancelled conversions remove their temporary output.
 //!
-//! DSD (`.dsf`/`.dff`) is out of scope for now: [`crate::decode::decode_to_pcm`]
-//! doesn't handle it (Symphonia cannot decode DSD; only the ffmpeg-backed
-//! analysis path can), so a DSD source fails fast with
-//! [`ConvertError::Unsupported`] rather than silently producing nothing or
-//! panicking partway through.
+//! FLAC uses the pure-Rust `flacenc` encoder. Opus and MP3 vendor their C
+//! codecs; building Opus requires the autotools documented in the README.
+//! DSD sources fail with [`ConvertError::Unsupported`] because the shared PCM
+//! decoder does not handle them.
 //!
-//! ## Format choice
-//!
-//! All four targets are free to depend on: FLAC via a pure-Rust encoder
-//! (`flac`, crate `flacenc`, no C toolchain at all), WAV via plain PCM muxing
-//! (`wav`, crate `hound`), and Opus/MP3 (`opus`, `mp3`) via crates that
-//! vendor their respective C codec (`libopus`, LAME) from source
-//! rather than linking a system library — so a built binary has no runtime
-//! dependency to install. *Building* is a different matter, and this comment
-//! used to get it wrong: `audiopus_sys` 0.1.x (what `audiopus` 0.2 pins)
-//! configures its vendored libopus with the autotools, so `autoreconf` has to
-//! be on PATH. That is fine on Linux, where the toolchain is usually already
-//! there, and not on a bare macOS box — see the README's prerequisites and the
-//! `brew install autoconf automake libtool` step in `.github/workflows/`.
-//! Opus and MP3's *patents* are what mattered here, not their build story:
-//! Opus was designed royalty-free from the start, and MP3's patents have all
-//! expired (the last, in the US, in 2017) — this app holds no codec license
-//! either way, so both are as free to ship as FLAC.
-//!
-//! ## Metadata
-//!
-//! Every conversion also carries the source's tags onto the result, via
-//! [`crate::tags::copy_tags`] — not as an option, because a copy of the music
-//! with no title and no cover is barely a copy at all. It runs after the
-//! encoder, and its failure is a warning rather than an error: see
-//! [`ConvertOutcome`].
-//!
-//! ## Module layout
-//!
-//! One file per encoder (`flac`, `wav`, `opus`, `mp3`), because each wraps a
-//! different codec crate with essentially nothing in common. What's left here
-//! is the dispatch: [`convert_file`] picks the encoder for one file, decodes
-//! it once, and copies its tags across.
-//!
-//! Three neighbours sit beside them, each for a reason of its own:
-//! `layout` (where output files land — [`plan_batch`], [`passthrough_files`]
-//! and [`ConvertSource`] are re-exported from it), `pcm` (sample reshaping
-//! shared by the encoders) and `cleanup` (removing what a cancelled batch
-//! already wrote).
+//! Source tags are always copied. A metadata failure returns a warning in
+//! [`ConvertOutcome`] while preserving the converted audio. Encoders live in
+//! their own modules; `layout` plans destinations and copies neighbouring files,
+//! `pcm` shares sample reshaping, and `cleanup` removes a cancelled batch's
+//! published outputs.
 
 mod cleanup;
 mod flac;
 mod layout;
 mod mp3;
 mod opus;
+mod output;
+mod paths;
 mod pcm;
 mod wav;
 
@@ -243,21 +209,22 @@ pub fn convert_file(
     if is_cancelled() {
         return Err(ConvertError::Cancelled(name()));
     }
-    ensure_parent_dir(dest)?;
+    let output = output::StagedOutput::new(dest, settings.format)?;
+    let staged = output.path();
 
     match settings.format {
         ConvertFormat::Flac => {
-            flac::encode(&pcm, dest, source_bit_depth(src), settings.flac_effort)
+            flac::encode(&pcm, staged, source_bit_depth(src), settings.flac_effort)
         }
-        ConvertFormat::Wav => wav::encode(&pcm, dest),
+        ConvertFormat::Wav => wav::encode(&pcm, staged),
         ConvertFormat::Opus => opus::encode(
             &pcm,
-            dest,
+            staged,
             settings.bitrate_kbps.unwrap_or(DEFAULT_OPUS_KBPS),
         ),
         ConvertFormat::Mp3 => mp3::encode(
             &pcm,
-            dest,
+            staged,
             settings.bitrate_kbps.unwrap_or(DEFAULT_MP3_KBPS),
         ),
     }?;
@@ -268,15 +235,19 @@ pub fn convert_file(
     // user looking for a file that is actually sitting there, complete. The
     // problem is still surfaced, just as what it is: a warning about one
     // file's tags, not a failed conversion.
-    let tag_warning = crate::tags::copy_tags(src, dest)
+    let tag_warning = crate::tags::copy_tags(src, staged)
         .err()
         .map(|e| e.to_string());
 
     // After the tags, never before: writing them rewrites the file and would
     // stamp it "now" again, silently undoing this.
     if settings.preserve_modtime {
-        copy_modtime(src, dest)?;
+        copy_modtime(src, staged)?;
     }
+    if is_cancelled() {
+        return Err(ConvertError::Cancelled(name()));
+    }
+    output.publish(dest)?;
     Ok(ConvertOutcome { tag_warning })
 }
 
@@ -313,14 +284,6 @@ fn copy_modtime(src: &Path, dest: &Path) -> Result<(), ConvertError> {
     std::fs::File::open(dest)
         .and_then(|f| f.set_modified(modified))
         .map_err(io_err)
-}
-
-fn ensure_parent_dir(dest: &Path) -> Result<(), ConvertError> {
-    if let Some(parent) = dest.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| ConvertError::Io(dest.display().to_string(), e.to_string()))?;
-    }
-    Ok(())
 }
 
 #[cfg(test)]

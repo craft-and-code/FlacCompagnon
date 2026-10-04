@@ -5,49 +5,21 @@ import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-import type { Progress, SpectrogramSize } from "../types";
+import type { Progress } from "../types";
 import { useLatest } from "./useLatest";
+import { dispatchMenuAction, type MenuActions } from "./menuActions";
 
-export interface MenuActions {
-  exportM3u: () => void;
-  exportM3uExtended: () => void;
-  exportCsv: () => void;
-  exportJson: () => void;
-  reset: () => void;
-  setSpectrogramSize: (size: SpectrogramSize) => void;
-}
+export type { MenuActions } from "./menuActions";
 
-/// Native menu bar (built in src-tauri/src/lib.rs). Each item only emits its
+/// Native menu bar (built in src-tauri/src/menu.rs). Each item only emits its
 /// id; routing it here means every action keeps exactly one implementation —
 /// the same function the equivalent toolbar button calls.
-export function useMenuActions(actions: MenuActions) {
-  const latest = useLatest(actions);
+export function useMenuActions(actions: MenuActions, enabled = true) {
+  const latest = useLatest({ actions, enabled });
   useEffect(() => {
     const unlisten = listen<string>("menu://action", (e) => {
-      const a = latest.current;
-      switch (e.payload) {
-        case "export_m3u":
-          a.exportM3u();
-          break;
-        case "export_m3u_extended":
-          a.exportM3uExtended();
-          break;
-        case "export_csv":
-          a.exportCsv();
-          break;
-        case "export_json":
-          a.exportJson();
-          break;
-        case "reset":
-          a.reset();
-          break;
-        case "spectrogram_size_small":
-          a.setSpectrogramSize("half");
-          break;
-        case "spectrogram_size_full":
-          a.setSpectrogramSize("full");
-          break;
-      }
+      const { actions: current, enabled: available } = latest.current;
+      dispatchMenuAction(e.payload, current, available);
     });
     return () => {
       void unlisten.then((f) => f());

@@ -40,7 +40,11 @@ pub fn undo_batch(
     let mut parents: HashSet<PathBuf> = HashSet::new();
 
     for dest in planned {
-        if preexisting.contains(dest) || !dest.starts_with(output_root) || !dest.is_file() {
+        if preexisting.contains(dest)
+            || !dest.starts_with(output_root)
+            || super::paths::validate_output_directory(output_root, dest).is_err()
+            || !dest.is_file()
+        {
             continue;
         }
         if std::fs::remove_file(dest).is_ok() {

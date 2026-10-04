@@ -1,9 +1,8 @@
 //! Start/stop/pause/seek the preview player, and its volume.
 //!
-//! Every command that touches the audio thread (play, stop, pause, resume,
-//! seek) hops onto a blocking thread: the engine in [`crate::playback`] talks
-//! to that thread over a channel and waits for the reply, which must not
-//! happen on the async runtime's thread. Volume and mute are a pair of plain
+//! Play and stop are queued before scheduling a blocking worker so a delayed
+//! play cannot arrive after a newer stop. Waiting for playback, pause, resume,
+//! or seek happens off the async runtime. Volume and mute are a pair of plain
 //! atomics the output callback reads directly (see `playback::set_volume`'s
 //! doc comment) — nothing to wait on, so those two stay synchronous.
 
@@ -19,17 +18,16 @@ use crate::playback;
 /// notification from a track that was already superseded can be ignored.
 #[tauri::command]
 pub async fn play_track(path: String) -> Result<u64, String> {
-    tauri::async_runtime::spawn_blocking(move || playback::play(PathBuf::from(path)))
+    let request = playback::request_play(PathBuf::from(path))?;
+    tauri::async_runtime::spawn_blocking(move || request.wait())
         .await
         .map_err(|e| e.to_string())?
 }
 
 /// Stop the currently playing track, if any.
 #[tauri::command]
-pub async fn stop_playback() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(playback::stop)
-        .await
-        .map_err(|e| e.to_string())?
+pub fn stop_playback() -> Result<(), String> {
+    playback::stop()
 }
 
 /// Pause the currently playing track in place — the footer's play/pause

@@ -46,7 +46,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Build rustdoc for the core crate
-        run: cargo doc --no-deps -p flaccompagnon-core
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --locked --no-deps -p flaccompagnon-core
 
       - name: Redirect the doc/ root to the crate docs
         run: echo '<meta http-equiv="refresh" content="0;url=flaccompagnon_core/index.html">' > target/doc/index.html

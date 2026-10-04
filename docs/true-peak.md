@@ -4,7 +4,7 @@ True peak estimates the maximum of the waveform reconstructed between stored PCM
 
 ## Calculation
 
-Each decoded channel is oversampled by a factor of four using a 48-tap, Blackman-windowed sinc low-pass FIR. The streaming polyphase implementation has 12 taps per phase and evaluates four outputs for each input sample. The maximum absolute oversampled value over every channel becomes the true peak:
+Each decoded channel is oversampled by a factor of four using a 48-tap, Blackman-windowed sinc low-pass FIR. The streaming polyphase implementation has 12 taps per phase and evaluates four outputs for each input sample. At end of stream, eleven zero frames drain the FIR history so the final audio samples receive the complete reconstruction filter. The peak is the maximum of the oversampled magnitudes and the original stored-sample peak, across every channel:
 
 ```text
 dBTP = 20 × log10(oversampled peak)
@@ -35,6 +35,6 @@ The meter uses the BS.1770-style 4× oversampling approach and its own fixed 48-
 cargo test -p flaccompagnon-core analysis::truepeak
 ```
 
-The unit suite includes a quarter-rate sine sampled away from its crest: its stored peak is below 0.70 while the 4× meter recovers a peak above 0.95. For a practical comparison, import a loud clipped fixture from [Clipping](clipping.md) and compare the clip event count with its dBTP value.
+The unit suite includes a quarter-rate sine sampled away from its crest: its stored peak is below 0.70 while the 4× meter recovers a peak above 0.95. An independent zero-stuffed convolution checks overshoot from the final two samples, and an impulse regression checks that reconstruction never underreports the stored sample peak. For a practical comparison, import a loud clipped fixture from [Clipping](clipping.md) and compare the clip event count with its dBTP value.
 
 Reference: [ITU-R BS.1770-5](https://www.itu.int/dms_pubrec/itu-r/rec/bs/R-REC-BS.1770-5-202311-I!!PDF-E.pdf).

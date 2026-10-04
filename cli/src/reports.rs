@@ -122,7 +122,10 @@ pub(crate) fn cached(
                     entries
                         .filter_map(Result::ok)
                         .map(|e| e.path())
-                        .filter(|p| p.extension().is_some_and(|e| e == "json")),
+                        .filter(|p| {
+                            p.extension()
+                                .is_some_and(|e| e.eq_ignore_ascii_case("json"))
+                        }),
                 );
             }
         }
@@ -136,17 +139,18 @@ pub(crate) fn cached(
     candidates.sort();
     candidates.dedup();
     // Prefer the newest snapshot when several reports cover the same file.
-    candidates.sort_by_key(|p| p.metadata().and_then(|m| m.modified()).ok());
+    candidates.sort_by_cached_key(|p| p.metadata().and_then(|m| m.modified()).ok());
+    let requested: BTreeSet<_> = paths.iter().map(|path| path_key(path)).collect();
     let mut files = BTreeMap::new();
     for candidate in candidates {
-        let report = std::fs::read_to_string(&candidate)
-            .map_err(|e| e.to_string())
-            .and_then(|text| core::report::parse_json(&text));
+        let report = core::report::read_json(&candidate);
         match report {
             Ok(report) => {
                 for file in report.files {
                     let key = path_key(Path::new(&file.path));
-                    if matches_requested(&file, Path::new(&file.path), args) {
+                    if requested.contains(&key)
+                        && matches_requested(&file, Path::new(&file.path), args)
+                    {
                         files.insert(key, file);
                     }
                 }
@@ -161,6 +165,18 @@ pub(crate) fn cached(
         }
     }
     Ok(files)
+}
+
+// Reusing every measurement does not imply that the export is unchanged:
+// the requested files, their order or the report root may have changed.
+pub(crate) fn snapshot_changed(dest: &Path, report: &core::FolderReport) -> Result<bool, String> {
+    if !dest.exists() {
+        return Ok(true);
+    }
+    let existing = core::report::read_json(dest)?;
+    let old = core::report::build_json(&existing).map_err(|error| error.to_string())?;
+    let new = core::report::build_json(report).map_err(|error| error.to_string())?;
+    Ok(old != new)
 }
 
 // Canonical keys let relative CLI targets reuse reports containing absolute paths.

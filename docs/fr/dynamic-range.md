@@ -12,6 +12,8 @@ DR = 20 × log10(sample peak / RMS of loudest blocks)
 
 La longueur est fixe en trames : à 96 kHz, elle correspond à environ 1,37 seconde. La mesure n’utilise donc pas une durée fixe à toutes les fréquences.
 
+Le PCM flottant peut contenir des amplitudes supérieures à la pleine échelle. Le DR utilise leur crête réelle sans la plafonner à 1,0 : multiplier tout le signal par un gain constant ne change donc pas son facteur de crête.
+
 ## Interprétation
 
 Une valeur plus grande indique un facteur de crête plus élevé dans les passages sélectionnés. L’interface utilise un repère vert à partir de 12 dB et un avertissement sous 8 dB. Ces couleurs ne prouvent ni la supériorité d’un mastering, ni du clipping ou une mauvaise qualité.
@@ -29,5 +31,7 @@ Utilisez le [LUFS intégré](integrated-loudness.md) pour le niveau du programme
 ```sh
 cargo test -p flaccompagnon-core analysis::analyzer
 ```
+
+Des tests analytiques couvrent le facteur de crête de 3,0103 dB d’un sinus, y compris avec des crêtes flottantes de 0,9 et 1,8. Un autre test décrit indépendamment six blocs dont les 20 % les plus forts correspondent à deux blocs.
 
 Comparez un sinus faible à une copie comportant une brève salve plus forte. Cette salve doit augmenter la crête davantage que le RMS des blocs forts, et donc augmenter le DR. Ce test illustre le calcul défini, sans établir de conformité à un logiciel externe.

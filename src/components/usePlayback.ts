@@ -25,6 +25,7 @@ import type { PlaybackFinished, PlaybackPosition } from "../types";
 import * as api from "../api";
 import { listen } from "@tauri-apps/api/event";
 import { effectiveQueue } from "./playbackQueue";
+import { LatestRequest } from "./latestRequest";
 
 export interface NowPlaying {
   path: string;
@@ -64,6 +65,8 @@ export function usePlayback(
   // invoke an updater more than once, and auto-advance has to fire exactly
   // once per finished track.
   const current = useRef<NowPlaying | null>(null);
+  const pendingPath = useRef<string | null>(null);
+  const requests = useRef(new LatestRequest());
   const activeQueueRef = useRef<string[] | null>(null);
   const orderRef = useRef(orderedPaths);
   orderRef.current = orderedPaths;
@@ -76,14 +79,13 @@ export function usePlayback(
   }, []);
 
   useEffect(() => {
-    current.current = nowPlaying;
-  }, [nowPlaying]);
-
-  useEffect(() => {
     api.stopPlayback().catch(() => {});
   }, []);
 
   const stop = useCallback(() => {
+    requests.current.cancel();
+    pendingPath.current = null;
+    current.current = null;
     setNowPlaying(null);
     setPaused(false);
     setPosition(0);
@@ -98,15 +100,23 @@ export function usePlayback(
   // action goes through `play`, below, instead.
   const startTrack = useCallback(
     async (path: string) => {
-      try {
-        const requestId = await api.playTrack(path);
-        setNowPlaying({ path, requestId });
+      // Retire the previous track immediately: its final event may arrive
+      // while the next file is still opening, before React renders again.
+      current.current = null;
+      pendingPath.current = path;
+      const result = await requests.current.run(() => api.playTrack(path));
+      if (result.status === "superseded" || !result.isCurrent()) return;
+      pendingPath.current = null;
+      if (result.status === "success") {
+        const playing = { path, requestId: result.value };
+        current.current = playing;
+        setNowPlaying(playing);
         setPaused(false);
         setPosition(0);
-      } catch (e) {
+      } else {
         setNowPlaying(null);
         setActiveQueue(null);
-        onToast(String(e), "error");
+        onToast(String(result.error), "error");
       }
     },
     [onToast, setActiveQueue],
@@ -141,9 +151,9 @@ export function usePlayback(
   /// about to leave the table.
   const stopIfPlaying = useCallback(
     (path: string) => {
-      if (nowPlaying?.path === path) stop();
+      if (current.current?.path === path || pendingPath.current === path) stop();
     },
-    [nowPlaying, stop],
+    [stop],
   );
 
   // A real pause in place, resumed in place — see `usePlaybackQueue`'s
@@ -156,6 +166,7 @@ export function usePlayback(
     setPaused(next);
     const call = next ? api.pausePlayback() : api.resumePlayback();
     call.catch((e) => {
+      if (current.current?.requestId !== nowPlaying.requestId) return;
       setPaused(!next); // the backend didn't actually change state — undo
       onToast(String(e), "error");
     });
@@ -197,11 +208,9 @@ export function usePlayback(
       }
       return;
     }
-    setMuted((m) => {
-      const next = !m;
-      api.setMuted(next).catch(() => {});
-      return next;
-    });
+    const next = !muted;
+    setMuted(next);
+    api.setMuted(next).catch(() => {});
   }, [volume, muted]);
 
   // Steps to the previous/next track within `activeQueue` — the footer's

@@ -70,6 +70,13 @@ impl Args {
         if args.json.is_some() && args.json_layout.is_some() {
             return Err("choose --json PATH or --json-layout, not both".into());
         }
+        if args.json.as_ref().is_some_and(|path| {
+            !path
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("json"))
+        }) {
+            return Err("--json destination must have a .json extension".into());
+        }
         if !args.analyses.is_empty() && (args.json.is_some() || args.json_layout.is_some()) {
             return Err(
                 "--analysis cannot be combined with --json or --json-layout: JSON reports require all analyses. Remove --analysis to export a complete report, or remove the JSON option to run only the selected analyses."

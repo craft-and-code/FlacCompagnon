@@ -43,6 +43,83 @@ fn dr_of_silence_is_none() {
 }
 
 #[test]
+fn float_dr_is_gain_invariant_even_above_full_scale() {
+    let selection = crate::AnalysisSelection::from_names(["dynamics"]).expect("known analysis");
+    let mut readings = Vec::new();
+    for peak in [0.9f32, 1.8] {
+        let mut analyzer = StreamAnalyzer::new_selected(1, 48_000, selection);
+        // A quarter-rate sine has samples [0, A, 0, -A]. Complete periods
+        // give exactly RMS=A/sqrt(2), independently of the implementation.
+        for frame in 0..131_072 * 2 {
+            let sample = match frame % 4 {
+                1 => peak,
+                3 => -peak,
+                _ => 0.0,
+            };
+            analyzer.push_frame(&[sample], None);
+        }
+        let summary = analyzer.finish(48_000, None);
+        let dr = summary.dr_db.expect("crest factor");
+        let expected = (20.0 * std::f64::consts::SQRT_2.log10()) as f32;
+        assert!((dr - expected).abs() < 0.0001, "peak={peak}, DR={dr}");
+        // Preserve the existing clipping payload used by authenticity.
+        assert_eq!(summary.clipping.peak, peak.min(1.0));
+        readings.push(dr);
+    }
+    assert!((readings[0] - readings[1]).abs() < 0.0001);
+}
+
+#[test]
+fn dr_uses_the_loudest_twenty_percent_of_multiple_blocks() {
+    let selection = crate::AnalysisSelection::from_names(["dynamics"]).expect("known analysis");
+    let mut analyzer = StreamAnalyzer::new_selected(1, 44_100, selection);
+    // Six specified equal-length blocks: ceil(6*20%)=2. The two greatest
+    // powers are 0.8² and 0.6²; their mean is 0.5 and the global peak is 0.8.
+    for amplitude in [0.1f32, 0.8, 0.2, 0.4, 0.6, 0.3] {
+        for _ in 0..131_072 {
+            analyzer.push_frame(&[amplitude], None);
+        }
+    }
+    let dr = analyzer
+        .finish(44_100, None)
+        .dr_db
+        .expect("loud-passage crest factor");
+    let expected = (20.0 * (0.8f64 / 0.5f64.sqrt()).log10()) as f32;
+    assert!(
+        (dr - expected).abs() < 0.0001,
+        "DR={dr}, expected={expected}"
+    );
+}
+
+#[test]
+fn stereo_silence_has_no_fake_stereo_finding() {
+    let selection = crate::AnalysisSelection::from_names(["stereo"]).expect("known analysis");
+    let mut analyzer = StreamAnalyzer::new_selected(2, 44_100, selection);
+    for _ in 0..1000 {
+        analyzer.push_frame(&[0.0, 0.0], None);
+    }
+    assert!(!analyzer.finish(44_100, None).fake_stereo);
+}
+
+#[test]
+fn stereo_clipping_and_final_true_peak_reach_the_analysis_summary() {
+    let selection = crate::AnalysisSelection::from_names(["clipping"]).expect("known analysis");
+    let mut analyzer = StreamAnalyzer::new_selected(2, 48_000, selection);
+    for _ in 0..3 {
+        analyzer.push_frame(&[1.0, 0.2], None);
+    }
+    // Give the final two-sample pulse an independent FIR history.
+    for _ in 0..12 {
+        analyzer.push_frame(&[0.0, 0.0], None);
+    }
+    analyzer.push_frame(&[0.0, 0.9], None);
+    analyzer.push_frame(&[0.0, 0.9], None);
+    let summary = analyzer.finish(48_000, None);
+    assert_eq!(summary.clipping.clip_events, 1);
+    assert!(summary.clipping.true_peak > 1.09);
+}
+
+#[test]
 fn loudness_with_md5_constructs_and_runs_only_the_loudness_meter() {
     let selection = crate::AnalysisSelection::from_names(["loudness", "flac-md5"]).expect("names");
     let mut analyzer = StreamAnalyzer::new_selected(2, 44_100, selection);

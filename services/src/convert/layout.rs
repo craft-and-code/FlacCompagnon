@@ -24,9 +24,10 @@
 //! no longer get forced under whatever distant ancestor they happen to share.
 
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
-use super::ConvertFormat;
+use super::paths::{resolve_output_root, validate_output_directory};
+use super::{ConvertError, ConvertFormat};
 
 /// One source file and the folder its layout should be mirrored from.
 #[derive(Debug, Clone)]
@@ -48,11 +49,14 @@ pub struct ConvertSource {
 /// just its own file name directly under `output_root`, rather than failing
 /// the whole batch over one path oddity: a destination that is merely flatter
 /// than intended is a far smaller problem than a batch that refuses to run.
+/// Paths with parent traversal or colliding destinations are rejected before
+/// any worker starts writing.
 pub fn plan_batch(
     sources: &[ConvertSource],
     output_root: &Path,
     format: ConvertFormat,
-) -> Vec<PathBuf> {
+) -> Result<Vec<PathBuf>, ConvertError> {
+    let mut destinations = HashSet::new();
     sources
         .iter()
         .map(|s| {
@@ -62,7 +66,24 @@ pub fn plan_batch(
                     .map(Path::new)
                     .unwrap_or(s.path.as_path())
             });
-            output_root.join(rel).with_extension(format.extension())
+            if rel.as_os_str().is_empty()
+                || rel.components().any(|c| !matches!(c, Component::Normal(_)))
+            {
+                return Err(ConvertError::Io(
+                    s.path.display().to_string(),
+                    "invalid relative output path".to_string(),
+                ));
+            }
+            let dest = output_root.join(rel).with_extension(format.extension());
+            validate_output_directory(output_root, &dest)
+                .map_err(|error| ConvertError::Io(dest.display().to_string(), error.to_string()))?;
+            if !destinations.insert(dest.clone()) {
+                return Err(ConvertError::Io(
+                    dest.display().to_string(),
+                    "multiple sources have the same output path".to_string(),
+                ));
+            }
+            Ok(dest)
         })
         .collect()
 }
@@ -132,26 +153,67 @@ pub fn passthrough_files(
         a_base.cmp(b_base).then_with(|| a_root.cmp(b_root))
     });
 
+    // Resolve the existing prefix even when the chosen output does not exist
+    // yet, so aliases through a symlink do not bypass the subtree exclusion.
+    let resolved_output = resolve_output_root(output_root)?;
     for (root, base) in roots {
         let walk = walkdir::WalkDir::new(&root).sort_by_file_name();
-        for entry in walk.into_iter().filter_map(Result::ok) {
+        let entries = walk.into_iter().filter_entry(|entry| {
+            !entry.file_type().is_dir()
+                || (entry.path() != output_root
+                    && entry
+                        .path()
+                        .canonicalize()
+                        .map_or(true, |p| p != resolved_output))
+        });
+        for entry in entries {
+            let entry = entry?;
+            // Do not follow file symlinks either: neighbouring files are
+            // copies of the selected folder, not arbitrary linked targets.
+            if !entry.file_type().is_file() {
+                continue;
+            }
             let path = entry.into_path();
-            if !path.is_file() || audio.contains(path.as_path()) {
+            if audio.contains(path.as_path()) {
                 continue;
             }
             let Ok(rel) = path.strip_prefix(&base) else {
                 continue;
             };
+            if rel.components().any(|c| !matches!(c, Component::Normal(_))) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "invalid relative copy path",
+                ));
+            }
             // Only after `strip_prefix` succeeded: a file this sweep can't
             // place must stay eligible for a later one that can.
             if !copied.insert(path.clone()) {
                 continue;
             }
             let dest = output_root.join(rel);
+            validate_output_directory(output_root, &dest)?;
             if let Some(parent) = dest.parent() {
                 std::fs::create_dir_all(parent)?;
             }
-            std::fs::copy(&path, &dest)?;
+            // A converted track can have the same name as a neighbouring
+            // file in another format. Never replace it (or an earlier run).
+            let mut output = match std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&dest)
+            {
+                Ok(file) => file,
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(error),
+            };
+            let copy_result = std::fs::File::open(&path)
+                .and_then(|mut input| std::io::copy(&mut input, &mut output));
+            if let Err(error) = copy_result {
+                drop(output);
+                let _ = std::fs::remove_file(&dest);
+                return Err(error);
+            }
             written.push(dest);
         }
     }

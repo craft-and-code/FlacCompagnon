@@ -1,7 +1,7 @@
 // The online lookup "session": provider calls, candidate list, release detail,
 // and the status/loading the pop-in shows around them.
 //
-// Every fetch is guarded by a generation counter rather than an AbortController
+// Every fetch is guarded by a request identity rather than an AbortController
 // because the backend calls can't actually be cancelled — the guard just makes
 // a superseded response (a newer search, or the pop-in being reopened) render
 // nothing instead of overwriting fresher results.
@@ -10,6 +10,7 @@ import { useCallback, useRef, useState } from "react";
 
 import type { LookupCandidate, LookupRelease } from "../types";
 import * as api from "../api";
+import { LatestRequest } from "./latestRequest";
 
 export interface LookupStatus {
   msg: string;
@@ -27,7 +28,7 @@ export function useLookup(discogsToken: string) {
   const [status, setStatusState] = useState<LookupStatus>({ msg: "", kind: "info" });
   const [loading, setLoading] = useState<LookupLoading>({ on: false, label: "" });
   const [searching, setSearching] = useState(false);
-  const generation = useRef(0);
+  const requests = useRef(new LatestRequest());
 
   const setStatus = useCallback((msg: string, kind: "info" | "error" = "info") => {
     setStatusState({ msg, kind });
@@ -36,7 +37,7 @@ export function useLookup(discogsToken: string) {
   /// Invalidates any in-flight request and clears the session. Called when the
   /// pop-in opens or closes.
   const reset = useCallback(() => {
-    generation.current++;
+    requests.current.cancel();
     setCandidates([]);
     setDetail(null);
     setStatusState({ msg: "", kind: "info" });
@@ -48,7 +49,6 @@ export function useLookup(discogsToken: string) {
     async (rawQuery: string) => {
       const query = rawQuery.trim();
       if (!query) return;
-      const gen = ++generation.current;
       setCandidates([]);
       setSearching(true);
       setStatusState({ msg: "", kind: "info" });
@@ -76,11 +76,11 @@ export function useLookup(discogsToken: string) {
         );
       }
 
-      const results = await Promise.all(tasks);
-      if (gen !== generation.current) return; // superseded by a newer search
+      const result = await requests.current.run(() => Promise.all(tasks));
+      if (result.status !== "success" || !result.isCurrent()) return;
       setLoading({ on: false, label: "" });
       setSearching(false);
-      const found = results.flat();
+      const found = result.value.flat();
       setCandidates(found);
 
       if (found.length > 0) {
@@ -102,24 +102,21 @@ export function useLookup(discogsToken: string) {
   /// merged or deleted on MusicBrainz's side).
   const selectCandidate = useCallback(
     async (candidate: LookupCandidate): Promise<boolean> => {
-      const gen = ++generation.current;
       setStatusState({ msg: "", kind: "info" });
       setLoading({ on: true, label: "Loading track list…" });
-      try {
-        const release =
-          candidate.source === "MusicBrainz"
-            ? await api.lookupMusicbrainzDetail(candidate.id)
-            : await api.lookupDiscogsDetail(candidate.id, discogsToken);
-        if (gen !== generation.current) return false;
-        setLoading({ on: false, label: "" });
-        setDetail(release);
+      const result = await requests.current.run(() =>
+        candidate.source === "MusicBrainz"
+          ? api.lookupMusicbrainzDetail(candidate.id)
+          : api.lookupDiscogsDetail(candidate.id, discogsToken),
+      );
+      if (result.status === "superseded" || !result.isCurrent()) return false;
+      setLoading({ on: false, label: "" });
+      if (result.status === "success") {
+        setDetail(result.value);
         return true;
-      } catch (e) {
-        if (gen !== generation.current) return false;
-        setLoading({ on: false, label: "" });
-        setStatusState({ msg: String(e), kind: "error" });
-        return false;
       }
+      setStatusState({ msg: String(result.error), kind: "error" });
+      return false;
     },
     [discogsToken],
   );

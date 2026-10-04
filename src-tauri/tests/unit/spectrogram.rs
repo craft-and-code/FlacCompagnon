@@ -137,3 +137,68 @@ fn default_and_full_dimensions_match_aede() {
     assert!(spectrum(SpectrogramSize::Half).contains("s=900x470"));
     assert!(spectrum(SpectrogramSize::Full).contains("s=1800x940"));
 }
+
+#[cfg(unix)]
+#[test]
+fn a_spectrogram_link_cannot_overwrite_the_original_audio() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("track.flac");
+    let output = dir.path().join("track.png");
+    std::fs::write(&input, b"original audio").unwrap();
+    std::os::unix::fs::symlink(&input, &output).unwrap();
+    let error = render(
+        "unused-ffmpeg",
+        &input,
+        &output,
+        None,
+        SpectrogramSize::Half,
+    )
+    .unwrap_err();
+    assert!(error.contains("symbolic link"));
+    assert_eq!(std::fs::read(input).unwrap(), b"original audio");
+}
+
+// The feature deliberately depends on a system ffmpeg, so this integration
+// check runs only on machines that can render spectrograms.
+#[test]
+fn renders_a_png_from_stdout_without_changing_the_audio() {
+    let Some(ffmpeg) = resolve_ffmpeg() else {
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("silent.wav");
+    let output = dir.path().join("silent.png");
+    let data_len = 4410u32 * 2;
+    // A standard RIFF PCM header with 0.1s of mono silence, independent of
+    // the app's decoders and encoders.
+    let mut wav = b"RIFF".to_vec();
+    wav.extend_from_slice(&(36 + data_len).to_le_bytes());
+    wav.extend_from_slice(b"WAVEfmt ");
+    wav.extend_from_slice(&16u32.to_le_bytes());
+    wav.extend_from_slice(&1u16.to_le_bytes());
+    wav.extend_from_slice(&1u16.to_le_bytes());
+    wav.extend_from_slice(&44_100u32.to_le_bytes());
+    wav.extend_from_slice(&88_200u32.to_le_bytes());
+    wav.extend_from_slice(&2u16.to_le_bytes());
+    wav.extend_from_slice(&16u16.to_le_bytes());
+    wav.extend_from_slice(b"data");
+    wav.extend_from_slice(&data_len.to_le_bytes());
+    wav.resize(44 + data_len as usize, 0);
+    std::fs::write(&input, &wav).unwrap();
+    std::fs::write(&output, b"previous render").unwrap();
+    render(&ffmpeg, &input, &output, None, SpectrogramSize::Half).unwrap();
+    assert!(std::fs::read(output)
+        .unwrap()
+        .starts_with(b"\x89PNG\r\n\x1a\n"));
+    assert_eq!(std::fs::read(input).unwrap(), wav);
+}
+
+#[test]
+fn a_wrong_spectrogram_destination_cannot_replace_the_source_audio() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("track.flac");
+    std::fs::write(&input, b"original audio").unwrap();
+    let error = render("unused-ffmpeg", &input, &input, None, SpectrogramSize::Half).unwrap_err();
+    assert!(error.contains(".png extension"));
+    assert_eq!(std::fs::read(input).unwrap(), b"original audio");
+}

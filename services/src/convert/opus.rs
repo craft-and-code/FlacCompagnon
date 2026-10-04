@@ -12,7 +12,7 @@
 //! coding needs a mastering-grade resampler ahead of it (see that function's
 //! own doc comment for the full reasoning).
 
-use std::path::Path;
+use std::{borrow::Cow, path::Path};
 
 use audiopus::coder::Encoder;
 use audiopus::{Application, Bitrate, Channels, SampleRate};
@@ -50,14 +50,14 @@ pub(super) fn encode(pcm: &PcmAudio, dest: &Path, bitrate_kbps: u32) -> Result<(
     };
 
     let resampled = if pcm.sample_rate == OPUS_SAMPLE_RATE {
-        pcm.samples.clone()
+        Cow::Borrowed(pcm.samples.as_slice())
     } else {
-        super::resample_linear(
+        Cow::Owned(super::resample_linear(
             &pcm.samples,
             pcm.channels,
             pcm.sample_rate,
             OPUS_SAMPLE_RATE,
-        )
+        ))
     };
 
     let mut encoder = Encoder::new(SampleRate::Hz48000, channels_enum, Application::Audio)
@@ -82,19 +82,28 @@ pub(super) fn encode(pcm: &PcmAudio, dest: &Path, bitrate_kbps: u32) -> Result<(
     // At least one frame even for a near-empty source, so the stream always
     // gets its `EndStream` packet.
     let total_frames = resampled.len().div_ceil(frame_len.max(1)).max(1);
+    let mut padded = vec![0.0; frame_len];
 
     for frame_index in 0..total_frames {
         let start = frame_index * frame_len;
         let end = (start + frame_len).min(resampled.len());
-        let mut frame = resampled.get(start..end).unwrap_or(&[]).to_vec();
+        let samples = resampled.get(start..end).unwrap_or(&[]);
         // Pads only the final, partial frame with silence — Opus frames must
         // all be the same fixed length; a player trims this back out using
         // the stream's final granule position, which stays at the *true*
         // sample count below rather than following this padding.
-        frame.resize(frame_len, 0.0);
+        let frame = if samples.len() == frame_len {
+            samples
+        } else {
+            padded.fill(0.0);
+            if let Some(prefix) = padded.get_mut(..samples.len()) {
+                prefix.copy_from_slice(samples);
+            }
+            &padded
+        };
 
         let n = encoder
-            .encode_float(&frame, &mut out_buf)
+            .encode_float(frame, &mut out_buf)
             .map_err(|e| ConvertError::Encode(name(), e.to_string()))?;
 
         let real_samples_this_frame = end.saturating_sub(start) / pcm.channels.max(1);

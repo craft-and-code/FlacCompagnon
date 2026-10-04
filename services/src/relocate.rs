@@ -20,7 +20,7 @@
 //! found on its own.
 
 use std::collections::HashMap;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -31,6 +31,11 @@ pub struct Relocation {
     pub from: String,
     /// The path found under the folder the user chose.
     pub to: String,
+}
+
+struct Candidate<'a> {
+    path: &'a Path,
+    parts: Vec<String>,
 }
 
 /// Match each of `missing` against the files under `root`.
@@ -47,29 +52,51 @@ pub struct Relocation {
 /// unit tests work on paths that never existed.
 pub fn match_moved_files(missing: &[String], candidates: &[PathBuf]) -> Vec<Relocation> {
     // Indexed by file name: the one part of a path a move cannot change.
-    let mut by_name: HashMap<String, Vec<&PathBuf>> = HashMap::new();
+    let mut by_name: HashMap<String, Vec<Candidate<'_>>> = HashMap::new();
     for path in candidates {
         if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-            by_name.entry(name.to_string()).or_default().push(path);
+            by_name
+                .entry(name.to_lowercase())
+                .or_default()
+                .push(Candidate {
+                    path,
+                    parts: path_parts(path),
+                });
         }
     }
 
     let mut out = Vec::new();
     for from in missing {
         let old = Path::new(from);
-        let Some(name) = old.file_name().and_then(|n| n.to_str()) else {
+        let Some(name) = from.rsplit(['/', '\\']).next().filter(|s| !s.is_empty()) else {
             continue;
         };
-        let Some(options) = by_name.get(name) else {
+        let Some(options) = by_name.get(&name.to_lowercase()) else {
             continue;
         };
-        // `max_by_key` returns the *last* maximum, so ties resolve to whichever
-        // candidate the walk found last — arbitrary but stable, and a tie here
-        // means two files that are equally plausible by every signal a path
-        // carries.
-        let Some(best) = options.iter().max_by_key(|c| shared_suffix(old, c)) else {
+        let old_parts = path_parts(old);
+        let mut best: Option<(&Path, usize)> = None;
+        let mut tied = false;
+        for candidate in options {
+            let score = shared_suffix(&old_parts, &candidate.parts);
+            match best {
+                Some((_, current)) if score < current => {}
+                Some((_, current)) if score == current => tied = true,
+                _ => {
+                    best = Some((candidate.path, score));
+                    tied = false;
+                }
+            }
+        }
+        let Some((best, _)) = best else {
             continue;
         };
+        // A tied folder suffix carries no evidence for choosing one track
+        // over another. Leave the row missing rather than silently changing
+        // its playback and tag-editing target to an unrelated album.
+        if tied {
+            continue;
+        }
         if let Some(to) = best.to_str() {
             // A candidate identical to the stale path is not a move. This can
             // only happen if the file came back between the presence check and
@@ -86,23 +113,18 @@ pub fn match_moved_files(missing: &[String], candidates: &[PathBuf]) -> Vec<Relo
     out
 }
 
-/// How many trailing path components `a` and `b` have in common, file name
-/// included.
-///
-/// Comparison is case-insensitive: the same library read from a case-sensitive
-/// filesystem and a case-preserving one differs in exactly this way, and a
-/// score that flipped between them would make the ranking depend on which
-/// machine the report was saved on.
-fn shared_suffix(a: &Path, b: &Path) -> usize {
-    let parts = |p: &Path| -> Vec<String> {
-        p.components()
-            .filter_map(|c| match c {
-                Component::Normal(s) => s.to_str().map(|s| s.to_lowercase()),
-                _ => None,
-            })
-            .collect()
-    };
-    let (a, b) = (parts(a), parts(b));
+// Reports can come from another OS, so both separator styles are accepted;
+// case folding is cached once per candidate rather than per missing track.
+fn path_parts(path: &Path) -> Vec<String> {
+    path.to_string_lossy()
+        .split(['/', '\\'])
+        .filter(|s| !s.is_empty())
+        .map(str::to_lowercase)
+        .collect()
+}
+
+/// Count matching trailing components, including the file name.
+fn shared_suffix(a: &[String], b: &[String]) -> usize {
     a.iter()
         .rev()
         .zip(b.iter().rev())

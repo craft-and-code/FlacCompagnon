@@ -8,9 +8,10 @@
 
 use std::io::Read;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::{Child, Stdio};
 
-use super::DecodeOutcome;
+use super::probe::validate_pcm_samples;
+use super::{local_ffmpeg_command, DecodeOutcome};
 use crate::analysis::analyzer::StreamAnalyzer;
 use crate::AnalysisError;
 
@@ -47,27 +48,73 @@ pub(crate) fn decode_and_analyze_dsd_selected(
     decoded_rate: u32,
     selection: crate::AnalysisSelection,
 ) -> Result<DecodeOutcome, AnalysisError> {
-    if channels == 0 {
-        return Err(AnalysisError::Decode("DSD: zero channels".into()));
+    if !(1..=8).contains(&channels) || decoded_rate == 0 {
+        return Err(AnalysisError::Decode(
+            "DSD: invalid stream parameters".into(),
+        ));
     }
 
-    let mut child = Command::new(ffmpeg)
-        .arg("-v")
-        .arg("error")
-        .arg("-i")
-        .arg(path)
-        .args(["-f", "f32le", "-"])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .stdin(Stdio::null())
-        .spawn()
-        .map_err(|e| AnalysisError::Decode(format!("ffmpeg spawn failed: {e}")))?;
+    let mut child = DecodeProcess(
+        local_ffmpeg_command(ffmpeg)
+            .arg("-v")
+            .arg("error")
+            .arg("-i")
+            .arg(path)
+            .args(["-f", "f32le", "-"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .stdin(Stdio::null())
+            .spawn()
+            .map_err(|e| AnalysisError::Decode(format!("ffmpeg spawn failed: {e}")))?,
+    );
 
     let mut stdout = child
+        .0
         .stdout
         .take()
         .ok_or_else(|| AnalysisError::Decode("ffmpeg produced no output pipe".into()))?;
 
+    let (analyzer, frame_count) =
+        analyze_pcm_output(&mut stdout, channels, decoded_rate, selection)?;
+
+    let status = child
+        .0
+        .wait()
+        .map_err(|e| AnalysisError::Decode(format!("ffmpeg wait failed: {e}")))?;
+    if !status.success() || frame_count == 0 {
+        return Err(AnalysisError::Decode(
+            "ffmpeg could not decode this DSD file".into(),
+        ));
+    }
+
+    Ok(DecodeOutcome {
+        format: "DSD".to_string(),
+        codec: None, // container already says everything this field would
+        sample_rate: decoded_rate,
+        channels,
+        declared_bits: None, // 1-bit stream; PCM bit depth does not apply
+        duration_secs: frame_count as f64 / decoded_rate.max(1) as f64,
+        analyzer,
+    })
+}
+
+// Dropping std::process::Child does not stop or reap it. Read/validation errors
+// must not leave FFmpeg running against a closed pipe or retain a zombie.
+struct DecodeProcess(Child);
+
+impl Drop for DecodeProcess {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+fn analyze_pcm_output(
+    stdout: &mut impl Read,
+    channels: usize,
+    decoded_rate: u32,
+    selection: crate::AnalysisSelection,
+) -> Result<(StreamAnalyzer, u64), AnalysisError> {
     let mut analyzer = StreamAnalyzer::new_selected(channels, decoded_rate, selection);
     let mut carry: Vec<u8> = Vec::new();
     let mut buf = vec![0u8; PIPE_CHUNK];
@@ -91,28 +138,19 @@ pub(crate) fn decode_and_analyze_dsd_selected(
                 let o = c * 4;
                 *s = f32::from_le_bytes([chunk[o], chunk[o + 1], chunk[o + 2], chunk[o + 3]]);
             }
+            validate_pcm_samples(&frame)?;
             analyzer.push_frame(&frame, None);
             frame_count += 1;
         }
         carry.drain(..whole);
     }
 
-    let status = child
-        .wait()
-        .map_err(|e| AnalysisError::Decode(format!("ffmpeg wait failed: {e}")))?;
-    if !status.success() || frame_count == 0 {
-        return Err(AnalysisError::Decode(
-            "ffmpeg could not decode this DSD file".into(),
-        ));
+    if !carry.is_empty() {
+        return Err(AnalysisError::Decode("incomplete FFmpeg PCM frame".into()));
     }
-
-    Ok(DecodeOutcome {
-        format: "DSD".to_string(),
-        codec: None, // container already says everything this field would
-        sample_rate: decoded_rate,
-        channels,
-        declared_bits: None, // 1-bit stream; PCM bit depth does not apply
-        duration_secs: frame_count as f64 / decoded_rate.max(1) as f64,
-        analyzer,
-    })
+    Ok((analyzer, frame_count))
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/decode/dsd.rs"]
+mod tests;

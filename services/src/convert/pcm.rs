@@ -102,13 +102,17 @@ pub(crate) fn resample_linear(
 /// the reconstruction `decode::stream` does for analysis (see its
 /// `int_scale` comment there).
 pub(crate) fn f32_to_ints(samples: &[f32], bit_depth: u32) -> Vec<i32> {
+    quantized_samples(samples, bit_depth).collect()
+}
+
+/// Quantize while iterating, so streaming writers need no second sample buffer.
+pub(super) fn quantized_samples(samples: &[f32], bit_depth: u32) -> impl Iterator<Item = i32> + '_ {
     let scale = 2f32.powi(bit_depth as i32 - 1);
     let max = scale - 1.0;
     let min = -scale;
     samples
         .iter()
-        .map(|&s| (s * scale).round().clamp(min, max) as i32)
-        .collect()
+        .map(move |&s| (s * scale).round().clamp(min, max) as i32)
 }
 
 #[cfg(test)]

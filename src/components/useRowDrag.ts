@@ -13,6 +13,7 @@
 // widths without this hook having to know anything about the columns.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { draggedPaths, reorderPaths, type RowDropTarget } from "./rowReorder";
 
 const DRAG_THRESHOLD_PX = 4;
 
@@ -20,10 +21,7 @@ const DRAG_THRESHOLD_PX = 4;
 // selection's ghost doesn't become a full-height copy of the table.
 const GHOST_STACK_CAP = 8;
 
-export interface DropTarget {
-  path: string;
-  before: boolean;
-}
+export type DropTarget = RowDropTarget;
 
 export interface RowDragState {
   /// Rows being moved, in display order. Empty when no drag is in progress.
@@ -50,6 +48,7 @@ export function useRowDrag({ tableRef, orderedPaths, selectedPaths, onReorder }:
   // Everything the move/up handlers need without re-subscribing on each render.
   const session = useRef<{
     paths: string[];
+    members: Set<string>;
     startX: number;
     startY: number;
     primary: string;
@@ -167,7 +166,7 @@ export function useRowDrag({ tableRef, orderedPaths, selectedPaths, onReorder }:
       )?.closest<HTMLTableRowElement>("tr[data-path]");
       const path = hovered?.getAttribute("data-path");
       let next: DropTarget | null = null;
-      if (hovered && path && !s.paths.includes(path)) {
+      if (hovered && path && !s.members.has(path)) {
         const r = hovered.getBoundingClientRect();
         next = { path, before: ev.clientY < r.top + r.height / 2 };
       }
@@ -193,12 +192,8 @@ export function useRowDrag({ tableRef, orderedPaths, selectedPaths, onReorder }:
       // Pull every dragged row out first, then reinsert them as one contiguous
       // block at the drop point — this keeps their relative order even when
       // the group wasn't contiguous to begin with.
-      const remaining = s.order.filter((p) => !s.paths.includes(p));
-      let to = remaining.indexOf(target.path);
-      if (to === -1) return;
-      if (!target.before) to += 1;
-      remaining.splice(to, 0, ...s.paths);
-      onReorder(remaining);
+      const reordered = reorderPaths(s.order, s.paths, target);
+      if (reordered) onReorder(reordered);
     };
 
     document.addEventListener("mousemove", onMove);
@@ -206,6 +201,8 @@ export function useRowDrag({ tableRef, orderedPaths, selectedPaths, onReorder }:
     return () => {
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
+      session.current?.ghost?.remove();
+      session.current = null;
     };
   }, [buildGhost, onReorder, tableRef]);
 
@@ -218,10 +215,7 @@ export function useRowDrag({ tableRef, orderedPaths, selectedPaths, onReorder }:
 
       // Dragging a row that's part of the current multi-selection moves the
       // whole selection together, in display order; any other row moves alone.
-      const paths =
-        selectedPaths.includes(path) && selectedPaths.length > 1
-          ? orderedPaths.filter((p) => selectedPaths.includes(p))
-          : [path];
+      const paths = draggedPaths(orderedPaths, selectedPaths, path);
 
       // Belt-and-braces against text selection on top of the CSS
       // `user-select: none` — WKWebView doesn't always honor it once a mouse
@@ -230,6 +224,7 @@ export function useRowDrag({ tableRef, orderedPaths, selectedPaths, onReorder }:
 
       session.current = {
         paths,
+        members: new Set(paths),
         startX: ev.clientX,
         startY: ev.clientY,
         primary: path,

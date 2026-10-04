@@ -4,7 +4,7 @@ Le true peak estime le maximum de l’onde reconstruite entre les échantillons 
 
 ## Calcul
 
-Chaque canal est suréchantillonné quatre fois à l’aide d’un filtre FIR passe-bas sinc de 48 coefficients, fenêtré par Blackman. L’implémentation polyphasée utilise 12 coefficients par phase et évalue quatre sorties par échantillon entrant. Le maximum absolu sur tous les canaux devient la crête :
+Chaque canal est suréchantillonné quatre fois à l’aide d’un filtre FIR passe-bas sinc de 48 coefficients, fenêtré par Blackman. L’implémentation polyphasée utilise 12 coefficients par phase et évalue quatre sorties par échantillon entrant. En fin de flux, onze trames nulles vident l’historique FIR pour appliquer le filtre complet aux derniers échantillons audio. La crête retient le maximum des valeurs suréchantillonnées et de la crête des échantillons stockés, sur tous les canaux :
 
 ```text
 dBTP = 20 × log10(oversampled peak)
@@ -35,6 +35,6 @@ Il s’agit d’une estimation du niveau, pas d’un diagnostic de clipping ou d
 cargo test -p flaccompagnon-core analysis::truepeak
 ```
 
-Les tests comprennent un sinus au quart de la fréquence d’échantillonnage dont les points évitent les sommets : la crête stockée est sous 0,70 tandis que la mesure 4× retrouve plus de 0,95. Vous pouvez comparer le nombre de plateaux et le true peak des exemples de [clipping](clipping.md).
+Les tests comprennent un sinus au quart de la fréquence d’échantillonnage dont les points évitent les sommets : la crête stockée est sous 0,70 tandis que la mesure 4× retrouve plus de 0,95. Une convolution indépendante après insertion de zéros vérifie les dépassements des deux derniers échantillons ; une impulsion vérifie que la reconstruction ne sous-estime jamais la crête stockée. Vous pouvez comparer le nombre de plateaux et le true peak des exemples de [clipping](clipping.md).
 
 Référence : [ITU-R BS.1770-5](https://www.itu.int/dms_pubrec/itu-r/rec/bs/R-REC-BS.1770-5-202311-I!!PDF-E.pdf).

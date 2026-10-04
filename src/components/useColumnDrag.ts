@@ -118,6 +118,8 @@ export function useColumnDrag({ onReorder }: UseColumnDragArgs) {
     return () => {
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
+      if (session.current?.timer) clearTimeout(session.current.timer);
+      session.current = null;
     };
   }, [onReorder]);
 

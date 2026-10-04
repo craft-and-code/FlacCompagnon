@@ -49,12 +49,8 @@ pub fn decode_flac_to_pcm(path: &Path) -> Result<crate::decode::PcmAudio, Analys
     let scale = 1.0f32 / (1u64 << (bits - 1)) as f32;
 
     let mut samples: Vec<f32> = Vec::new();
-    // `info.samples` is a hint from a header this crate does not trust, so it
-    // sizes the allocation but never bounds the loop.
     if let Some(total) = info.samples {
-        if let Ok(n) = usize::try_from(total) {
-            samples.reserve(n.saturating_mul(channels).min(1 << 28));
-        }
+        reserve_pcm_hint(&mut samples, total, channels)?;
     }
 
     let mut blocks = reader.blocks();
@@ -81,6 +77,19 @@ pub fn decode_flac_to_pcm(path: &Path) -> Result<crate::decode::PcmAudio, Analys
         sample_rate,
         channels,
     })
+}
+
+// A forged STREAMINFO count must not reserve gigabytes before any frame is
+// validated. At most 4 MiB is allocated from the hint; real data can grow it.
+fn reserve_pcm_hint(
+    samples: &mut Vec<f32>,
+    frames: u64,
+    channels: usize,
+) -> Result<(), AnalysisError> {
+    let frames = usize::try_from(frames).unwrap_or(usize::MAX);
+    samples
+        .try_reserve_exact(frames.saturating_mul(channels).min(1 << 20))
+        .map_err(|e| AnalysisError::Decode(format!("FLAC PCM allocation failed: {e}")))
 }
 
 /// Fused single-pass FLAC decode.

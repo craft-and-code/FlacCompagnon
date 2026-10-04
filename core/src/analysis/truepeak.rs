@@ -126,6 +126,8 @@ impl TruePeak {
     /// Feed one frame (one sample per channel).
     pub fn push_frame(&mut self, samples: &[f32]) {
         for (ch, &s) in self.channels.iter_mut().zip(samples.iter()) {
+            // Interpolation must never hide a larger stored sample peak.
+            self.peak = self.peak.max(s.abs());
             // Shift the delay line (newest sample at index 0).
             ch.delay.copy_within(0..PHASE_LEN - 1, 1);
             ch.delay[0] = s;
@@ -141,6 +143,15 @@ impl TruePeak {
                     self.peak = a;
                 }
             }
+        }
+    }
+
+    /// Drain the FIR history at end of stream so peaks in the final samples
+    /// receive the same reconstruction as peaks earlier in the file.
+    pub fn flush_tail(&mut self) {
+        let silence = vec![0.0; self.channels.len()];
+        for _ in 0..PHASE_LEN - 1 {
+            self.push_frame(&silence);
         }
     }
 

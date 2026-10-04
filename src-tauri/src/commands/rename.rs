@@ -48,6 +48,17 @@ fn validate_stem(stem: &str) -> Result<&str, String> {
     if trimmed == "." || trimmed == ".." {
         return Err("That is not a valid file name.".to_string());
     }
+    #[cfg(windows)]
+    if trimmed.contains(':') {
+        return Err("File name cannot contain a colon.".to_string());
+    }
+    if !matches!(
+        Path::new(trimmed).components().next(),
+        Some(std::path::Component::Normal(_))
+    ) || Path::new(trimmed).components().count() != 1
+    {
+        return Err("That is not a valid file name.".to_string());
+    }
     Ok(trimmed)
 }
 
@@ -77,19 +88,16 @@ pub async fn rename_file(path: String, new_stem: String) -> Result<RenameResult,
     }
 
     tauri::async_runtime::spawn_blocking(move || {
-        // Checked separately from the `rename` call itself so the error names
-        // the actual conflicting file rather than surfacing whatever generic
-        // OS error a same-name `rename` happens to produce (which varies by
-        // platform, and on some doesn't fail at all — it silently replaces
-        // the existing file, which is exactly what this guards against).
-        if dest.exists() {
+        if let Err(error) = flaccompagnon_services::rename::rename_file_noclobber(&src, &dest) {
+            if error.kind() != std::io::ErrorKind::AlreadyExists {
+                return Err(error.to_string());
+            }
             let name = dest
                 .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("that name");
             return Err(format!("\"{name}\" already exists in this folder."));
         }
-        std::fs::rename(&src, &dest).map_err(|e| e.to_string())?;
         Ok(to_result(&dest))
     })
     .await

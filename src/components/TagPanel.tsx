@@ -7,7 +7,7 @@
 // handler needs to ask "is the pointer over the cover box?" and, if an image
 // lands there, hand it in.
 
-import { useImperativeHandle, useMemo, useState, type Ref } from "react";
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import { X } from "lucide-react";
 
 import type { CoverArt as CoverArtData, LookupRelease, TagSet } from "../types";
@@ -24,14 +24,13 @@ import { TagFields } from "./TagFields";
 import type { TagTextField } from "./tagLayout";
 import { applyExtraEdits, commonReleaseId, distinctCovers, extendedRows } from "./tagSelection";
 import { useTagEditor } from "./useTagEditor";
+import { DraftRevision } from "./draftRevision";
+import { LatestRequest } from "./latestRequest";
 
 export interface TagPanelHandle {
-  /// Stage a dropped image as the new cover for every selected file.
-  stageCover(cover: CoverArtData): void;
-  /// Toggle the cover box's loading spinner while a dropped image is being
-  /// read from disk (the read happens in `useNativeDrop`, outside this
-  /// component, which is why it needs an imperative way in).
-  setCoverLoading(loading: boolean): void;
+  /// Stage a dropped image only if the original selection and role remain
+  /// active when its backend read finishes. A newer drop supersedes this one.
+  importCover(read: Promise<CoverArtData>): Promise<void>;
   /// True while there's an unsaved edit (a field, the cover, or the
   /// compilation flag) for the current selection — the caller uses this to
   /// decide whether switching to a different selection needs confirming
@@ -85,6 +84,13 @@ export function TagPanel({
   const [coverLoading, setCoverLoading] = useState(false);
   const [deleteCoverOpen, setDeleteCoverOpen] = useState(false);
   const [pictureType, setPictureType] = useState("CoverFront");
+  const coverScope = useRef(new DraftRevision(JSON.stringify([selectedPaths, pictureType])));
+  const coverRequest = useRef(new LatestRequest());
+  useEffect(() => () => coverRequest.current.cancel(), []);
+  if (coverScope.current.setScope(JSON.stringify([selectedPaths, pictureType]))) {
+    coverRequest.current.cancel();
+    setCoverLoading(false);
+  }
 
   const editor = useTagEditor({ paths: selectedPaths, tagSets, onSaved, onToast });
 
@@ -110,11 +116,18 @@ export function TagPanel({
   useImperativeHandle(
     ref,
     () => ({
-      stageCover(cover: CoverArtData) {
-        editor.stageCover(cover, pictureType);
-      },
-      setCoverLoading(loading: boolean) {
-        setCoverLoading(loading);
+      async importCover(read: Promise<CoverArtData>) {
+        const scope = coverScope.current.capture();
+        setCoverLoading(true);
+        const result = await coverRequest.current.run(() => read);
+        if (
+          result.status === "superseded" ||
+          !result.isCurrent() ||
+          !coverScope.current.isCurrent(scope)
+        ) return;
+        setCoverLoading(false);
+        if (result.status === "success") editor.stageCover(result.value, pictureType);
+        else throw result.error;
       },
       isDirty() {
         return editor.dirty;

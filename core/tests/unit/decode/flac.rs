@@ -173,3 +173,11 @@ fn integrity_only_decodes_unsigned_flac_and_rejects_garbage() {
     std::fs::write(&path, b"not a FLAC").expect("garbage fixture");
     assert!(verify_flac_md5(&path, true).is_err());
 }
+
+#[test]
+fn forged_flac_sample_count_cannot_reserve_gigabytes_before_decoding() {
+    let mut samples = Vec::new();
+    reserve_pcm_hint(&mut samples, u64::MAX, 8).expect("bounded metadata allocation");
+    assert!(samples.capacity() * std::mem::size_of::<f32>() <= 4 * 1024 * 1024);
+    assert!(samples.is_empty());
+}

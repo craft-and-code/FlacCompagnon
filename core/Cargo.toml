@@ -30,8 +30,12 @@ serde_json = "1"
 thiserror = "1"
 # Recursive folder walking
 walkdir = "2"
+tempfile = "3"    # atomic report replacement beside its destination
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"     # nonblocking, no-follow opens for untrusted report paths
+
 [dev-dependencies]
 rustfft = "6"     # synthesize truly band-limited test signals (inverse FFT)
-tempfile = "3"    # scratch files for audio fixtures
 flacenc = "0.5"   # reference encoder for FLAC decoder tests
 hound = "3"      # independent WAV fixtures for decoder tests

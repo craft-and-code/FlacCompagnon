@@ -75,6 +75,7 @@ impl ProbedTrack {
     pub(super) fn sample_rate(&self) -> Result<u32, AnalysisError> {
         self.params
             .sample_rate
+            .filter(|rate| *rate != 0)
             .ok_or_else(|| AnalysisError::Decode("missing sample rate".into()))
     }
 
@@ -82,6 +83,7 @@ impl ProbedTrack {
         self.params
             .channels
             .map(|c| c.count())
+            .filter(|channels| *channels != 0)
             .ok_or_else(|| AnalysisError::Decode("missing channel layout".into()))
     }
 
@@ -99,6 +101,30 @@ impl ProbedTrack {
                 })
             })
     }
+}
+
+/// A decoder must keep the header's frame layout; silently accepting a changed
+/// rate/count would feed analyzers or audio devices the wrong channel stride.
+pub(super) fn validate_decoded_spec(
+    decoded: &AudioBufferRef<'_>,
+    sample_rate: u32,
+    channels: usize,
+) -> Result<(), AnalysisError> {
+    if decoded.spec().rate != sample_rate || decoded.spec().channels.count() != channels {
+        return Err(AnalysisError::Decode(
+            "stream changed during decoding".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Float PCM may contain NaN or infinity. Reject these at the decode boundary
+/// before they poison measurements or reach an audio device.
+pub(super) fn validate_pcm_samples(samples: &[f32]) -> Result<(), AnalysisError> {
+    if samples.iter().any(|sample| !sample.is_finite()) {
+        return Err(AnalysisError::Decode("non-finite PCM sample".into()));
+    }
+    Ok(())
 }
 
 /// A reusable interleaved scratch buffer for decoded packets.

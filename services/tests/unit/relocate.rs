@@ -75,15 +75,45 @@ fn nothing_to_match_is_not_an_error() {
 #[test]
 fn shared_suffix_counts_from_the_end() {
     assert_eq!(
-        shared_suffix(Path::new("/a/b/c.flac"), Path::new("/x/b/c.flac")),
+        shared_suffix(
+            &path_parts(Path::new("/a/b/c.flac")),
+            &path_parts(Path::new("/x/b/c.flac"))
+        ),
         2
     );
     assert_eq!(
-        shared_suffix(Path::new("/a/b/c.flac"), Path::new("/x/y/c.flac")),
+        shared_suffix(
+            &path_parts(Path::new("/a/b/c.flac")),
+            &path_parts(Path::new("/x/y/c.flac"))
+        ),
         1
     );
     assert_eq!(
-        shared_suffix(Path::new("/a/b/c.flac"), Path::new("/x/y/z.flac")),
+        shared_suffix(
+            &path_parts(Path::new("/a/b/c.flac")),
+            &path_parts(Path::new("/x/y/z.flac"))
+        ),
         0
     );
+}
+
+#[test]
+fn equally_plausible_tracks_are_left_missing() {
+    let missing = vec!["/old/Album/Intro.flac".into()];
+    assert!(match_moved_files(
+        &missing,
+        &paths(&["/new/A/Intro.flac", "/new/B/Intro.flac"])
+    )
+    .is_empty());
+}
+
+#[test]
+fn a_windows_report_can_be_relocated_on_another_platform() {
+    let missing = vec!["C:\\Music\\Album\\TRACK.FLAC".into()];
+    let got = match_moved_files(
+        &missing,
+        &paths(&["/new/Other/track.flac", "/new/Album/track.flac"]),
+    );
+    assert_eq!(got.len(), 1);
+    assert_eq!(got[0].to, "/new/Album/track.flac");
 }

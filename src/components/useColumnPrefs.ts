@@ -51,7 +51,7 @@ function load(): StoredPrefs {
 /// own `defaultVisible` since a saved `hidden` list from before it existed
 /// obviously never mentions it either way.
 export function reconcile(stored: StoredPrefs): State {
-  const order = stored.order.filter(isColumnKey);
+  const order = [...new Set(stored.order.filter(isColumnKey))];
   const seen = new Set(order);
   const hidden = new Set(stored.hidden.filter(isColumnKey));
   for (const col of ALL_COLUMNS) {
