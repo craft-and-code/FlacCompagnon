@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["analyze_file","analyze_file_cancellable"],"mod":["transcode"]};
+window.SIDEBAR_ITEMS = {"fn":["analyze_file","analyze_file_cancellable","analyze_file_selected"],"mod":["transcode"]};

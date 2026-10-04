@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["decode_and_analyze_flac","decode_flac_to_pcm"]};
+window.SIDEBAR_ITEMS = {"fn":["decode_and_analyze_flac","decode_flac_to_pcm","flac_md5_signature","verify_flac_md5"]};
