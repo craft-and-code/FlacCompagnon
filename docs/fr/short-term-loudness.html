@@ -38,7 +38,7 @@
 <li>Mono ou stéréo à 8–768 kHz, y compris le <abbr>PCM</abbr> décodé du <abbr>DSD</abbr>. Le multicanal attend des positions de canaux fiables.</li>
 <li>Un fichier de moins de trois secondes n’a pas de maximum S. Exactement trois secondes permettent une fenêtre complète.</li>
 <li>Silence, données invalides, décodage absent ou échoué et anciens rapports : pas de valeur. Un son non nul sous la porte du <abbr>LUFS</abbr> intégré reste mesurable.</li>
-<li>L’historique de trois secondes stocke les puissances en flottants 32 bits pour limiter la mémoire. Une puissance extrême non représentable invalide S et <abbr>LRA</abbr> ; M peut rester disponible grâce à son historique 64 bits. Une puissance trop petite pour cette représentation ne produit pas de lecture finie.</li>
+<li>L’historique de trois secondes stocke les puissances en flottants 32 bits pour limiter la mémoire ; sa somme glissante utilise une arithmétique compensée 64 bits. Une puissance extrême non représentable invalide S et <abbr>LRA</abbr> ; M peut rester disponible grâce à son historique 64 bits. Une puissance trop petite pour cette représentation ne produit pas de lecture finie.</li>
 <li>Un maximum n’est pas un niveau typique ni une note de qualité. Une attaque brève est diluée sur trois secondes, qui peuvent aussi inclure une pause ou une transition.</li>
 <li>L’historique des filtres affecte les bords : mesurer séparément un extrait peut changer le résultat.</li>
 <li>S max est le plus haut niveau local <strong>sans porte</strong>, en <abbr>LUFS</abbr>. <abbr>LRA</abbr> est l’étendue d’une distribution de niveaux S <strong>après portes</strong>, en LU.</li>
@@ -48,7 +48,7 @@
 <h2 id="verification">Vérification<a class="heading-link" href="#verification" aria-label="Vérification">#</a></h2><pre><code class="language-sh">cargo test -p flaccompagnon-core loudness_peaks
 cargo test -p flaccompagnon-core --test loudness_reference -- --ignored --nocapture
 </code></pre>
-<p>Les tests couvrent les 20 décalages du cas 10 d’<abbr>EBU</abbr> Tech 3341, le niveau de référence stéréo, l’écart mono/stéréo d’environ 3,01 LU, les faibles niveaux, la durée exacte de trois secondes, les entrées invalides et l’exclusion de la fin artificielle <abbr>LRA</abbr>. Un test <abbr>WAV</abbr> vérifie les changements de niveau, positions, rapports et compatibilité. La comparaison facultative avec FFmpeg couvre plusieurs fréquences et les deux configurations.</p>
+<p>Les tests couvrent l’alternance de niveaux du cas 9 et les 20 décalages du cas 10 d’<abbr>EBU</abbr> Tech 3341, le niveau de référence stéréo, l’écart mono/stéréo d’environ 3,01 LU, les faibles niveaux, la durée exacte de trois secondes à 8 et 11,025 kHz, le retour au calme après un passage flottant très fort, les entrées invalides et l’exclusion de la fin artificielle <abbr>LRA</abbr>. Un test <abbr>WAV</abbr> vérifie les changements de niveau, positions, rapports et compatibilité. La comparaison facultative avec FFmpeg couvre plusieurs fréquences et les deux configurations.</p>
 <h2 id="exemple-salve-de-trois-secondes">Exemple : salve de trois secondes<a class="heading-link" href="#exemple-salve-de-trois-secondes" aria-label="Exemple : salve de trois secondes">#</a></h2><pre><code class="language-sh">ffmpeg -n -f lavfi -i &#39;aevalsrc=if(between(t\,2.15\,5.15)\,0.0707945784\,0)*sin(2*PI*1000*t)|if(between(t\,2.15\,5.15)\,0.0707945784\,0)*sin(2*PI*1000*t):s=48000:d=8&#39; -c:a pcm_s24le short-term.wav
 ffmpeg -hide_banner -nostats -i short-term.wav -af ebur128 -f null -
 </code></pre>
