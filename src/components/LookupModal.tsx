@@ -13,20 +13,8 @@ import { Modal } from "./Modal";
 import { LookupDetailView } from "./LookupDetailView";
 import { LookupSearchView } from "./LookupSearchView";
 import { useLookup } from "./useLookup";
+import type { DiscogsCredential } from "./useDiscogsCredential";
 import "./LookupModal.css";
-
-// The Discogs personal access token lives in localStorage (nowhere on the Rust
-// side) since it's the user's own credential, entered once and reused across
-// sessions. Its absence just means Discogs is skipped, not an error.
-const DISCOGS_TOKEN_KEY = "flaccompagnon.discogsToken";
-
-function storedToken(): string {
-  try {
-    return localStorage.getItem(DISCOGS_TOKEN_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
 
 export interface LookupModalProps {
   open: boolean;
@@ -39,6 +27,7 @@ export interface LookupModalProps {
   existingReleaseId: string | null;
   /// Current tag panel values, used to prefill the query.
   prefill: { artist: string; album: string };
+  discogsCredential: DiscogsCredential;
   onApply: (release: LookupRelease, trackIndex: number | null) => void;
   onToast: (msg: string, kind?: "info" | "error") => void;
 }
@@ -62,21 +51,21 @@ export function LookupModal({
   selectedPaths,
   existingReleaseId,
   prefill,
+  discogsCredential,
   onApply,
   onToast,
 }: LookupModalProps) {
   const [query, setQuery] = useState("");
-  const [discogsToken, setDiscogsToken] = useState(storedToken);
   const [matchedByExistingId, setMatchedByExistingId] = useState(false);
   const [selectedTrackIndex, setSelectedTrackIndex] = useState<number | null>(null);
 
-  const lookup = useLookup(discogsToken);
+  const lookup = useLookup(discogsCredential);
   const { reset, search, selectCandidate, setStatus, clearDetail } = lookup;
 
   const runSearch = useCallback(
     async (q: string) => {
       const partialFailure = await search(q);
-      if (partialFailure) onToast(partialFailure, "error");
+      if (partialFailure?.isCurrent()) onToast(partialFailure.message, "error");
     },
     [search, onToast],
   );
@@ -150,18 +139,13 @@ export function LookupModal({
     }
   };
 
-  const onTokenChange = (token: string) => {
-    const trimmed = token.trim();
-    setDiscogsToken(trimmed);
-    try {
-      localStorage.setItem(DISCOGS_TOKEN_KEY, trimmed);
-    } catch {
-      // Disabled storage still allows a token for the current session.
-    }
-  };
-
   return (
-    <Modal open={open} onClose={onClose} innerClassName="modal-card lookup-inner" title="Search online">
+    <Modal
+      open={open}
+      onClose={onClose}
+      innerClassName="modal-card lookup-inner"
+      title="Search online"
+    >
       {lookup.loading.on && (
         <div className="lookup-loading">
           <span className="spinner" />
@@ -191,8 +175,7 @@ export function LookupModal({
           onQueryChange={setQuery}
           onSubmit={() => void runSearch(query)}
           searching={lookup.searching}
-          discogsToken={discogsToken}
-          onDiscogsTokenChange={onTokenChange}
+          discogsCredential={discogsCredential}
           status={lookup.status}
           candidates={lookup.candidates}
           onPick={onPick}

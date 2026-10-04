@@ -44,6 +44,7 @@ import { useRenumberTracks } from "./components/useRenumberTracks";
 import { useGlobalShortcut } from "./components/useGlobalShortcut";
 import { useTagCache, useTagPrefetch } from "./components/useTagCache";
 import { useToast } from "./components/useToast";
+import { useDiscogsCredential } from "./components/useDiscogsCredential";
 import "./App.css";
 
 // These panels are absent from the initial screen; load their code and CSS
@@ -60,6 +61,7 @@ const PlaylistFormatModal = lazy(() =>
 
 export function App() {
   const { toast, showToast } = useToast();
+  const discogsCredential = useDiscogsCredential((message) => showToast(message, "error"));
   const tagPanelRef = useRef<TagPanelHandle>(null);
   const resultsTableRef = useRef<TableScrollHandle>(null);
   const [ffmpegAvailable, setFfmpegAvailable] = useState(false);
@@ -617,6 +619,7 @@ export function App() {
               tagSets={selectedTagSets}
               formats={selectedFormats}
               coverDragOver={drop.overCover}
+              discogsCredential={discogsCredential}
               onClose={guardedDeselectAll}
               onSaved={invalidate}
               onToast={showToast}

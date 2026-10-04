@@ -17,6 +17,13 @@ cover drops across selection changes; storage failures; and duplicate column
 preferences. They use the production state controllers without
 an audio device, network access or a Tauri runtime.
 
+Discogs credential regressions cover startup migration, concurrent operations,
+locked stores, blocked browser cleanup, retries, secret-free lookup payloads
+and drafts edited during a save. MusicBrainz requests are tested independently
+of credential readiness. A permission inventory checks the Tauri grants
+against the frontend APIs, including native drop listeners and window lifecycle.
+These tests use controlled backends; they do not replace native desktop checks.
+
 Run `node tests/benchmark-row-reorder.mjs` from the repository root to compare
 the pre-audit row reorder logic with the production helpers. The synthetic
 case has 10,000 paths, 5,000 selected paths, one warmup and ten measured

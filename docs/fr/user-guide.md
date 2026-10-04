@@ -42,6 +42,14 @@ L’en-tête doit fournir des dimensions valides. Le TIFF classique est pris en 
 
 Les changements restent en attente tant que vous n’avez pas choisi **Save**. Le bouton **Reset** annule seulement les changements en attente.
 
+### Rechercher les tags en ligne
+
+**Search online** interroge MusicBrainz sans clé. Pour inclure Discogs, ouvrez **Discogs token** dans la fenêtre de recherche, saisissez un jeton personnel obtenu dans les réglages Discogs, puis choisissez **Save token**. Le jeton est enregistré dans le Trousseau macOS, Credential Manager Windows ou Secret Service Linux ; le champ ne réaffiche jamais un secret déjà enregistré. Sous Linux, un service Secret Service déverrouillé doit être disponible.
+
+**Forget token** supprime l’identifiant enregistré par l’application. Pour révoquer le jeton lui-même, utilisez les réglages Discogs. MusicBrainz reste disponible si le coffre-fort est verrouillé ou indisponible.
+
+Les jetons enregistrés par les anciennes versions migrent automatiquement au démarrage. En cas d’échec, une copie de récupération reste uniquement en mémoire pour la session : déverrouillez le coffre-fort puis choisissez **Retry secure storage** avant de fermer l’application. Si le nettoyage du navigateur échoue, le panneau indique qu’une ancienne copie en clair peut subsister ; **Forget token** reste incomplet tant que ce nettoyage n’a pas réussi. La suppression de l’entrée active ne peut pas effacer les copies présentes dans d’anciennes sauvegardes.
+
 ## Convertir une sélection
 
 Le bouton avec les deux flèches, dans la barre du haut, ouvre le volet **Convert** à droite.

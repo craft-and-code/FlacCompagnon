@@ -42,6 +42,14 @@ Image headers must provide valid dimensions. Classic TIFF is supported; BigTIFF,
 
 Changes remain pending until you select **Save**. **Reset** only cancels pending changes.
 
+### Look up tags online
+
+**Search online** searches MusicBrainz without a key. To include Discogs, open **Discogs token** in the search pop-in, enter a personal access token from Discogs settings and select **Save token**. The saved token lives in macOS Keychain, Windows Credential Manager or Linux Secret Service; the input never displays an existing secret. Linux needs an unlocked Secret Service provider.
+
+**Forget token** removes the app's saved credential. To revoke the token itself, use Discogs settings. MusicBrainz remains available if the credential store is locked or unavailable.
+
+Tokens saved by older versions migrate automatically at startup. A failed migration keeps a recovery copy only in memory for the current session: unlock the system store and select **Retry secure storage** before closing the app. If browser cleanup fails, the panel warns that an old plaintext copy may remain; **Forget token** stays incomplete until cleanup succeeds. Removing the active browser entry cannot erase copies in older backups.
+
 ## Convert a selection
 
 The two-arrow button in the top bar opens the **Convert** panel on the right.

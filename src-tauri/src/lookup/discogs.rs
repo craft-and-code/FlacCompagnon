@@ -1,6 +1,6 @@
 //! Discogs provider. Requires a personal access token (Settings → Developers
-//! on discogs.com) — the frontend keeps it in `localStorage` and passes it in
-//! on every call; nothing here stores it.
+//! on discogs.com) — commands read it from the OS vault only when needed.
+//! The provider never stores it or sends it to artwork servers.
 
 use super::http::{fetch_cover, http_client, parse_json_response, user_agent};
 use super::{LookupCandidate, LookupRelease, LookupTrack};
@@ -8,6 +8,14 @@ use super::{LookupCandidate, LookupRelease, LookupTrack};
 /// Results per search page — matches MusicBrainz's limit so the pop-in reads
 /// the same whichever provider answered.
 const SEARCH_PER_PAGE: &str = "15";
+
+fn authorization(token: &str) -> Result<reqwest::header::HeaderValue, String> {
+    let mut value = reqwest::header::HeaderValue::from_str(&format!("Discogs token={token}"))
+        .map_err(|_| "Discogs token cannot be used as an authorization header.".to_string())?;
+    // Sensitive headers are redacted from debug output by the HTTP library.
+    value.set_sensitive(true);
+    Ok(value)
+}
 
 /// Discogs release ids are plain integers. Same reasoning as MusicBrainz's
 /// `is_valid_mbid`: the id lands in a URL path, so its shape is checked
@@ -22,10 +30,7 @@ pub async fn discogs_search(query: String, token: String) -> Result<Vec<LookupCa
     let resp = client
         .get("https://api.discogs.com/database/search")
         .header(reqwest::header::USER_AGENT, user_agent())
-        .header(
-            reqwest::header::AUTHORIZATION,
-            format!("Discogs token={token}"),
-        )
+        .header(reqwest::header::AUTHORIZATION, authorization(&token)?)
         .query(&[
             ("q", query.as_str()),
             ("type", "release"),
@@ -89,10 +94,7 @@ pub async fn discogs_detail(id: String, token: String) -> Result<LookupRelease, 
     let resp = client
         .get(format!("https://api.discogs.com/releases/{id}"))
         .header(reqwest::header::USER_AGENT, user_agent())
-        .header(
-            reqwest::header::AUTHORIZATION,
-            format!("Discogs token={token}"),
-        )
+        .header(reqwest::header::AUTHORIZATION, authorization(&token)?)
         .send()
         .await
         .map_err(|e| format!("Discogs request failed: {e}"))?;

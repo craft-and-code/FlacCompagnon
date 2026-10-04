@@ -18,7 +18,13 @@ JSON report reads validate the opened file and enforce a 64 MiB budget. On Unix 
 
 Artwork imports share the same regular-file opening guard as reports. The dimension check covers PNG, JPEG, GIF, BMP, WebP and classic TIFF, including announced animation frames and chained TIFF pages. Unknown or invalid dimensions, BigTIFF, TIFF SubIFDs and BMP JPEG/PNG wrappers are rejected. These checks parse headers; they neither decode the complete raster nor impose a cumulative animation frame budget.
 
-Tauri's CSP and capabilities were reviewed: scripts stay local, images use local/data sources, and no remote capability or filesystem/shell/HTTP plugin is enabled. The application commands still trust the local frontend; their paths are not restricted to files previously chosen in a dialog. `core:default` remains broader than the permissions currently used. The Discogs token is sent only with Discogs API requests and remains in local plaintext storage; no encryption or WebView penetration test is claimed.
+Tauri's CSP and capabilities were reviewed: scripts stay local, images use local/data sources, and no remote capability or filesystem/shell/HTTP plugin is enabled. Broad `core:default` and `dialog:default` grants were replaced with eight explicit event, window and file-dialog permissions. An automated frontend API inventory checks this list and listener cleanup. The application commands still trust the local frontend; their paths are not restricted to files previously chosen in a dialog. These grants do not establish a file-selection access-control boundary, and no WebView penetration test is claimed.
+
+Discogs credentials now persist exclusively in macOS Keychain, Windows Credential Manager or Linux Secret Service through the native `keyring` adapter. Credential reads, including presence checks, stay in the backend; IPC returns presence rather than the saved token. Provider calls retrieve it for explicit Discogs requests. Save and Forget are explicit actions. Authorization headers are marked sensitive, and native errors are sanitized because some can contain secret bytes. Artwork requests carry no Discogs credential. Store operations run on blocking workers and share a process-local lock; no secret is cached in backend state and no plaintext fallback exists.
+
+Startup removes the legacy browser entry before migration, preserves an already saved native token and shares initialization across React StrictMode replays. Failed migration retains a recovery copy only in session memory and reports the need to retry before closing. Failed browser cleanup reports a possible residual plaintext copy. Forget refuses native deletion until browser cleanup succeeds, so a successful Forget cannot be undone by migration of that surviving entry after a reload. Concurrent writes and edits made during a save have regressions. MusicBrainz searches and details remain independent of credential readiness.
+
+Removing the active browser entry cannot erase older backups. Forget removes the application's credential, not its authorization at Discogs or requests already in flight. OS-vault protection depends on the user's unlocked session and store permissions; it does not protect against a compromised session, and no complete memory zeroization is claimed. The lock serializes this app process, not other instances or external vault editors. Linux needs an available Secret Service provider; failures remain visible rather than silently switching storage.
 
 Audio decoding rejects invalid sample rates, channel counts, non-finite PCM and changing playback layouts. DSD subprocesses are killed and reaped when reading fails; incomplete final PCM frames are rejected. DSF/DFF headers validate chunk boundaries, channel identifiers, compression and required properties. FLAC STREAMINFO can no longer request an initial allocation approaching 1 GiB: the reservation hint is capped at 4 MiB and grows only with actual decoded samples.
 
@@ -48,27 +54,32 @@ LUFS/LRA gate histories and DR block histories also grow with duration. This pas
 
 The audit upgraded `h2` to 0.4.16 for [RUSTSEC-2026-0258](https://rustsec.org/advisories/RUSTSEC-2026-0258.html) and `rustls` to 0.23.45 for [RUSTSEC-2026-0285](https://rustsec.org/advisories/RUSTSEC-2026-0285.html). `Cargo.lock` is now retained, and CI, rustdoc and release builds use locked resolution. CI runs every JavaScript suite, the complete Rust workspace, strict Clippy, documentation checks and dependency audits.
 
-The resulting Cargo audit reports zero entries classified as vulnerabilities and nine warnings. The distinction matters: [RUSTSEC-2024-0429](https://rustsec.org/advisories/RUSTSEC-2024-0429.html) reports unsound iterator implementations in Linux's transitive `glib` 0.18.5. The Tauri GTK dependency chain still selects this version; adding a second newer `glib` dependency would not repair it. The remaining eight maintenance advisories affect `audiopus_sys`, `paste`, `proc-macro-error` and five `unic` crates. No advisory is suppressed. Upstream migration and continued dependency monitoring remain necessary. `npm audit` reports zero vulnerabilities.
+The local-security follow-up upgraded the compatible Tauri family to 2.12.1. Its `tauri-utils` 2.10.1 / `urlpattern` 0.6 dependency chain replaces the five unmaintained `unic` crates. The resolved lockfile and a fresh advisory database confirm that all five alerts disappeared; the native credential adapter introduces no new advisory. [Tauri](https://docs.rs/crate/tauri/2.12.1), [tauri-utils](https://docs.rs/crate/tauri-utils/2.10.1), [urlpattern](https://docs.rs/crate/urlpattern/0.6.0).
+
+The resulting Cargo audit reports zero entries classified as vulnerabilities and four warnings. The distinction matters: [RUSTSEC-2024-0429](https://rustsec.org/advisories/RUSTSEC-2024-0429.html) reports unsound iterator implementations in Linux's transitive `glib` 0.18.5. The Tauri GTK dependency chain still selects this version; adding a second newer `glib` dependency would not repair it. The remaining three maintenance advisories affect [audiopus_sys](https://rustsec.org/advisories/RUSTSEC-2026-0150.html), [paste](https://rustsec.org/advisories/RUSTSEC-2024-0436.html) and [proc-macro-error](https://rustsec.org/advisories/RUSTSEC-2024-0370.html). No advisory is suppressed. `npm audit` reports zero vulnerabilities.
+
+Further options are a maintained Opus binding, an upstream `paste` replacement in Lofty, and a coordinated GTK/GLib migration or narrowly scoped backport. A new direct dependency cannot remove the affected transitive branch. Small adapters and focused corrections can be maintained here; rewriting codecs or the desktop platform would add substantially more code to validate. These remaining replacements have not been implemented or validated by this pass.
 
 ## Verification and remaining limits
 
-The complete reproducible commands are listed in the [project README](../README.md#tests). Frontend state tests control the order of backend responses; parser tests include malformed inputs; export tests check that audio files remain unchanged. Independent FFmpeg comparisons cover loudness and DC offset, and a real FFmpeg render checks the PNG output path.
+The complete reproducible commands are listed in the [project README](../README.md#testing). Frontend state tests control the order of backend responses; parser tests include malformed inputs; export tests check that audio files remain unchanged. Independent FFmpeg comparisons cover loudness and DC offset, and a real FFmpeg render checks the PNG output path.
 
 Checks run locally on macOS with Rust 1.99.0 and Node 26.10.0:
 
-| Check                                                            | Result                                         |
-| ---------------------------------------------------------------- | ---------------------------------------------- |
-| `npx tsc --noEmit` and `npm run build`                           | Passed                                         |
-| `npm test`                                                       | 78 passed                                      |
-| AppImage Python regression suite                                 | 6 passed                                       |
-| `cargo test --workspace --locked`                                | 516 passed; 2 optional FFmpeg tests ignored    |
-| Optional loudness/DC FFmpeg comparisons, run separately          | Both passed                                    |
-| Artwork tests after the final TIFF iteration cleanup             | 25 passed                                      |
-| `cargo clippy --workspace --all-targets --locked -- -D warnings` | Passed                                         |
-| `cargo build --workspace --locked`                               | Passed                                         |
-| Strict workspace rustdoc with `RUSTDOCFLAGS='-D warnings'`       | Passed                                         |
-| Rust formatting and `git diff --check`                           | Passed                                         |
-| Markdown formatting and documentation site build                 | Passed; 55 pages and 2,787 local links checked |
+| Check                                                            | Result                                                |
+| ---------------------------------------------------------------- | ----------------------------------------------------- |
+| `npx tsc --noEmit` and `npm run build`                           | Passed                                                |
+| `npm test`                                                       | 108 passed                                            |
+| AppImage Python regression suite                                 | 6 passed                                              |
+| `cargo test --workspace --locked`                                | 528 passed; 3 optional native/reference tests ignored |
+| Optional loudness/DC FFmpeg comparisons, run separately          | Both passed                                           |
+| Optional native credential round-trip and cleanup                | Passed on macOS                                       |
+| Artwork tests after the final TIFF iteration cleanup             | 25 passed                                             |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | Passed                                                |
+| `cargo build --workspace --locked`                               | Passed                                                |
+| Strict workspace rustdoc with `RUSTDOCFLAGS='-D warnings'`       | Passed                                                |
+| Rust formatting and `git diff --check`                           | Passed                                                |
+| Markdown formatting and documentation site build                 | Passed; 55 pages and 2,789 local links checked        |
 
 Compiler warnings and frontend unused-symbol checks were addressed. The historical public `requant` subsystem has no production caller but is retained because it belongs to the excluded Transcoded scope. Public library APIs cannot be declared dead solely because this repository has no caller. Existing large orchestration components, especially `App.tsx` and `ResultsTable.tsx`, still exceed the repository's component size convention; splitting them requires a focused structural refactor with desktop interaction checks.
 
@@ -76,4 +87,8 @@ Compiler warnings and frontend unused-symbol checks were addressed. The historic
 
 This pass does not include fuzzing, a representative independent musical corpus to estimate false-positive rates, native audio-device tests, or new Windows/Linux installer runs. Synthetic/reference tests demonstrate specific properties; they do not establish universal detection accuracy. Filesystem checks also do not provide a confinement guarantee against another local process concurrently replacing directory ancestors.
 
+Systematic fuzzing would exercise each parser repeatedly with automatically generated and mutated inputs, track code coverage, enforce resource/time budgets and retain minimized inputs that reproduce crashes, panics or hangs. Each confirmed defect would gain a deterministic regression. Current malformed-input unit tests are useful but are not a continuous fuzzing campaign. [LLVM libFuzzer documentation](https://llvm.org/docs/LibFuzzer.html).
+
 The native exclusive rename tests ran on macOS. Run `cargo test -p flaccompagnon-services --locked rename::tests` on Linux and Windows as well; the Windows long-path branch and its regression were not executed locally.
+
+Credential unit tests use an isolated in-memory vault and never touch the maintainer's account. The optional native round-trip test writes, reads and deletes a synthetic entry under a unique temporary service name; it passed on macOS with an unlocked Keychain. Run `cargo test -p flaccompagnon --locked credentials::tests::native_vault_round_trip_and_cleanup -- --ignored` on Windows and Linux with an available store. Those native adapters and interactive desktop drop/menu checks were not exercised locally by this follow-up.

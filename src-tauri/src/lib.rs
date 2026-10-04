@@ -38,6 +38,7 @@
 //!   the user clicks "Search online".
 
 mod commands;
+mod credentials;
 mod lookup;
 mod menu;
 mod playback;
@@ -46,6 +47,7 @@ mod spectrogram;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(credentials::CredentialStore::default())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // Playback owns a dedicated audio thread for the app's lifetime;
@@ -79,6 +81,10 @@ pub fn run() {
             commands::lookup::lookup_musicbrainz_detail,
             commands::lookup::lookup_discogs,
             commands::lookup::lookup_discogs_detail,
+            commands::credentials::discogs_credential_status,
+            commands::credentials::save_discogs_token,
+            commands::credentials::delete_discogs_token,
+            commands::credentials::migrate_discogs_token,
             commands::player::play_track,
             commands::player::stop_playback,
             commands::player::pause_playback,

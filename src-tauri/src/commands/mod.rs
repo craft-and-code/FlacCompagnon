@@ -1,9 +1,9 @@
 //! Every Tauri command the frontend can invoke, one file per domain.
 //!
-//! Commands are deliberately thin (see CLAUDE.md): validate the arguments,
-//! call into `flaccompagnon_core`, map the error to a `String` the frontend
-//! can show. Anything with real logic belongs in `core`, where it can be
-//! tested without a GUI.
+//! Commands are deliberately thin (see AGENTS.md): validate the arguments,
+//! call a domain service, map errors to a `String` the frontend can show.
+//! Analysis belongs in `core`, editing in `services`, and app-specific
+//! integrations in separate backend modules, all testable without a GUI.
 //!
 //! * [`analysis`] — run the detector over a set of targets.
 //! * [`batch`] — the cancellation flag and progress plumbing those long jobs
@@ -20,11 +20,13 @@
 //! * [`rename`] — rename a file on disk, keeping its extension. The only
 //!   command that changes where a file lives rather than what's in it.
 //! * [`lookup`] — thin wrappers over the online providers in [`crate::lookup`].
+//! * [`credentials`] — status, migration and explicit changes in the OS vault.
 //! * [`player`] — start/stop/pause/seek the preview player, and its volume.
 
 pub mod analysis;
 pub mod batch;
 pub mod convert;
+pub mod credentials;
 pub mod files;
 pub mod lookup;
 pub mod player;

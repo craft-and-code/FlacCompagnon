@@ -73,6 +73,12 @@ test("disabled local storage does not crash the online lookup panel", () => {
     assert.equal(renderToStaticMarkup(createElement(LookupModal, {
       open: false, onClose() {}, selectedPaths: [], existingReleaseId: null,
       prefill: { artist: "", album: "" }, onApply() {}, onToast() {},
+      discogsCredential: {
+        configured: false, ready: true, busy: false, error: "Storage unavailable",
+        recoveryPending: false, legacyCleanupPending: true,
+        readyForLookup: async () => false, save: async () => false,
+        forget: async () => false, retry: async () => false,
+      },
     })), "");
   } finally {
     if (previous) Object.defineProperty(globalThis, "localStorage", previous);

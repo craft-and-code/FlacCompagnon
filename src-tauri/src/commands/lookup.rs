@@ -5,7 +5,15 @@
 //! but they are what makes the surface visible in one place: if a command
 //! that talks to the internet is ever added, it belongs here and nowhere else.
 
+use crate::credentials::CredentialStore;
 use crate::lookup::{LookupCandidate, LookupRelease};
+
+async fn saved_token(store: tauri::State<'_, CredentialStore>) -> Result<String, String> {
+    let store = store.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || store.token_for_request())
+        .await
+        .map_err(|_| "Credential worker failed. Restart the app.".to_string())?
+}
 
 /// Search MusicBrainz for releases matching free-text `query`.
 #[tauri::command]
@@ -20,17 +28,24 @@ pub async fn lookup_musicbrainz_detail(id: String) -> Result<LookupRelease, Stri
     crate::lookup::musicbrainz_detail(id).await
 }
 
-/// Search Discogs for releases matching free-text `query`. `token` is the
-/// user's personal Discogs access token, kept in the frontend's
-/// `localStorage` — never persisted here.
+/// Search Discogs with a token read from the system credential store.
+/// The secret is never supplied by or returned to the lookup frontend.
 #[tauri::command]
-pub async fn lookup_discogs(query: String, token: String) -> Result<Vec<LookupCandidate>, String> {
+pub async fn lookup_discogs(
+    query: String,
+    store: tauri::State<'_, CredentialStore>,
+) -> Result<Vec<LookupCandidate>, String> {
+    let token = saved_token(store).await?;
     crate::lookup::discogs_search(query, token).await
 }
 
 /// Full track list (and cover art, if any) for a Discogs release chosen from
 /// [`lookup_discogs`]'s results.
 #[tauri::command]
-pub async fn lookup_discogs_detail(id: String, token: String) -> Result<LookupRelease, String> {
+pub async fn lookup_discogs_detail(
+    id: String,
+    store: tauri::State<'_, CredentialStore>,
+) -> Result<LookupRelease, String> {
+    let token = saved_token(store).await?;
     crate::lookup::discogs_detail(id, token).await
 }

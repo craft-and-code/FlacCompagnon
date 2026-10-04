@@ -1,8 +1,11 @@
-// Lookup pop-in, search step: the query box, the optional Discogs token, and
+// Lookup pop-in, search step: the query box, Discogs credential settings, and
 // the candidate list returned by the providers.
 
 import type { LookupCandidate } from "../types";
 import type { LookupStatus } from "./useLookup";
+import type { DiscogsCredential } from "./useDiscogsCredential";
+import { DiscogsCredentialSettings } from "./DiscogsCredentialSettings";
+import { lookupCandidateKey } from "./lookupProviders";
 import "./LookupSearchView.css";
 
 export interface LookupSearchViewProps {
@@ -10,8 +13,7 @@ export interface LookupSearchViewProps {
   onQueryChange: (query: string) => void;
   onSubmit: () => void;
   searching: boolean;
-  discogsToken: string;
-  onDiscogsTokenChange: (token: string) => void;
+  discogsCredential: DiscogsCredential;
   status: LookupStatus;
   candidates: LookupCandidate[];
   onPick: (candidate: LookupCandidate) => void;
@@ -26,8 +28,7 @@ export function LookupSearchView({
   onQueryChange,
   onSubmit,
   searching,
-  discogsToken,
-  onDiscogsTokenChange,
+  discogsCredential,
   status,
   candidates,
   onPick,
@@ -54,33 +55,26 @@ export function LookupSearchView({
         </button>
       </form>
 
-      <details className="lookup-settings">
-        <summary>Discogs token</summary>
-        <p className="muted">
-          Optional — without it, only MusicBrainz results are searched. Get a personal access token
-          from Discogs' developer settings (discogs.com → Settings → Developers).
-        </p>
-        <input
-          type="text"
-          placeholder="Discogs personal access token"
-          autoComplete="off"
-          value={discogsToken}
-          onChange={(ev) => onDiscogsTokenChange(ev.target.value)}
-        />
-      </details>
+      <DiscogsCredentialSettings credential={discogsCredential} />
 
       {status.msg && (
-        <p className={status.kind === "error" ? "muted lookup-status lookup-status-error" : "muted lookup-status"}>
+        <p
+          className={
+            status.kind === "error"
+              ? "muted lookup-status lookup-status-error"
+              : "muted lookup-status"
+          }
+        >
           {status.msg}
         </p>
       )}
 
       <div className="lookup-results">
-        {candidates.map((c, i) => (
+        {candidates.map((c) => (
           <button
             type="button"
             className="lookup-candidate"
-            key={`${c.source}:${c.id}:${i}`}
+            key={lookupCandidateKey(c)}
             onClick={() => onPick(c)}
           >
             <span className="lookup-candidate-source">{c.source}</span>

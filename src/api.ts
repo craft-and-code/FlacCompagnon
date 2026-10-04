@@ -8,6 +8,7 @@ import type {
   ConvertSource,
   ConvertSummary,
   CoverArt,
+  DiscogsCredentialStatus,
   FolderReport,
   LookupCandidate,
   LookupRelease,
@@ -139,19 +140,30 @@ export const setMuted = (muted: boolean) => invoke("set_muted", { muted });
 // Online lookup: the tag panel's "Search online" button. Search returns a
 // short candidate list; picking one fetches its full detail (track list +
 // cover) to stage into the tag panel. Discogs calls need the user's own
-// personal API token (kept in localStorage by the frontend, never persisted
-// on the Rust side).
+// personal API token, read by the backend from system credential storage.
 export const lookupMusicbrainz = (query: string) =>
   invoke<LookupCandidate[]>("lookup_musicbrainz", { query });
 
 export const lookupMusicbrainzDetail = (id: string) =>
   invoke<LookupRelease>("lookup_musicbrainz_detail", { id });
 
-export const lookupDiscogs = (query: string, token: string) =>
-  invoke<LookupCandidate[]>("lookup_discogs", { query, token });
+export const getDiscogsCredentialStatus = () =>
+  invoke<DiscogsCredentialStatus>("discogs_credential_status");
 
-export const lookupDiscogsDetail = (id: string, token: string) =>
-  invoke<LookupRelease>("lookup_discogs_detail", { id, token });
+export const saveDiscogsToken = (token: string) =>
+  invoke<DiscogsCredentialStatus>("save_discogs_token", { token });
+
+export const deleteDiscogsToken = () =>
+  invoke<DiscogsCredentialStatus>("delete_discogs_token");
+
+export const migrateDiscogsToken = (token: string) =>
+  invoke<DiscogsCredentialStatus>("migrate_discogs_token", { token });
+
+export const lookupDiscogs = (query: string) =>
+  invoke<LookupCandidate[]>("lookup_discogs", { query });
+
+export const lookupDiscogsDetail = (id: string) =>
+  invoke<LookupRelease>("lookup_discogs_detail", { id });
 
 // Playlist export: the frontend builds each entry (order, duration, cached
 // tags) — this just turns them into Simple or Extended M3U text and writes

@@ -122,7 +122,9 @@ It picks the most precise starting point available:
 
 Results from both sources are listed with a source badge. Picking one shows its track list and cover; **Apply** stages the values into the tag panel’s fields — it does not write anything, so you can review or adjust before pressing **Save** as usual. With a single track selected you can also click a track in the list to fill in its title and number; with several selected, only album-level fields are offered (there is no reliable way to guess which file is which track).
 
-**Discogs** requires your own free personal access token (discogs.com → Settings → Developers), pasted once into the panel inside the search pop-in; it is kept locally in the app and never sent anywhere but Discogs. Without a token, only MusicBrainz is searched. **MusicBrainz needs no key.**
+**Discogs** requires your own free personal access token (discogs.com → Settings → Developers). Open **Discogs token** inside the search pop-in, paste the token and select **Save token**. It is stored in macOS Keychain, Windows Credential Manager or Linux Secret Service. Saved secrets stay in the backend; the panel shows only whether a token is present. **Forget token** removes the app's saved credential, but does not revoke the token at Discogs. Without an available token, only MusicBrainz is searched. **MusicBrainz needs no key.**
+
+An older token in browser storage is migrated automatically at startup. If the system store is locked or unavailable, the app reports the failure and offers **Retry secure storage**; it never saves a new plaintext fallback. A failed migration keeps a recovery copy only for the current session, so retry before closing. A browser cleanup failure is reported separately and prevents **Forget token** from claiming completion.
 
 ### 8. Playlist export (M3U)
 
@@ -303,7 +305,7 @@ All cut-off-based detection assumes genuine music has energy up near Nyquist. Ac
 
 `ffmpeg` is located automatically at runtime (it checks `PATH` plus common install locations such as Homebrew's `/opt/homebrew/bin`). If it lives somewhere unusual, point the app at it with the `FLACCOMPAGNON_FFMPEG` environment variable. Analysis, MD5 verification, and reports do **not** require ffmpeg for FLAC/WAV/AIFF/ALAC/CAF/OGG/MP3/AAC — only spectrogram rendering does. **DSD (`.dsf`/`.dff`) is the one exception**: its container header is always verified natively, but the content-level checks (dynamic range, clipping, cutoff, and the real-DSD-vs-PCM-sourced authenticity check) need ffmpeg to decode the 1-bit stream. Without it, a DSD file only gets header verification and its quality badge is marked "(unverified)".
 
-**Optional, for the online tag lookup:** a free [Discogs personal access token](https://www.discogs.com/settings/developers) if you want Discogs results alongside MusicBrainz. It's pasted into the search pop-in once and stored locally. MusicBrainz needs no key, and the whole feature is optional — the app works fully offline without it.
+**Optional, for the online tag lookup:** a free [Discogs personal access token](https://www.discogs.com/settings/developers) if you want Discogs results alongside MusicBrainz. Save it from the search pop-in to the system credential store. Linux needs an available, unlocked Secret Service provider, such as the desktop's password manager. The OS may request permission to access its store. MusicBrainz needs no key, and the whole feature is optional — the app works fully offline without it.
 
 ### Notable dependencies
 
@@ -497,9 +499,9 @@ The **conversion panel** (see [above](#10-conversion)) is a separate case: it al
 FlacCompagnon works **fully offline**. The single feature that makes a network request is the tag panel's **Search online** button, and only on that click:
 
 - Requests go to **MusicBrainz**, the **Cover Art Archive**, and — only if you configured a token — **Discogs**, plus HTTPS image hosts referenced by those providers, including redirected artwork hosts.
-- What is sent is the **search text** (artist/album, or a release ID already in your tags). **No audio, no file paths, no file contents, and no identifying information about you** ever leave the machine.
+- What is sent is the **search text** (artist/album, or a release ID already in your tags). **No audio, no file paths and no file contents** leave the machine. Discogs requests also send your personal access token to authenticate your account.
 - There is **no telemetry, analytics, crash reporting or update check** anywhere in the app.
-- Your Discogs token is stored locally by the app and is only ever sent to Discogs.
+- Your Discogs token is saved in the system credential store and sent only to the Discogs API. The backend retrieves it for explicit requests; saved tokens are never returned to the frontend. Artwork requests do not carry this credential. Forgetting it removes the app's entry; revoke it in Discogs settings if an older plaintext copy was exposed.
 
 Requests carry a descriptive `User-Agent`, time out after 20 s and remain on HTTPS through redirects. Provider JSON responses are limited to 4 MiB and cover images to 12 MiB while reading, even without `Content-Length`. Local and embedded artwork use the same 12 MiB limit and a 64-megapixel dimension limit. Report imports are limited to 64 MiB and accept regular files only.
 

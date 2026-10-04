@@ -26,6 +26,7 @@ import { applyExtraEdits, commonReleaseId, distinctCovers, extendedRows } from "
 import { useTagEditor } from "./useTagEditor";
 import { DraftRevision } from "./draftRevision";
 import { LatestRequest } from "./latestRequest";
+import type { DiscogsCredential } from "./useDiscogsCredential";
 
 export interface TagPanelHandle {
   /// Stage a dropped image only if the original selection and role remain
@@ -56,6 +57,7 @@ export interface TagPanelProps {
   /// on the format.
   formats: string[];
   coverDragOver: boolean;
+  discogsCredential: DiscogsCredential;
   onClose: () => void;
   onSaved: (paths: string[]) => void;
   onToast: (msg: string, kind?: "info" | "error") => void;
@@ -67,6 +69,7 @@ export function TagPanel({
   tagSets,
   formats,
   coverDragOver,
+  discogsCredential,
   onClose,
   onSaved,
   onToast,
@@ -279,6 +282,7 @@ export function TagPanel({
         selectedPaths={selectedPaths}
         existingReleaseId={releaseId}
         prefill={{ artist: editor.values.artist.value, album: editor.values.album.value }}
+        discogsCredential={discogsCredential}
         onApply={applyLookup}
         onToast={onToast}
       />

@@ -1,6 +1,20 @@
 use super::*;
 
 #[test]
+fn authorization_header_is_redacted_from_debug_output() {
+    let header = authorization("synthetic-token").unwrap();
+    assert!(header.is_sensitive());
+    assert_eq!(header.to_str().unwrap(), "Discogs token=synthetic-token");
+    assert!(!format!("{header:?}").contains("synthetic-token"));
+}
+
+#[test]
+fn invalid_authorization_header_error_does_not_echo_the_secret() {
+    let error = authorization("synthetic-token\r\nInjected: yes").unwrap_err();
+    assert!(!error.contains("synthetic-token"));
+}
+
+#[test]
 fn accepts_a_plain_numeric_release_id() {
     assert!(is_valid_release_id("249504"));
     assert!(is_valid_release_id("1"));

@@ -12,7 +12,7 @@ export class LatestRequest {
     this.current = null;
   }
 
-  async run<T>(task: () => Promise<T>): Promise<RequestResult<T>> {
+  async run<T>(task: (isCurrent: () => boolean) => Promise<T>): Promise<RequestResult<T>> {
     const request = Symbol();
     this.current = request;
     // Awaiting run() adds another microtask after this method's own await.
@@ -20,7 +20,7 @@ export class LatestRequest {
     // run between those two continuations.
     const isCurrent = () => this.current === request;
     try {
-      const value = await task();
+      const value = await task(isCurrent);
       return this.current === request
         ? { status: "success", value, isCurrent }
         : { status: "superseded", isCurrent };

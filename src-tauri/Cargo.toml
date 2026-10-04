@@ -35,6 +35,8 @@ cpal = "0.18"
 # building each request's query string (both API endpoints take their
 # search terms/params that way).
 reqwest = { version = "0.13", features = ["json", "query"] }
+# The OS credential store owns persistence; no password file or JS readback.
+keyring = { version = "4.2", default-features = false, features = ["v1"] }
 
 [dev-dependencies]
 # Scratch folders for the target-expansion tests in commands/batch.rs, which

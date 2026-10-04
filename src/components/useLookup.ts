@@ -11,6 +11,12 @@ import { useCallback, useRef, useState } from "react";
 import type { LookupCandidate, LookupRelease } from "../types";
 import * as api from "../api";
 import { LatestRequest } from "./latestRequest";
+import type { DiscogsCredential } from "./useDiscogsCredential";
+import {
+  lookupCandidateDetail,
+  lookupSearchStatus,
+  searchLookupProviders,
+} from "./lookupProviders";
 
 export interface LookupStatus {
   msg: string;
@@ -22,7 +28,7 @@ export interface LookupLoading {
   label: string;
 }
 
-export function useLookup(discogsToken: string) {
+export function useLookup(credential: DiscogsCredential) {
   const [candidates, setCandidates] = useState<LookupCandidate[]>([]);
   const [detail, setDetail] = useState<LookupRelease | null>(null);
   const [status, setStatusState] = useState<LookupStatus>({ msg: "", kind: "info" });
@@ -54,46 +60,32 @@ export function useLookup(discogsToken: string) {
       setStatusState({ msg: "", kind: "info" });
       setLoading({ on: true, label: "Searching…" });
 
-      // Each provider's failure is captured rather than thrown, so one being
-      // down still lets the other's results through — but the reason is kept
-      // so an *entirely* empty result can say why instead of a bare
-      // "No results".
-      const errors: string[] = [];
-      const tasks: Promise<LookupCandidate[]>[] = [
-        api.lookupMusicbrainz(query).catch((e) => {
-          errors.push(`MusicBrainz: ${String(e)}`);
-          return [];
+      const result = await requests.current.run((isCurrent) =>
+        searchLookupProviders(query, credential.readyForLookup, api, {
+          isCurrent,
+          publish: (progress) => {
+            setCandidates(progress.candidates);
+            setStatusState(lookupSearchStatus(progress, false));
+            if (progress.musicbrainzFinished) {
+              setLoading({ on: false, label: "" });
+              setSearching(false);
+            }
+          },
         }),
-      ];
-      // Discogs requires the user's own token — silently skipped (not an
-      // error) when none is set, same as leaving a provider unchecked.
-      if (discogsToken) {
-        tasks.push(
-          api.lookupDiscogs(query, discogsToken).catch((e) => {
-            errors.push(`Discogs: ${String(e)}`);
-            return [];
-          }),
-        );
-      }
-
-      const result = await requests.current.run(() => Promise.all(tasks));
+      );
       if (result.status !== "success" || !result.isCurrent()) return;
       setLoading({ on: false, label: "" });
       setSearching(false);
-      const found = result.value.flat();
+      const { candidates: found, errors } = result.value;
       setCandidates(found);
 
-      if (found.length > 0) {
-        setStatusState({ msg: "", kind: "info" });
-      } else if (errors.length > 0) {
-        setStatusState({ msg: errors.join(" · "), kind: "error" });
-      } else {
-        setStatusState({ msg: "No results.", kind: "info" });
-      }
+      setStatusState(lookupSearchStatus(result.value, true));
       // Partial failure with results showing is a side note, not the headline.
-      return found.length > 0 && errors.length > 0 ? errors.join(" · ") : undefined;
+      return found.length > 0 && errors.length > 0
+        ? { message: errors.join(" · "), isCurrent: result.isCurrent }
+        : undefined;
     },
-    [discogsToken],
+    [credential.readyForLookup],
   );
 
   /// Loads a candidate's full track list + cover. Returns whether it actually
@@ -102,12 +94,11 @@ export function useLookup(discogsToken: string) {
   /// merged or deleted on MusicBrainz's side).
   const selectCandidate = useCallback(
     async (candidate: LookupCandidate): Promise<boolean> => {
+      setSearching(false);
       setStatusState({ msg: "", kind: "info" });
       setLoading({ on: true, label: "Loading track list…" });
       const result = await requests.current.run(() =>
-        candidate.source === "MusicBrainz"
-          ? api.lookupMusicbrainzDetail(candidate.id)
-          : api.lookupDiscogsDetail(candidate.id, discogsToken),
+        lookupCandidateDetail(candidate, credential.readyForLookup, api),
       );
       if (result.status === "superseded" || !result.isCurrent()) return false;
       setLoading({ on: false, label: "" });
@@ -118,7 +109,7 @@ export function useLookup(discogsToken: string) {
       setStatusState({ msg: String(result.error), kind: "error" });
       return false;
     },
-    [discogsToken],
+    [credential.readyForLookup],
   );
 
   /// Back to the candidate list, keeping the results already fetched.

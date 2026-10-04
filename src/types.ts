@@ -313,6 +313,11 @@ export interface PlaybackPosition {
 
 export type LookupSource = "MusicBrainz" | "Discogs";
 
+// The system credential store reports presence only, never its secret value.
+export interface DiscogsCredentialStatus {
+  configured: boolean;
+}
+
 export interface LookupCandidate {
   source: LookupSource;
   id: string;

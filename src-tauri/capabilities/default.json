@@ -1,13 +1,17 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capability set for the main window.",
+  "description": "Local main-window events, lifecycle, dragging and file dialogs only.",
+  "local": true,
   "windows": ["main"],
   "permissions": [
-    "core:default",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:event:allow-emit",
     "core:window:allow-start-dragging",
     "core:window:allow-show",
     "core:window:allow-set-focus",
-    "dialog:default"
+    "dialog:allow-open",
+    "dialog:allow-save"
   ]
 }
