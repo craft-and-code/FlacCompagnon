@@ -34,6 +34,8 @@ Clipping runs are tracked independently per channel. Interleaved silence can no 
 
 The review also covered global/local phase, channel balance, HF stereo width, DC offset, integrated LUFS/LRA and momentary/short-term maxima, impulses and dropouts. Their existing analytical, injected-signal and EBU reference tests were reviewed; no additional defect was confirmed. Local phase, HF stereo and discontinuity findings remain descriptive evidence rather than universal authenticity or corruption verdicts. Loudness remains limited to mono/stereo because channel counts alone do not identify surround positions.
 
+The subsequent [0.9.6 measurement audit](release-0.9.6-analysis-audit.md), performed on 5 October, extends that review with additional adversarial numerical fixtures and cross-rate reference checks. It records newly reproduced defects and their corrections; the preceding paragraph describes only the original pass.
+
 Stale tag, cover, lookup, playback and missing-file responses cannot overwrite newer state. Removed rows release cached tags and artwork. A save cannot clear edits made while it was in flight or discard a failed partial write. Cover imports retain their original selection and picture role. Native menu actions and keyboard shortcuts share the toolbar's busy guard. Backend play requests are queued before waiting in a blocking worker; stop invalidates pending playback, and extreme seeks return silence without integer overflow.
 
 Relocation uses names and folder suffixes rather than audio fingerprints. Equal-ranking candidates remain missing instead of silently choosing an arbitrary file. Windows paths are recognized when importing a report on another platform. Relocated measurements should be refreshed by analysis.

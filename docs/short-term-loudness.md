@@ -19,7 +19,7 @@ The maximum is captured before the LRA calculation appends its analysis-only tai
 - Supported audio is **mono or stereo at 8–768 kHz**, including decoded DSD PCM. Multichannel audio has no reading because reliable channel-position weights are not yet supplied.
 - A file **shorter than three seconds** has no S maximum, even if it has valid integrated or momentary loudness. Exactly three seconds permits one complete S window.
 - Silence, invalid input, failed/skipped decoding and older reports have no reading. Quiet nonzero audio below the integrated loudness gate remains measurable.
-- The shared 3-second history stores powers as 32-bit floats to bound memory. Extreme finite float samples whose weighted power cannot fit invalidate S and LRA; M can remain available because its history uses 64-bit powers. Powers too tiny for the compact representation cannot produce a finite S reading.
+- The shared 3-second history stores powers as 32-bit floats to bound memory; its rolling sum uses compensated 64-bit arithmetic. Extreme finite float samples whose weighted power cannot fit invalidate S and LRA; M can remain available because its history uses 64-bit powers. Powers too tiny for the compact representation cannot produce a finite S reading.
 - A maximum is not a typical loudness or a quality grade. Short accents are diluted over three seconds. A longer window can also average across pauses or transitions; audition the interval shown in the tooltip.
 - K-weighting filter history affects boundaries. A maximum from an excerpt need not equal the maximum calculated over that same passage within the full file.
 - This is not LRA. LRA describes the gated distribution of many S readings; this column retains the highest ungated S reading. Its value is in **LUFS**, whereas LRA is in **LU**.
@@ -37,7 +37,7 @@ cargo test -p flaccompagnon-core loudness_peaks
 cargo test -p flaccompagnon-core --test loudness_reference -- --ignored --nocapture
 ```
 
-The unit suite includes all 20 shifted-file cases from EBU Tech 3341 case 10, the known stereo calibration level, the approximately 3.01 LU mono/stereo difference, audio below the integrated gate, exact three-second availability and invalid input. It also verifies that LRA's synthetic filter tail cannot increase exported M/S maxima. A separate WAV test checks a known level step, maximum positions, report fields and backward compatibility. The optional FFmpeg comparison covers mixed frequencies, several rates and both supported layouts.
+The unit suite includes the alternating-level rectangular-window case 9 and all 20 shifted-file cases from EBU Tech 3341 case 10, the known stereo calibration level, the approximately 3.01 LU mono/stereo difference, audio below the integrated gate, exact three-second availability (including 8 and 11.025 kHz), recovery after a large finite float passage and invalid input. It also verifies that LRA's synthetic filter tail cannot increase exported M/S maxima. A separate WAV test checks a known level step, maximum positions, report fields and backward compatibility. The optional FFmpeg comparison covers mixed frequencies, several rates and both supported layouts.
 
 ## Manual fixtures
 

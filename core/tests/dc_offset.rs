@@ -1,6 +1,6 @@
 //! Independently specified integer biases through decoding and report assembly.
 
-use flaccompagnon_core::{analyze_file, ScanOptions};
+use flaccompagnon_core::{analyze_file, analyze_file_selected, AnalysisSelection, ScanOptions};
 use std::{path::Path, process::Command};
 
 fn write_fixture(path: &Path, rate: u32, biases: &[i16]) {
@@ -46,6 +46,36 @@ fn dc_offset_survives_mono_stereo_and_multichannel_decoding() {
             dc.max_abs,
             expected.iter().map(|x| x.abs()).fold(0.0, f64::max)
         );
+    }
+}
+
+#[test]
+fn a_single_float_frame_above_full_scale_survives_decode_without_clamping() {
+    let dir = tempfile::tempdir().unwrap();
+    for rate in [8_000, 44_100, 192_000] {
+        let path = dir.path().join(format!("short-{rate}.wav"));
+        let mut writer = hound::WavWriter::create(
+            &path,
+            hound::WavSpec {
+                channels: 2,
+                sample_rate: rate,
+                bits_per_sample: 32,
+                sample_format: hound::SampleFormat::Float,
+            },
+        )
+        .unwrap();
+        writer.write_sample(2.0f32).unwrap();
+        writer.write_sample(-1.5f32).unwrap();
+        writer.finalize().unwrap();
+        let result = analyze_file_selected(
+            &path,
+            &ScanOptions::default(),
+            AnalysisSelection::from_names(["dc-offset"]).unwrap(),
+        );
+        assert!(result.error.is_none(), "{:?}", result.error);
+        let dc = result.dc_offset.unwrap();
+        assert_eq!(dc.channel_means, vec![2.0, -1.5]);
+        assert_eq!(dc.max_abs, 2.0);
     }
 }
 

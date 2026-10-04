@@ -78,3 +78,29 @@ fn malformed_tail_withholds_the_mean_of_the_valid_prefix() {
         assert!(meter.finish().is_none());
     }
 }
+
+#[test]
+fn fades_and_opposing_sections_are_arithmetic_means_not_a_persistent_bias_verdict() {
+    let mut fade = DcOffsetMeter::new(1).unwrap();
+    // A linear fade from +1/2 to zero over 1025 samples has exact mean 1/4.
+    for n in 0..=1024 {
+        fade.push_frame(&[(1024 - n) as f32 / 2048.0]);
+    }
+    assert_eq!(fade.finish().unwrap().channel_means, vec![0.25]);
+
+    let mut sections = DcOffsetMeter::new(2).unwrap();
+    for amplitude in [0.125, -0.125] {
+        for _ in 0..1024 {
+            sections.push_frame(&[amplitude, 0.25]);
+        }
+    }
+    assert_eq!(sections.finish().unwrap().channel_means, vec![0.0, 0.25]);
+}
+
+#[test]
+fn an_unrepresentable_frame_count_withholds_the_reading() {
+    let mut meter = DcOffsetMeter::new(1).unwrap();
+    meter.frames = u64::MAX;
+    meter.push_frame(&[0.125]);
+    assert!(meter.finish().is_none());
+}

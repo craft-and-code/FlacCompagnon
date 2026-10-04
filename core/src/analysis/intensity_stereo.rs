@@ -60,6 +60,7 @@ pub struct HighFrequencyStereo {
 /// Direct-form biquad used for the Butterworth low-pass/high-pass sections.
 #[derive(Clone, Copy)]
 struct Biquad {
+    high_pass: bool,
     b0: f64,
     b1: f64,
     b2: f64,
@@ -82,6 +83,7 @@ impl Biquad {
         let sign = if high_pass { -1.0 } else { 1.0 };
         let b0 = (1.0 - sign * cosine) / (2.0 * a0);
         Self {
+            high_pass,
             b0,
             b1: sign * 2.0 * b0,
             b2: b0,
@@ -95,9 +97,15 @@ impl Biquad {
     }
 
     fn push(&mut self, input: f64) -> f64 {
-        let output = self.b0 * input + self.b1 * self.x1 + self.b2 * self.x2
-            - self.a1 * self.y1
-            - self.a2 * self.y2;
+        // The HP numerator is a second difference. Taking differences before
+        // multiplication makes a constant bias cancel exactly, even at huge
+        // float amplitudes; summing three rounded products can leave leakage.
+        let numerator = if self.high_pass {
+            self.b0 * ((input - self.x1) - (self.x1 - self.x2))
+        } else {
+            self.b0 * input + self.b1 * self.x1 + self.b2 * self.x2
+        };
+        let output = numerator - self.a1 * self.y1 - self.a2 * self.y2;
         self.x2 = self.x1;
         self.x1 = input;
         self.y2 = self.y1;
@@ -127,6 +135,15 @@ impl Butterworth {
         }
         input
     }
+
+    fn prime_high_pass(&mut self, input: f64) {
+        // A constant input has zero steady-state output in every HP stage.
+        // Only the first stage therefore needs non-zero input history.
+        if let Some(stage) = self.stages.first_mut() {
+            stage.x1 = input;
+            stage.x2 = input;
+        }
+    }
 }
 
 struct BandPass {
@@ -150,6 +167,10 @@ impl BandPass {
             .as_mut()
             .map_or(output, |filter| filter.push(output))
     }
+
+    fn prime(&mut self, input: f64) {
+        self.high_pass.prime_high_pass(input);
+    }
 }
 
 /// Streaming high-frequency stereo-width meter for a valid stereo stream.
@@ -170,6 +191,7 @@ pub struct HighFrequencyStereoMeter {
     total_reference_side_energy: f64,
     eligible_blocks: u32,
     narrowed_blocks: u32,
+    primed: bool,
     valid: bool,
 }
 
@@ -200,6 +222,7 @@ impl HighFrequencyStereoMeter {
             total_reference_side_energy: 0.0,
             eligible_blocks: 0,
             narrowed_blocks: 0,
+            primed: false,
             valid: true,
         })
     }
@@ -217,6 +240,17 @@ impl HighFrequencyStereoMeter {
 
         let mid = (samples[0] as f64 + samples[1] as f64) * 0.5;
         let side = (samples[0] as f64 - samples[1] as f64) * 0.5;
+        // Assume the initial values preceded the excerpt, so constant DC
+        // does not excite an artificial filter-start step. Prime the histories
+        // directly: subtracting that value forever would swallow quiet audio
+        // after a single extreme first sample through floating-point loss.
+        if !self.primed {
+            self.high_mid.prime(mid);
+            self.high_side.prime(side);
+            self.reference_mid.prime(mid);
+            self.reference_side.prime(side);
+            self.primed = true;
+        }
         let high_mid = self.high_mid.push(mid);
         let high_side = self.high_side.push(side);
         let reference_mid = self.reference_mid.push(mid);

@@ -36,6 +36,7 @@
 pub mod analyzer;
 pub mod bitdepth;
 pub mod clipping;
+mod compensated_sum;
 pub mod dc_offset;
 pub mod detections;
 pub mod discontinuities;

@@ -4,9 +4,9 @@ La LRA mesure la variation du loudness à court terme dans un programme. Elle su
 
 ## Calcul
 
-La mesure partage la puissance pondérée K du [LUFS intégré](integrated-loudness.md), mais utilise des fenêtres de trois secondes toutes les 100 ms. À la fin, elle ajoute 1,5 seconde de silence réservée à l’analyse afin que la dernière fenêtre soit centrée sur la fin réelle, conformément à la mesure sur fichier.
+La mesure partage la puissance pondérée K du [LUFS intégré](integrated-loudness.md), mais utilise des fenêtres de trois secondes toutes les 100 ms. Sur fichier, elle suit la convention de référence de Tech 3342 en ajoutant au moins 1,5 seconde de silence réservée à l’analyse, arrondie au nombre entier supérieur de trames. Le centre de la dernière fenêtre se situe à moins d’une mise à jour de la fin réelle ; une fin de fichier arbitraire ne coïncide pas forcément avec la grille. Ce silence traverse les filtres et conserve donc leur réponse résiduelle.
 
-Elle conserve les fenêtres à partir de −70 LUFS, calcule leur puissance moyenne, puis conserve les niveaux situés à moins de 20 LU sous cette moyenne. La différence entre les 95e et 10e percentiles restants donne la LRA.
+Elle conserve les fenêtres à partir de −70 LUFS, calcule leur puissance moyenne, puis conserve les niveaux supérieurs ou égaux à cette moyenne moins 20 LU. La différence entre les 95e et 10e percentiles restants donne la LRA. Pour `n` valeurs conservées et triées par ordre croissant, les rangs à partir de zéro sont `round((n − 1) × 0.10)` et `round((n − 1) × 0.95)`, sans interpolation. La LRA inclut les valeurs exactement égales aux seuils, contrairement au LUFS intégré.
 
 | Propriété      | Réglage                                              |
 | -------------- | ---------------------------------------------------- |
@@ -17,6 +17,8 @@ Elle conserve les fenêtres à partir de −70 LUFS, calcule leur puissance moye
 | Étendue        | 95e percentile moins 10e percentile                  |
 
 Seuls les flux mono ou stéréo valides à 8–768 kHz sont mesurés. Moins d’une fenêtre complète de trois secondes, silence, données invalides ou puissance interne non représentable donnent une absence de résultat.
+
+Les historiques écartent les valeurs qui ne peuvent jamais franchir la porte absolue. La LRA réutilise son vecteur et sélectionne deux rangs sans tri complet ni deuxième allocation de taille proportionnelle au programme. Les tampons partagés de 400 ms et 3 s occupent environ 11,1 Mio à 768 kHz ; les historiques retenus croissent d’environ 160 octets par seconde de programme, hors capacité supplémentaire des vecteurs. Les maxima M/S ajoutent un état de taille fixe. Des sommes glissantes compensées préservent les fenêtres calmes après un passage flottant très fort, sans fournir une précision arbitraire.
 
 ## Interprétation et limites
 
@@ -33,6 +35,8 @@ ffmpeg -n -f lavfi -i 'aevalsrc=if(lt(t\,20)\,0.1\,0.0316227766)*sin(2*PI*1000*t
 ffmpeg -i range.wav -af ebur128 -f null -
 ```
 
+Les tests couvrent les quatre distributions de niveaux publiées dans EBU Tech 3342, la porte basée sur la moyenne en puissance, l’égalité au seuil absolu, l’exclusion des percentiles, les observations répétées, le silence et l’arrondi final aux taux impairs. Le test facultatif utilise les métadonnées FFmpeg à trois décimales, à plusieurs taux. Les conventions de percentiles et de fin peuvent différer entre les deux mesures ; la comparaison LRA utilise la tolérance d’acceptation de ±1 LU de Tech 3342.
+
 Attendez environ 10 LU, avec l’indication d’approximation sous 60 secondes. Comparez avec FFmpeg sans exiger un arrondi strictement identique.
 
-Références : [EBU Tech 3342](https://tech.ebu.ch/docs/tech/tech3342.pdf), [EBU Tech 3341](https://tech.ebu.ch/docs/tech/tech3341.pdf).
+Références : [EBU Tech 3342](https://tech.ebu.ch/docs/tech/tech3342.pdf), [EBU Tech 3341](https://tech.ebu.ch/docs/tech/tech3341.pdf), [conseils sur les programmes courts dans EBU Tech 3343](https://tech.ebu.ch/docs/tech/tech3343.pdf).

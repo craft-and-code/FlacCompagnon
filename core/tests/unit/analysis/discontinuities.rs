@@ -1,5 +1,12 @@
 use super::*;
 
+#[path = "discontinuities/boundaries.rs"]
+mod boundaries;
+#[path = "discontinuities/precision.rs"]
+mod precision;
+#[path = "discontinuities/thresholds.rs"]
+mod thresholds;
+
 fn analyze(rate: u32, channels: usize, samples: &[f32]) -> Option<DiscontinuityAnalysis> {
     let mut detector = DiscontinuityDetector::new(rate, channels).unwrap();
     for frame in samples.chunks(channels) {

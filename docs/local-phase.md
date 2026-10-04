@@ -51,6 +51,8 @@ X[k] = DFT(w[n] × (x[n] − μ))
 
 The periodic Hann convention follows the [MathWorks window documentation](https://www.mathworks.com/help/signal/ref/hann.html). Its weighting reduces leakage at window boundaries. Removing the mean prevents a constant channel bias from dominating the phase reading; [DC offset](dc-offset.md) remains separately available.
 
+The implementation sums deviations from the smallest-magnitude sample before calculating the mean. This is algebraically the same formula, but a constant float offset then subtracts exactly. Choosing a small anchor also prevents an extreme outlier from swallowing ordinary samples in every subtraction. Summing a very large offset directly can lose enough precision to manufacture audible-band energy after the FFT. Removing an offset cannot recover audio already lost when a large bias was quantized to float samples.
+
 Let `L[k]` and `R[k]` be the two complex spectra. For each frequency range, sum the positive-frequency bins in that range:
 
 ```text
@@ -65,6 +67,8 @@ The factor `q` comes from Parseval's identity, the two symmetric frequency halve
 
 A window is eligible for a particular range only when **both** `E_L` and `E_R` exceed `10⁻⁶`, equivalent to a band RMS above −60 dBFS per channel. Each range has its own gate. A strong bass component cannot make an otherwise silent treble band eligible. The floor is a project choice to suppress meaningless ratios in silence and very weak leakage; it is not loudness weighting.
 
+More precisely, the gate uses normalized-sample RMS strictly greater than `0.001`, with `20 log10(RMS)` referenced to sample magnitude one. This defines the project's floor without relying on an RMS meter's full-scale calibration convention.
+
 For each range, the report retains:
 
 - Correlation calculated from the **sum of eligible-window energies**. It is not an arithmetic average of individual coefficients.
@@ -77,6 +81,7 @@ The opposed fraction counts **overlapping eligible windows**, not samples or sec
 ## Interpretation limits
 
 - This is **zero-lag correlation**, not a phase angle in degrees and not magnitude-squared coherence. An averaged coherence estimate and the cross-spectrum angle answer different questions; see the [MathWorks discussion of cross spectrum and coherence](https://www.mathworks.com/help/signal/ug/cross-spectrum-and-magnitude-squared-coherence.html). FlacCompagnon uses the real cross spectrum here to quantify agreement or opposition within each range.
+- This is not interaural coherence: [Whitmer, Seeber and Akeroyd's experiments](https://pmc.ncbi.nlm.nih.gov/articles/PMC3566657/) assess peak cross-correlation at the ears and show listener dependence. File L/R zero-lag correlation omits the head, room and crosstalk; that study does not calibrate our thresholds.
 - Broadband and band results are energy-weighted. Multiple components can cancel each other's correlation inside the same band. This is a four-band summary, not a phase-versus-frequency curve.
 - Intentional stereo widening, ambience, delays and microphone spacing can produce negative correlation. Listening and knowledge of the source are required before changing the audio.
 - A brief event shorter than a window can be diluted. Hann weighting also reduces the influence of samples near each window edge. The method does not promise sample-accurate event detection.
@@ -85,6 +90,18 @@ The opposed fraction counts **overlapping eligible windows**, not samples or sec
 - The absolute energy gate makes coverage depend on gain. Raising a very quiet file can make previously unavailable ranges measurable. A missing band is not proof of perfect mono compatibility.
 - Global polarity uses whole-stream samples, while this measurement removes DC, limits the frequency range, windows the audio and gates each range. Their aggregate coefficients need not be equal.
 - Invalid frames or non-finite samples withhold the entire measurement. Failed/skipped decoding and older saved reports also have no reading. Float samples above full scale are measured without clipping them first.
+
+For a mono average `M = (L + R) / 2`, the measured energies obey `E_M = (E_L + E_R + 2C) / 4`. Negative correlation reduces this sum relative to zero cross energy, but the coefficient alone does not quantify the loss. For example, `R = −0.1L` has correlation −1 while its mono average is `0.45L`; it does not vanish. Complete cancellation requires equal opposing channels. Conversely, quadrature tones have coefficient zero while remaining deterministically related. Audition the actual mono sum before deciding that an opposed passage needs correction.
+
+This listening requirement agrees with the recording practitioner's discussion in [Sengpiel's correlation-meter tutorial](https://sengpielaudio.com/GedankenZumKorrelationsgrad.pdf). A [firsthand sampled-piano discussion](https://forum.soundonsound.com/phpbb/viewtopic.php?embed=true&t=79368) also illustrates how a negative meter reading can accompany a mono sum its mixer finds acceptable. These are interpretation examples, not numerical ground truth or threshold calibration.
+
+## Design choices and cost
+
+Zero-lag signed correlation is retained because the question here is opposition in the mono sum. Maximizing over time lag could turn a delayed opposed tone into a positive match, hiding that evidence. Magnitude-squared coherence would describe linear relatedness instead: a single spectral segment gives a value of one at nonzero bins, and a useful estimate needs averaging across segments, as the [official `mscohere` documentation](https://www.mathworks.com/help/signal/ref/mscohere.html) explains. Adding such an estimate would be a different measurement with a different time-resolution tradeoff.
+
+The four fixed bands remain summaries rather than a perceptual filter bank. On an exactly bin-centred 200 Hz tone at 32768 Hz (`N = 8192`, 4 Hz bins), the periodic Hann places one sixth of its energy in the lower neighbouring bin and five sixths in the centre and upper neighbour. Both adjacent bands can therefore have valid readings at a boundary. An excluded 20 kHz or Nyquist centre bin can likewise have a windowed neighbour inside a measured range. Sharper physical crossovers or auditory bands would change the method and its calibration; synthetic boundary tests make the present convention explicit.
+
+There are two forward FFTs per complete window, with `O(N log N)` work, and no per-window allocation. The spectral scan stops at 20 kHz or Nyquist, whichever comes first; at 768 kHz it visits about 6827 bins instead of all 131072 positive bins. The two spectra, frame buffer and Hann coefficients use `48N` bytes before the FFT plan and scratch: 768 KiB at 48 kHz, 12 MiB at 768 kHz. Summaries remain fixed-size. Decimating before the FFT could reduce the high-rate cost, but would require a specified anti-alias filter and renewed band/gate verification; this audit does not substitute unverified resampling.
 
 ## Saved reports
 
@@ -109,7 +126,7 @@ cargo test -p flaccompagnon-core local_phase
 node --test tests/analysis-cells.test.mjs tests/search.test.mjs
 ```
 
-Unit tests live in `core/tests/unit/analysis/local_phase.rs`; the independent expected values come from sine phase identities and sums of orthogonal tone energies. They cover 0°, 60°, 90° and 180°, unequal gains, opposite treble under aligned bass, a short opposed passage with a known position, DC rejection, the RMS gate, invalid input, incomplete windows, supported rates and Nyquist limits. `core/tests/local_phase.rs` passes an independently generated 24-bit WAV through the complete decoder and verifies the reported timing, bands, CSV and JSON, including loading an older report. Frontend tests cover signed sorting, values, missing readings, tooltips and search.
+Unit tests live in `core/tests/unit/analysis/local_phase.rs`; the independent expected values come from sine phase identities, Hann's analytical three-bin powers and sums of orthogonal tone energies. They cover 0°, 60°, 90° and 180°, unequal gains, opposite treble under aligned bass, a short opposed passage with a known position, large constant DC rejection, ordinary audio after an extreme zero-weight first sample, Parseval normalization in all four bands, bin boundaries, the exclusive 20 kHz edge, energy-weighted aggregation, the RMS gate, invalid input, incomplete windows, supported rates and Nyquist limits. `core/tests/local_phase.rs` passes an independently generated 24-bit WAV through the complete decoder and verifies the reported timing, bands, CSV and JSON, including loading an older report. Frontend tests cover signed sorting, values, missing readings, tooltips and search.
 
 ## Manual fixtures with FFmpeg or Audacity
 

@@ -20,6 +20,8 @@ A high Side/Mid ratio indicates a wide stereo difference; a more negative ratio 
 
 A block is eligible only when Mid RMS exceeds −60 dBFS in both bands. A block is called narrowed when high-band Side/Mid is at or below −20 dB, the reference Side/Mid is at or above −12 dB, and the difference between them is at least 12 dB. The file receives the narrowing cue only when at least 70% of three or more eligible blocks satisfy the rule **and** the ratios of summed eligible energies satisfy the same three thresholds. Blocks need not be consecutive; the fraction describes eligible audio, not a continuous duration.
 
+Here the gate means normalized-sample RMS strictly greater than `0.001`, using `20 log10(RMS)` relative to sample magnitude one. This explicitly defines the project's floor rather than an audibility threshold or a standardized RMS-meter calibration.
+
 The displayed number is `10 log10(sum(Side energy) / sum(Mid energy))` across eligible complete blocks, in dB. Quiet blocks and the trailing partial block are excluded. Zero or extremely weak Side is reported at a relative floor of −120 dB, which is a display convention, not a measured noise floor. Hovering also shows the reference ratio and the fraction of qualifying blocks.
 
 All thresholds are project heuristics, not values prescribed by MPEG, ITU or EBU. Synthetic tests validate their implementation; sensitivity and false-positive rates on a labelled corpus of music have not been established.
@@ -30,9 +32,21 @@ The ITU overview explains that intensity stereo reduces directional information 
 
 A low Side/Mid ratio is only an indirect cue. Unequal channel gains or polarity can leave substantial Side energy even when the high-band channels share one signal. A negative result cannot rule out intensity stereo; identifying a codec tool requires evidence beyond this measurement.
 
+For proportional channels `R = kL`, `Side/Mid = ((1 − k)/(1 + k))²`: a panned common signal can have Side energy with no independent ambience. For balanced channel energies only, the relationship to correlation is `Side/Mid = (1 − correlation)/(1 + correlation)`. Thus the −20 dB rule corresponds to correlation about +0.9802 in that balanced special case; it is not a general stereo-width or perception scale. A mono average is exactly Mid, while a pure opposed pair has no Mid and receives no eligible reading. One silent channel gives equal Mid/Side energies and no frequency-dependent narrowing cue.
+
+Common gain, channel swapping and simultaneous polarity reversal preserve the ratios when the same blocks remain eligible. Independent channel gains change M/S, and the absolute Mid gate can change coverage after a gain change. Missing data does not mean a clean stereo image. The [interaural experiments discussed for local phase](local-phase.md#interpretation-limits) do not validate these decoded-signal thresholds.
+
 Naturally centre-heavy mixes, deliberately narrow high-frequency material, mono ambience and later mastering can have the same shape. The reference-band requirement prevents a uniformly narrow recording from being labelled, but cannot eliminate every artistic case. A negative result means only that this defined persistent pattern was not measured.
 
+At startup, the meter primes the first high-pass stage's input history with the initial M/S values, assuming those values preceded the excerpt. The remaining stages start at their zero DC output. Computing the high-pass numerator as sample differences rejects constant DC exactly, without an artificial filter-start step or a permanent subtraction that could swallow ordinary audio after an extreme first sample. Events at the first frame depend on this assumed, unknown prehistory; later real steps and DC changes still produce transients. Audio lost to float quantization cannot be recovered. The filter histories continue across block boundaries; blocks divide the decisions, not the audio filtering.
+
 The measurement is available only for valid two-channel streams at 24–768 kHz with at least three qualifying half-second blocks. Mono, multichannel, silent, very short, invalid and old saved reports show `—`.
+
+## Alternatives and cost
+
+The matched IIR paths are retained for bounded memory and one-pass operation. At 48–768 kHz the four M/S band paths contain 32 biquad sections in total; when the high-band upper edge reaches Nyquist, its two low-pass paths are omitted, leaving 24. Work grows linearly with sample count and memory stays constant with duration. The eighth-order skirts reduce neighbouring-band leakage but cannot eliminate it: a very strong reference or ultrasonic component can still affect the measured ratio.
+
+Gain-normalized correlation or averaged coherence could describe shared HF signals despite panning, but would answer a different question from the relative energies of Mid and Side. Per-block coherence would also need multiple spectral segments to avoid a trivial one-bin result. Neither is substituted for this explicit M/S cue. More auditory bands, resampling or retuned thresholds require independent music-corpus calibration and new frequency/time-resolution choices; the existing thresholds are not made normative by passing synthetic tests.
 
 ## Tests and manual fixture
 
@@ -41,7 +55,7 @@ cargo test -p flaccompagnon-core analysis::intensity_stereo
 node --test tests/analysis-cells.test.mjs tests/search.test.mjs
 ```
 
-The tests also cover bass leakage into the reference, ultrasonic contamination, mono ratio invariance, persistence, invalid tails, seven sample rates from 24 to 768 kHz, and decoding a WAV through report export. The Rust tests construct Mid and Side tones independently: a 3 kHz reference with equal Mid and Side energy, paired with either a 9 kHz Side signal 40 dB below Mid or a wide 9 kHz control. This gives ground truth without using the meter’s own result as its oracle.
+The tests also cover bass leakage into the reference, ultrasonic contamination, constant channel offsets at startup, recovery of eligible tone blocks after an extreme first sample, common gain and polarity, channel swapping, panned common signals, pure Side, mono ratio invariance, the exact complete-block minimum, persistence, invalid tails, seven sample rates from 24 to 768 kHz, and decoding a WAV through report export. The Rust tests construct Mid and Side tones independently: a 3 kHz reference with equal Mid and Side energy, paired with either a 9 kHz Side signal 40 dB below Mid or a wide 9 kHz control. This gives ground truth without using the meter’s own result as its oracle.
 
 For a manual fixture, create a wide upper-mid reference and a strongly narrowed high band, then compare it with a wide-band control in the app:
 

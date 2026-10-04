@@ -177,3 +177,64 @@ fn compact_short_term_ring_overflow_withholds_only_the_unrepresentable_reading()
     assert!(peaks.momentary.unwrap().lufs.is_finite());
     assert!(peaks.short_term.is_none());
 }
+
+#[test]
+fn ebu_3341_alternating_levels_cases_9_and_12_use_rectangular_windows() {
+    // Tech 3341 Table 1 defines these durations/levels independently. Every
+    // full period has -23 +/-0.1 LUFS at the relevant timescale, despite its
+    // louder segment. Additional attack/release smoothing changes the result.
+    for (periods, loud_frames, quiet_frames, short_term) in
+        [(5, 64_320, 79_680, true), (25, 8_640, 10_560, false)]
+    {
+        let mut meter = LoudnessMeter::new(48_000, 2).unwrap();
+        let mut at = 0;
+        for _ in 0..periods {
+            for (frames, level) in [(loud_frames, -20.0), (quiet_frames, -30.0)] {
+                let amplitude = 10f64.powf(level / 20.0);
+                for _ in 0..frames {
+                    let sample = (amplitude
+                        * (std::f64::consts::TAU * 1000.0 * at as f64 / 48_000.0).sin())
+                        as f32;
+                    meter.push_frame(&[sample, sample]);
+                    at += 1;
+                }
+            }
+        }
+        let peaks = meter.peaks().unwrap();
+        near(
+            if short_term {
+                peaks.short_term.unwrap().lufs
+            } else {
+                peaks.momentary.unwrap().lufs
+            },
+            -23.0,
+        );
+    }
+}
+
+#[test]
+fn low_and_odd_rates_wait_for_complete_m_and_s_windows() {
+    // Exact frame counts derived from 400 ms and 3 s, not from meter state.
+    for (rate, momentary_frames, short_frames) in [(8_000, 3_200, 24_000), (11_025, 4_410, 33_075)]
+    {
+        let mut meter = LoudnessMeter::new(rate, 2).unwrap();
+        for frame in 1..=short_frames {
+            let sample = (0.07
+                * (std::f64::consts::TAU * 1_000.0 * f64::from(frame) / f64::from(rate)).sin())
+                as f32;
+            meter.push_frame(&[sample, sample]);
+            if frame == momentary_frames - 1 {
+                assert!(meter.peaks().is_none());
+                assert!(meter.integrated_lufs().is_none());
+            } else if frame == momentary_frames {
+                let peaks = meter.peaks().unwrap();
+                assert_eq!(peaks.momentary.unwrap().start_secs, 0.0);
+                assert!(peaks.short_term.is_none());
+                assert!(meter.integrated_lufs().is_some());
+            } else if frame == short_frames - 1 {
+                assert!(meter.peaks().unwrap().short_term.is_none());
+            }
+        }
+        assert_eq!(meter.peaks().unwrap().short_term.unwrap().start_secs, 0.0);
+    }
+}

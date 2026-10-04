@@ -52,3 +52,5 @@ RUSTDOCFLAGS="-D warnings" cargo doc --workspace --locked --no-deps
 ```
 
 Some reference comparisons require FFmpeg. Those tests are marked ignored so FFmpeg remains optional for ordinary development. Individual pages name the narrowest useful command and their manual audio fixtures.
+
+The [0.9.6 measurement audit](release-0.9.6-analysis-audit.md) records the standards review, numerical corrections, independent reference checks and CPU comparison for the phase, level, discontinuity and loudness measurements.

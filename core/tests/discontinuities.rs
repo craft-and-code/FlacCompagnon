@@ -1,7 +1,7 @@
 //! Independent sample-domain defects injected into a WAV, through the same
 //! decode, analysis and report assembly path as the desktop application.
 
-use flaccompagnon_core::{analyze_file, ScanOptions};
+use flaccompagnon_core::{analyze_file, analyze_file_selected, AnalysisSelection, ScanOptions};
 
 #[test]
 fn pcm_click_and_dropout_survive_decode_and_are_reported_on_the_correct_channel() {
@@ -42,4 +42,41 @@ fn pcm_click_and_dropout_survive_decode_and_are_reported_on_the_correct_channel(
     assert_eq!(measured.dropouts.events[0].channel, 2);
     assert_eq!(measured.dropouts.events[0].start_secs, 0.55);
     assert_eq!(measured.dropouts.events[0].duration_secs, 0.03);
+}
+
+#[test]
+fn a_float_dropout_after_an_extreme_sample_survives_the_decode_path() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("float-gap.wav");
+    let mut writer = hound::WavWriter::create(
+        &path,
+        hound::WavSpec {
+            channels: 1,
+            sample_rate: 48_000,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        },
+    )
+    .unwrap();
+    for n in 0..4_800 {
+        let sample = if n == 0 {
+            2f32.powi(40)
+        } else if (2_400..2_496).contains(&n) {
+            0.0
+        } else {
+            0.125
+        };
+        writer.write_sample(sample).unwrap();
+    }
+    writer.finalize().unwrap();
+    let result = analyze_file_selected(
+        &path,
+        &ScanOptions::default(),
+        AnalysisSelection::from_names(["dropouts"]).unwrap(),
+    );
+    assert!(result.error.is_none(), "{:?}", result.error);
+    let measured = result.discontinuities.unwrap();
+    assert_eq!(measured.dropouts.count, 1);
+    assert_eq!(measured.dropouts.events[0].start_secs, 0.05);
+    assert_eq!(measured.dropouts.events[0].duration_secs, 0.002);
 }

@@ -114,3 +114,52 @@ fn moderately_negative_correlation_does_not_claim_an_inversion() {
     assert_eq!(phase.correlation, Some(-0.5));
     assert!(!phase.likely_inverted);
 }
+
+#[test]
+fn phase_keeps_its_gain_invariant_coefficient_without_energy_product_overflow() {
+    // E_R = 4 E_L and C = -2 E_L describe R = -2 L, at any common gain.
+    for scale in [1e-300, 1e-30, 1.0, 1e150, 1e300] {
+        let measured = analyze_phase(scale, 4.0 * scale, -2.0 * scale);
+        assert_eq!(measured.correlation, Some(-1.0), "scale {scale}");
+        assert!(measured.likely_inverted);
+    }
+    // Vastly unequal but finite channel energies still obey Cauchy-Schwarz.
+    assert_eq!(analyze_phase(1e-300, 1e300, 0.5).correlation, Some(0.5));
+    assert_eq!(analyze_phase(1e300, 1e-300, 0.5).correlation, Some(0.5));
+}
+
+#[test]
+fn balance_is_common_gain_invariant_even_when_an_energy_ratio_would_overflow() {
+    for scale in [1e-300, 1e-30, 1.0, 1e150, 1e300] {
+        let Some(StereoBalance::Measured {
+            right_minus_left_db,
+        }) = analyze_balance(scale, 4.0 * scale)
+        else {
+            panic!("finite positive energies");
+        };
+        assert!((right_minus_left_db - 6.0206).abs() < 1e-4);
+    }
+    let Some(StereoBalance::Measured {
+        right_minus_left_db,
+    }) = analyze_balance(1e-300, 1e300)
+    else {
+        panic!("finite positive energies");
+    };
+    assert_eq!(right_minus_left_db, 6000.0);
+}
+
+#[test]
+fn raw_rms_balance_includes_dc_and_does_not_infer_polarity_or_loudness() {
+    // Orthogonal AC +/-A with a constant d has mean-square A^2+d^2.
+    let ac = [0.25_f64, -0.25, 0.25, -0.25];
+    let left = ac.iter().map(|x| x * x).sum();
+    let right = ac.iter().map(|x| (x + 0.5).powi(2)).sum();
+    let Some(StereoBalance::Measured {
+        right_minus_left_db,
+    }) = analyze_balance(left, right)
+    else {
+        panic!("both channels contain signal");
+    };
+    // AC energy is equal, but right raw mean-square is five times larger.
+    assert!((right_minus_left_db - 10.0 * 5.0_f32.log10()).abs() < 1e-5);
+}

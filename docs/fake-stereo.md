@@ -8,10 +8,12 @@ The analyzer accumulates left energy, right energy and the energy of the L−R d
 
 | Condition                                      | Meaning                                                 |
 | ---------------------------------------------- | ------------------------------------------------------- |
-| Every L/R frame is bit-identical               | Exact dual mono                                         |
+| All decoded L/R sample values are equal        | Exact dual mono                                         |
 | L−R energy is more than 60 dB below L+R energy | The stereo difference is negligible over the whole file |
 
 A fully silent stream is not called fake stereo. For files with more than two channels, the decision still uses the first two decoded channels; it does not make a claim about a surround layout.
+
+Equality uses the decoded sample values exactly, without an absolute tolerance. The relative-energy rule is independent of a common finite gain, including very quiet float PCM. Malformed or non-finite frames invalidate the result rather than publishing the valid prefix as a whole-file finding.
 
 ## Interpretation and limits
 
@@ -23,6 +25,7 @@ For an unequal but sign-reversed relationship, use [Stereo polarity](stereo-pola
 
 ```sh
 cargo test -p flaccompagnon-core analysis::stereo
+cargo test -p flaccompagnon-core --test stereo_validity
 ```
 
 Create an exact dual-mono file and an obviously different stereo file, then import both:

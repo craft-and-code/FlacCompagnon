@@ -209,3 +209,134 @@ fn short_or_invalid_tail_cannot_publish_a_valid_prefix() {
         assert!(meter.finish().is_none());
     }
 }
+
+#[test]
+fn constant_channel_offsets_do_not_excite_a_false_high_band_startup_step() {
+    let mut readings = Vec::new();
+    for (left_dc, right_dc) in [(0.0, 0.0), (0.5, 0.5), (0.5, -0.5)] {
+        let measured = analyse(2, |n| {
+            let mid = 0.002 * (sine(3000.0, n) + sine(9000.0, n));
+            let side = 0.002 * sine(3000.0, n) + 0.00002 * sine(9000.0, n);
+            [
+                (mid + side + left_dc) as f32,
+                (mid - side + right_dc) as f32,
+            ]
+        })
+        .unwrap();
+        assert!(measured.narrowed, "DC {left_dc}/{right_dc}: {measured:?}");
+        readings.push(measured);
+    }
+    for measured in &readings[1..] {
+        assert!((measured.side_to_mid_db - readings[0].side_to_mid_db).abs() < 0.05);
+        assert!(
+            (measured.reference_side_to_mid_db - readings[0].reference_side_to_mid_db).abs() < 0.02
+        );
+        assert_eq!(
+            measured.narrowed_block_fraction,
+            readings[0].narrowed_block_fraction
+        );
+    }
+}
+
+#[test]
+fn common_gain_channel_swap_and_common_polarity_keep_nonzero_side_ratios() {
+    let mut baseline: Option<HighFrequencyStereo> = None;
+    for (gain, swap, polarity) in [(0.01, false, 1.0), (0.1, true, 1.0), (0.5, false, -1.0)] {
+        let measured = analyse(2, |n| {
+            let mid = gain * (sine(3000.0, n) + sine(9000.0, n));
+            let side = gain * (sine(3000.0, n) + 0.1 * sine(9000.0, n));
+            let frame = [
+                (polarity * (mid + side)) as f32,
+                (polarity * (mid - side)) as f32,
+            ];
+            if swap {
+                [frame[1], frame[0]]
+            } else {
+                frame
+            }
+        })
+        .unwrap();
+        if let Some(base) = baseline {
+            assert!((measured.side_to_mid_db - base.side_to_mid_db).abs() < 0.005);
+            assert!(
+                (measured.reference_side_to_mid_db - base.reference_side_to_mid_db).abs() < 0.005
+            );
+            assert_eq!(measured.narrowed, base.narrowed);
+        } else {
+            baseline = Some(measured);
+        }
+    }
+}
+
+#[test]
+fn a_panned_common_signal_has_side_energy_without_frequency_dependent_narrowing() {
+    for right_gain in [0.0, 0.25, 0.5, 2.0] {
+        let measured = analyse(2, |n| {
+            let left = 0.1 * (sine(3000.0, n) + sine(9000.0, n));
+            [left as f32, (right_gain * left) as f32]
+        })
+        .unwrap();
+        let expected = 20.0 * ((1.0_f64 - right_gain) / (1.0 + right_gain)).abs().log10();
+        assert!((f64::from(measured.side_to_mid_db) - expected).abs() < 1e-4);
+        assert!((f64::from(measured.reference_side_to_mid_db) - expected).abs() < 1e-4);
+        assert!(!measured.narrowed);
+    }
+    assert!(
+        analyse(2, |n| {
+            let x = (0.1 * (sine(3000.0, n) + sine(9000.0, n))) as f32;
+            [x, -x]
+        })
+        .is_none(),
+        "pure Side has no eligible Mid"
+    );
+}
+
+#[test]
+fn partial_third_block_cannot_satisfy_the_three_complete_block_minimum() {
+    for missing_last_frame in [true, false] {
+        let mut meter = HighFrequencyStereoMeter::new(RATE, 2).unwrap();
+        let frames = RATE as usize * 3 / 2 - usize::from(missing_last_frame);
+        for n in 0..frames {
+            let x = (0.1 * (sine(3000.0, n) + sine(9000.0, n))) as f32;
+            meter.push_frame(&[x, x]);
+        }
+        assert_eq!(meter.finish().is_some(), !missing_last_frame);
+    }
+}
+
+#[test]
+fn an_extreme_first_sample_does_not_swallow_normal_audio_in_later_blocks() {
+    let rate = 48_000;
+    let extreme = 2.0_f32.powi(80);
+    for first in [[extreme, extreme], [extreme, -extreme]] {
+        let mut meter = HighFrequencyStereoMeter::new(rate, 2).unwrap();
+        meter.push_frame(&first);
+        for n in 1..rate * 5 / 2 {
+            let time = f64::from(n) / f64::from(rate);
+            let reference = 0.02 * (std::f64::consts::TAU * 3_000.0 * time).sin();
+            let high = 0.02 * (std::f64::consts::TAU * 9_000.0 * time).sin();
+            let mid = reference + high;
+            let side = reference + high * 0.01;
+            meter.push_frame(&[(mid + side) as f32, (mid - side) as f32]);
+        }
+        // The extreme initial step may dominate the first block. Subsequent
+        // complete blocks contain the analytical -40 dB high / 0 dB reference
+        // M/S pair after the real filter transient has decayed.
+        assert_eq!(meter.eligible_blocks, 5, "first frame {first:?}");
+        assert!(meter.narrowed_blocks >= 4, "first frame {first:?}");
+    }
+}
+
+#[test]
+fn primed_high_pass_rejects_even_extreme_constant_mid_or_side_exactly() {
+    for level in [2.0_f32.powi(80), f32::MAX] {
+        for right in [level, -level] {
+            let mut meter = HighFrequencyStereoMeter::new(24_000, 2).unwrap();
+            for _ in 0..36_000 {
+                meter.push_frame(&[level, right]);
+            }
+            assert_eq!(meter.eligible_blocks, 0);
+            assert!(meter.finish().is_none());
+        }
+    }
+}

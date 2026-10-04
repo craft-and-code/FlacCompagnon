@@ -14,7 +14,7 @@ display       = 100 × max_abs
 
 Samples use normalized amplitude: `+1.0` is positive full scale, so `0.01` is 1%. The calculation includes silence and the final frame. There is no frequency weighting, gate, resampling, filtering or minimum duration. Each channel has its own compensated double-precision sum to preserve small contributions when large positive and negative samples cancel. Opposite offsets in different channels never cancel through a mono downmix.
 
-This follows the arithmetic-mean interpretation of DC offset described in the [Audacity manual](https://manual.audacityteam.org/man/dc_offset.html) and [FFmpeg's DC correction documentation](https://ffmpeg.org/ffmpeg-filters.html#dynaudnorm). A persistent displacement consumes headroom on one side of the waveform.
+This follows the arithmetic-mean interpretation of DC offset described in the [Audacity manual](https://manual.audacityteam.org/man/dc_offset.html) and [FFmpeg's DC correction documentation](https://ffmpeg.org/ffmpeg-filters.html#dynaudnorm). A persistent displacement consumes headroom on one side of the waveform. The summation uses [Neumaier's correction](https://doi.org/10.1002/zamm.19740540106); it improves floating-point accuracy without making the calculation exact for all possible inputs.
 
 ## Availability and interpretation
 
@@ -28,6 +28,14 @@ This follows the arithmetic-mean interpretation of DC offset described in the [A
 - Float audio outside the nominal ±1 range is measured without clipping or clamping, so a result can exceed 100%.
 
 This is a descriptive measurement with no automatic warning threshold. It does not establish hardware failure, audibility, or lossless provenance. It does not change the three authenticity verdicts or modify audio files.
+
+For example, a linear fade from `0.5` to zero has a whole-file mean of `0.25`, even though it is changing throughout. Two equally long sections with opposite offsets have zero overall mean. These are correct arithmetic means and require context before interpreting them as a persistent bias.
+
+## Cost and alternatives
+
+The calculation visits each decoded sample once and keeps two double-precision values per channel, independent of file duration. It shares the numerical summation helper with the discontinuity detectors; the measurement does not buffer the track.
+
+A median or trimmed mean would answer a different question and could hide the contribution of short biased sections. A windowed mean could locate changes, but would need a window duration, overlap and additional report fields. A high-pass filter would modify the signal being measured. These alternatives are not implemented, and none is needed to define the current whole-file arithmetic mean.
 
 ## Reports
 
@@ -43,7 +51,7 @@ cargo test -p flaccompagnon-core --test dc_offset -- --ignored
 node --test tests/analysis-cells.test.mjs tests/search.test.mjs
 ```
 
-The ordinary tests inject exact integer or binary-fraction offsets into balanced signals. They check channel independence, silence, asymmetric zero-mean waves, partial periods, invalid tails, large float samples, mono/stereo/multichannel WAV decoding, JSON compatibility and CSV units. UI tests cover signed tooltips, percentage conversion, numerical sorting, search and missing values.
+The ordinary tests inject exact integer or binary-fraction offsets into balanced signals. They check channel independence, silence, asymmetric zero-mean waves, partial periods, fades, opposing sections, invalid tails, large float cancellation, frame-count overflow, single-frame float WAV values above full scale, mono/stereo/multichannel WAV decoding, JSON compatibility and CSV units. UI tests cover signed tooltips, percentage conversion, numerical sorting, search and missing values.
 
 The optional reference test uses the installed FFmpeg binary to compare per-channel `astats` means and independently encode FLAC. It requires FFmpeg on `PATH`; no third-party implementation source is used. The comparison allows the half-unit rounding error of FFmpeg's six-decimal output. FLAC decoding must preserve the same channel means as the original integer WAV.
 

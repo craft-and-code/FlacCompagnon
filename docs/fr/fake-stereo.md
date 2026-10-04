@@ -6,12 +6,14 @@ L’indication de fake stereo identifie deux canaux contenant essentiellement le
 
 Le moteur accumule les énergies gauche, droite et de leur différence L−R. Pour un flux d’au moins deux canaux, l’indication apparaît si l’une des conditions suivantes est remplie :
 
-| Condition                                       | Signification                                           |
-| ----------------------------------------------- | ------------------------------------------------------- |
-| Toutes les trames L/R sont identiques bit à bit | Dual mono exact                                         |
-| Énergie L−R à plus de 60 dB sous l’énergie L+R  | Différence stéréo négligeable sur l’ensemble du fichier |
+| Condition                                               | Signification                                           |
+| ------------------------------------------------------- | ------------------------------------------------------- |
+| Tous les échantillons L/R décodés sont exactement égaux | Dual mono exact                                         |
+| Énergie L−R à plus de 60 dB sous l’énergie L+R          | Différence stéréo négligeable sur l’ensemble du fichier |
 
 Un flux entièrement silencieux n’est pas qualifié de fake stereo. Au-delà de deux canaux, seuls les deux premiers canaux décodés sont comparés ; aucune conclusion n’est portée sur l’ensemble de la configuration surround.
+
+L’égalité compare exactement les valeurs des échantillons décodés, sans tolérance absolue. La règle d’énergie relative est indépendante d’un gain fini commun aux deux canaux, même pour un PCM float très faible. Une trame incomplète ou non finie invalide le résultat, plutôt que de présenter le préfixe valide comme une conclusion sur tout le fichier.
 
 ## Interprétation et limites
 
@@ -23,6 +25,7 @@ Pour une relation inversée, consultez la [polarité](stereo-polarity.md) ; pour
 
 ```sh
 cargo test -p flaccompagnon-core analysis::stereo
+cargo test -p flaccompagnon-core --test stereo_validity
 ffmpeg -n -f lavfi -i 'aevalsrc=0.1*sin(2*PI*1000*t)|0.1*sin(2*PI*1000*t):s=48000:d=5' -c:a pcm_s24le dual-mono.wav
 ffmpeg -n -f lavfi -i 'aevalsrc=0.1*sin(2*PI*1000*t)|0.1*sin(2*PI*1700*t):s=48000:d=5' -c:a pcm_s24le stereo.wav
 ```

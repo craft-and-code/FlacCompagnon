@@ -97,7 +97,6 @@ impl DiscontinuityDetector {
             return None;
         }
         let context = context_frames(sample_rate);
-        let max_pulse = pulse_frames(sample_rate);
         Some(Self {
             channels: (1..=channels)
                 .map(|channel| Channel {
@@ -108,7 +107,9 @@ impl DiscontinuityDetector {
                 .collect(),
             result: DiscontinuityAnalysis::default(),
             frames: 0,
-            min_frames: (2 * context + max_pulse + 2) as u64,
+            // One-sample pulses need only their own two edges and real
+            // context, even when longer candidates are also supported.
+            min_frames: (2 * context + 3) as u64,
             valid: true,
         })
     }

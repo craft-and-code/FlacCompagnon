@@ -19,7 +19,7 @@ Le maximum est capturé avant l’ajout de la fin artificielle de LRA. Aucune fe
 - Mono ou stéréo à 8–768 kHz, y compris le PCM décodé du DSD. Le multicanal attend des positions de canaux fiables.
 - Un fichier de moins de trois secondes n’a pas de maximum S. Exactement trois secondes permettent une fenêtre complète.
 - Silence, données invalides, décodage absent ou échoué et anciens rapports : pas de valeur. Un son non nul sous la porte du LUFS intégré reste mesurable.
-- L’historique de trois secondes stocke les puissances en flottants 32 bits pour limiter la mémoire. Une puissance extrême non représentable invalide S et LRA ; M peut rester disponible grâce à son historique 64 bits. Une puissance trop petite pour cette représentation ne produit pas de lecture finie.
+- L’historique de trois secondes stocke les puissances en flottants 32 bits pour limiter la mémoire ; sa somme glissante utilise une arithmétique compensée 64 bits. Une puissance extrême non représentable invalide S et LRA ; M peut rester disponible grâce à son historique 64 bits. Une puissance trop petite pour cette représentation ne produit pas de lecture finie.
 - Un maximum n’est pas un niveau typique ni une note de qualité. Une attaque brève est diluée sur trois secondes, qui peuvent aussi inclure une pause ou une transition.
 - L’historique des filtres affecte les bords : mesurer séparément un extrait peut changer le résultat.
 - S max est le plus haut niveau local **sans porte**, en LUFS. LRA est l’étendue d’une distribution de niveaux S **après portes**, en LU.
@@ -37,7 +37,7 @@ cargo test -p flaccompagnon-core loudness_peaks
 cargo test -p flaccompagnon-core --test loudness_reference -- --ignored --nocapture
 ```
 
-Les tests couvrent les 20 décalages du cas 10 d’EBU Tech 3341, le niveau de référence stéréo, l’écart mono/stéréo d’environ 3,01 LU, les faibles niveaux, la durée exacte de trois secondes, les entrées invalides et l’exclusion de la fin artificielle LRA. Un test WAV vérifie les changements de niveau, positions, rapports et compatibilité. La comparaison facultative avec FFmpeg couvre plusieurs fréquences et les deux configurations.
+Les tests couvrent l’alternance de niveaux du cas 9 et les 20 décalages du cas 10 d’EBU Tech 3341, le niveau de référence stéréo, l’écart mono/stéréo d’environ 3,01 LU, les faibles niveaux, la durée exacte de trois secondes à 8 et 11,025 kHz, le retour au calme après un passage flottant très fort, les entrées invalides et l’exclusion de la fin artificielle LRA. Un test WAV vérifie les changements de niveau, positions, rapports et compatibilité. La comparaison facultative avec FFmpeg couvre plusieurs fréquences et les deux configurations.
 
 ## Exemple : salve de trois secondes
 

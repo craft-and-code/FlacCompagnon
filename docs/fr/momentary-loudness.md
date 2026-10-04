@@ -30,7 +30,7 @@ Le JSON conserve `loudness_peaks.momentary` sous la forme `{ "lufs": nombre, "st
 
 L’ordre par défaut est **LUFS → LUFS-M max → LUFS-S max → LRA**. Les préférences existantes insèrent les nouvelles colonnes après LUFS à leur première apparition, puis conservent les déplacements et choix de visibilité de l’utilisateur. Le tri utilise les valeurs non arrondies et place les absences en dernier dans les deux sens.
 
-`core/src/analysis/loudness_peaks.rs` gère les maxima et leurs positions ; `loudness.rs` fournit la puissance pondérée et les fenêtres partagées. Le suivi ajoute un état de taille fixe, sans nouveau filtrage ni nouveau tampon d’échantillons.
+`core/src/analysis/loudness_peaks.rs` gère les maxima et leurs positions ; `loudness.rs` fournit la puissance pondérée et les fenêtres partagées. Des sommes glissantes compensées conservent les contributions calmes après un passage PCM flottant très fort. Le suivi ajoute un état de taille fixe, sans nouveau filtrage ni nouveau tampon d’échantillons.
 
 ## Vérification
 
@@ -40,7 +40,7 @@ cargo test -p flaccompagnon-core --test loudness_reference -- --ignored --nocapt
 node --test tests/analysis-cells.test.mjs tests/search.test.mjs
 ```
 
-Les tests séparés du code reproduisent notamment les 20 décalages du cas 13 d’EBU Tech 3341 : ils révèlent les maxima manqués par une simple grille de 100 ms. D’autres cas vérifient les faibles niveaux non filtrés par une porte, la durée minimale, les dernières fenêtres, les erreurs et l’exclusion de la fin artificielle de LRA. Un test WAV vérifie décodage, positions, CSV/JSON et anciens rapports.
+Les tests séparés du code reproduisent notamment l’alternance de niveaux du cas 12 et les 20 décalages du cas 13 d’EBU Tech 3341 : ils révèlent les maxima manqués par une simple grille de 100 ms. D’autres cas vérifient les faibles niveaux non filtrés par une porte, la durée minimale à 8 et 11,025 kHz, le retour au calme après un passage flottant très fort, les dernières fenêtres, les erreurs et l’exclusion de la fin artificielle de LRA. Un test WAV vérifie décodage, positions, CSV/JSON et anciens rapports.
 
 FFmpeg journalise M/S à 10 Hz : pour un bref transitoire, le maximum de ses lignes peut être inférieur au maximum recherché à chaque trame. Les comparaisons automatiques utilisent des niveaux soutenus, à plusieurs fréquences d’échantillonnage.
 

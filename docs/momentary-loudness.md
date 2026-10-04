@@ -27,7 +27,7 @@ Every complete sample-aligned window is examined, including one ending on the la
 
 ## Code, reports and table behaviour
 
-`core/src/analysis/loudness_peaks.rs` holds M/S maxima and locations; `loudness.rs` supplies the shared weighted power and existing windows. Tracking maxima adds fixed-size state and no second filtering pass or additional sample buffer.
+`core/src/analysis/loudness_peaks.rs` holds M/S maxima and locations; `loudness.rs` supplies the shared weighted power and existing windows. Compensated rolling sums retain quiet contributions after a large finite float-PCM passage. Tracking maxima adds fixed-size state and no second filtering pass or additional sample buffer.
 
 JSON stores `loudness_peaks.momentary` as `{ "lufs": number, "start_secs": number }`, or `null` when unavailable. The outer `loudness_peaks` field is optional for older reports. CSV exports `max_momentary_lufs` and `momentary_max_start_s` immediately after `integrated_lufs`. Values retain their stored precision; a missing value is blank and a measured zero remains zero.
 
@@ -41,9 +41,9 @@ cargo test -p flaccompagnon-core --test loudness_reference -- --ignored --nocapt
 node --test tests/analysis-cells.test.mjs tests/search.test.mjs
 ```
 
-Tests are separate from production code. They reproduce the independently specified levels and shifted-file cases from EBU Tech 3341, including all 20 offsets in case 13, which expose maxima missed by measuring only on a 100 ms grid. Additional tests cover quiet ungated signals, mono/stereo power, exact minimum duration, malformed tails, final windows and exclusion of LRA's artificial tail. A WAV integration test checks decoding, positions, CSV/JSON and older-report loading.
+Tests are separate from production code. They reproduce the independently specified levels and shifted-file cases from EBU Tech 3341, including the alternating-level rectangular-window case 12 and all 20 offsets in case 13, which expose maxima missed by measuring only on a 100 ms grid. Additional tests cover quiet ungated signals, mono/stereo power, exact minimum duration, malformed tails, final windows, complete-window boundaries at 8 and 11.025 kHz, recovery after a large finite float passage and exclusion of LRA's artificial tail. A WAV integration test checks decoding, positions, CSV/JSON and older-report loading.
 
-The optional reference test compares mixed-frequency signals with FFmpeg at 44.1, 48 and 96 kHz, in mono and stereo. [FFmpeg's ebur128 filter](https://ffmpeg.org/ffmpeg-filters.html#ebur128) logs M/S values at 10 Hz; the comparison uses sustained levels whose maxima are represented on that grid. For short transients, taking the maximum of those logs can under-read an every-frame maximum.
+The optional reference test compares mixed-frequency signals with FFmpeg at 8, 11.025, 16, 32, 44.1, 48 and 96 kHz, in mono and stereo. [FFmpeg's ebur128 filter](https://ffmpeg.org/ffmpeg-filters.html#ebur128) logs M/S values at 10 Hz; the comparison uses sustained levels whose maxima are represented on that grid. For short transients, taking the maximum of those logs can under-read an every-frame maximum.
 
 ## Manual fixture
 

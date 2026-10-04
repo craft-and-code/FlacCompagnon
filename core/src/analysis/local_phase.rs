@@ -118,6 +118,15 @@ pub struct LocalPhaseMeter {
     valid: bool,
 }
 
+fn minimum_magnitude_sample(samples: impl Iterator<Item = f32>) -> Option<f32> {
+    // Finite IEEE magnitudes have ordered bits. Move the sign to a tie-breaking
+    // low bit so an integer min can vectorize while retaining an input sample.
+    samples
+        .map(|sample| sample.to_bits().rotate_left(1))
+        .min()
+        .map(|bits| f32::from_bits(bits.rotate_right(1)))
+}
+
 impl LocalPhaseMeter {
     /// Accept exactly two channels from 8 to 768 kHz; the rate cap bounds FFT memory.
     pub fn new(sample_rate: u32, channels: usize) -> Option<Self> {
@@ -170,22 +179,37 @@ impl LocalPhaseMeter {
     fn process_window(&mut self) {
         let size = self.hann.len();
         for (channel, spectrum) in self.spectra.iter_mut().enumerate() {
+            // Anchor at the smallest-magnitude sample: constant offsets then
+            // subtract exactly, without an extreme outlier swallowing ordinary
+            // samples in every subtraction. The latter matters even at Hann's
+            // zero-weight first sample, which should contribute no energy.
+            // push_frame has already rejected every non-finite sample.
+            let Some(origin) =
+                minimum_magnitude_sample(self.frames.iter().map(|frame| frame[channel]))
+            else {
+                return;
+            };
+            let origin = f64::from(origin);
             let mean = self
                 .frames
                 .iter()
                 .zip(&self.hann)
-                .map(|(frame, w)| f64::from(frame[channel]) * w)
+                .map(|(frame, w)| (f64::from(frame[channel]) - origin) * w)
                 .sum::<f64>()
                 / (size as f64 * 0.5);
             for ((value, frame), w) in spectrum.iter_mut().zip(&self.frames).zip(&self.hann) {
-                *value = Complex::new((f64::from(frame[channel]) - mean) * w, 0.0);
+                *value = Complex::new((f64::from(frame[channel]) - origin - mean) * w, 0.0);
             }
             self.fft.process_with_scratch(spectrum, &mut self.scratch);
         }
         let mut energies = [[0.0; 3]; 5];
         let [left, right] = &self.spectra;
         // Positive-frequency bins only; neither DC nor Nyquist is counted.
-        for (k, (l, r)) in left.iter().zip(right).enumerate().take(size / 2).skip(1) {
+        // Bound the traversal to audible bins as well as Nyquist. At 768 kHz
+        // the transform has 131072 positive bins but only about 6827 below 20 kHz.
+        let end_bin =
+            ((20_000.0 * size as f64 / self.sample_rate as f64).ceil() as usize).min(size / 2);
+        for (k, (l, r)) in left.iter().zip(right).enumerate().take(end_bin).skip(1) {
             let frequency = k as f64 * self.sample_rate as f64 / size as f64;
             if !(20.0..20_000.0).contains(&frequency) {
                 continue;

@@ -47,6 +47,8 @@ X[k] = DFT(w[n] × (x[n] − μ))
 
 La convention périodique suit la [documentation Hann de MathWorks](https://www.mathworks.com/help/signal/ref/hann.html). Le fenêtrage réduit les fuites aux bords ; retirer la moyenne évite qu’un décalage continu domine la corrélation. Le [DC offset](dc-offset.md) reste mesuré séparément.
 
+Le calcul additionne les écarts à l’échantillon de plus petite amplitude avant de calculer la moyenne. La formule reste algébriquement identique, mais un offset flottant constant se soustrait exactement. Une petite origine évite aussi qu’une valeur extrême masque les échantillons ordinaires dans chaque soustraction. Additionner directement un biais très élevé peut perdre assez de précision pour fabriquer de l’énergie dans la bande audible après FFT. Retirer un offset ne restitue pas un signal déjà perdu lors de sa quantification en flottants.
+
 Avec les spectres complexes gauche `L[k]` et droit `R[k]`, on additionne les cases de fréquences positives appartenant à chaque plage :
 
 ```text
@@ -61,6 +63,8 @@ Le facteur `q` provient de Parseval, des deux moitiés symétriques du spectre r
 
 Une fenêtre est admissible dans une plage si **les deux** énergies dépassent `10⁻⁶`, soit un RMS de bande supérieur à −60 dBFS par canal. Chaque plage a sa propre porte : des graves forts ne rendent pas des aigus silencieux admissibles. Ce seuil de projet écarte les rapports insignifiants dus au silence ou aux faibles fuites ; ce n’est pas une pondération de loudness.
 
+La définition exacte est un RMS d’échantillons normalisés strictement supérieur à `0.001`, avec `20 log10(RMS)` rapporté à une amplitude d’échantillon de un. Elle ne dépend donc pas d’une convention de calibration pleine échelle d’un vumètre RMS.
+
 Pour chaque plage, le rapport garde la corrélation calculée sur la **somme des énergies admissibles**, le minimum local et sa position, la fraction de fenêtres à −0,5 ou moins, ainsi que leur nombre. La corrélation cumulée n’est pas la moyenne arithmétique des coefficients.
 
 La fraction concerne des **fenêtres admissibles qui se recouvrent**, pas des échantillons ni des secondes. Elle ne doit pas être présentée comme un pourcentage de piste affectée. Le silence et les passages sur un seul canal sont exclus du dénominateur. Cinq résumés au plus sont conservés ; mémoire et rapport ne grossissent pas avec la durée.
@@ -68,6 +72,7 @@ La fraction concerne des **fenêtres admissibles qui se recouvrent**, pas des é
 ## Limites d’interprétation
 
 - C’est une corrélation à décalage nul, pas un angle en degrés ni une cohérence quadratique. Voir la [discussion MathWorks sur le spectre croisé et la cohérence](https://www.mathworks.com/help/signal/ug/cross-spectrum-and-magnitude-squared-coherence.html).
+- Ce n’est pas la cohérence interaurale : les [expériences de Whitmer, Seeber et Akeroyd](https://pmc.ncbi.nlm.nih.gov/articles/PMC3566657/) évaluent le maximum de corrélation aux oreilles et montrent une dépendance à l’auditeur. Le calcul L/R omet tête, pièce et interactions entre enceintes ; cette étude ne calibre pas nos seuils.
 - Les résultats sont pondérés par l’énergie. Des composantes peuvent compenser leurs corrélations dans une même bande. Quatre résumés ne constituent pas une courbe de phase en fonction de la fréquence.
 - Élargissement stéréo, ambiances, délais et microphones espacés peuvent créer une corrélation négative volontaire. Il faut écouter et connaître la source avant de corriger.
 - Un événement plus court qu’une fenêtre peut être dilué. Hann atténue aussi l’influence des bords ; la localisation n’est pas précise à l’échantillon.
@@ -76,6 +81,18 @@ La fraction concerne des **fenêtres admissibles qui se recouvrent**, pas des é
 - La porte absolue rend la couverture dépendante du gain. Amplifier un fichier très faible peut rendre des bandes admissibles. Une absence ne prouve pas une compatibilité mono parfaite.
 - La polarité globale utilise le flux entier, sans cette suppression du DC, ces fenêtres, limites de bande et portes : les coefficients cumulés peuvent différer.
 - Une trame invalide ou un échantillon non fini invalide toute la mesure. Les anciens rapports et décodages absents ou échoués sont indisponibles. Les flottants dépassant la pleine échelle sont mesurés sans écrêtage préalable.
+
+Pour une moyenne mono `M = (L + R) / 2`, les énergies mesurées suivent `E_M = (E_L + E_R + 2C) / 4`. Une corrélation négative réduit cette somme par rapport à une énergie croisée nulle, mais le coefficient seul ne chiffre pas la perte. Par exemple, `R = −0.1L` donne −1 alors que la moyenne mono vaut `0.45L` : elle ne s’annule pas. L’annulation complète exige des canaux opposés de même niveau. À l’inverse, des sinus en quadrature ont un coefficient nul malgré une relation déterministe. Écoutez le mélange mono réel avant de décider de corriger un passage.
+
+Cette nécessité d’écoute rejoint les remarques du praticien dans le [cours de Sengpiel sur le corrélateur](https://sengpielaudio.com/GedankenZumKorrelationsgrad.pdf). Un [retour direct sur un piano échantillonné](https://forum.soundonsound.com/phpbb/viewtopic.php?embed=true&t=79368) illustre aussi un résultat négatif dont le mixeur juge finalement la somme mono acceptable. Ce sont des exemples d’interprétation, pas une vérité numérique de référence ni une calibration des seuils.
+
+## Choix et coût
+
+La corrélation signée à décalage nul est conservée pour mesurer l’opposition dans la somme mono. Chercher le maximum sur plusieurs retards pourrait transformer un ton retardé et opposé en correspondance positive, masquant cette information. La cohérence quadratique décrirait plutôt la relation linéaire : avec un seul segment spectral, elle vaut un dans les cases non nulles ; une estimation utile demande plusieurs segments, comme le précise la [documentation officielle de `mscohere`](https://www.mathworks.com/help/signal/ref/mscohere.html). Ce serait une autre mesure, avec un autre compromis temporel.
+
+Les quatre bandes fixes restent des résumés, pas une banque de filtres perceptifs. Pour un ton exactement centré à 200 Hz, à 32768 Hz (`N = 8192`, cases de 4 Hz), Hann répartit un sixième de l’énergie dans la case voisine inférieure et cinq sixièmes dans la case centrale et la voisine supérieure. Les deux bandes peuvent donc être admissibles à une frontière. Une case centrale exclue à 20 kHz ou Nyquist peut également avoir une voisine fenêtrée dans la plage mesurée. Des croisements physiques plus raides ou des bandes auditives changeraient la méthode et sa calibration ; les tests analytiques rendent la convention actuelle explicite.
+
+Deux FFT directes sont calculées par fenêtre complète, pour un travail en `O(N log N)`, sans allocation par fenêtre. Le parcours spectral s’arrête à 20 kHz ou Nyquist : à 768 kHz, environ 6827 cases sont visitées au lieu des 131072 cases positives. Spectres, trames et coefficients Hann occupent `48N` octets avant plan FFT et scratch, soit 768 Kio à 48 kHz et 12 Mio à 768 kHz. Les résumés restent de taille fixe. Une décimation préalable pourrait réduire le coût aux taux élevés, mais exigerait un filtre anti-repliement défini et une nouvelle vérification des bandes et portes ; cet audit ne remplace pas le calcul par un rééchantillonnage non vérifié.
 
 ## Rapports enregistrés
 
@@ -100,7 +117,7 @@ cargo test -p flaccompagnon-core local_phase
 node --test tests/analysis-cells.test.mjs tests/search.test.mjs
 ```
 
-Les valeurs attendues des tests proviennent d’identités de phase des sinus et de sommes d’énergies de tons orthogonaux. Ils couvrent 0°, 60°, 90°, 180°, gains différents, aigus opposés sous des graves alignés, opposition localisée, suppression DC, porte RMS, erreurs, fenêtres incomplètes, taux et Nyquist. Le test WAV complet vérifie temps, bandes, CSV, JSON et anciens rapports. Les tests frontend couvrent valeurs signées, tri, absences, infobulles et recherche.
+Les valeurs attendues proviennent d’identités de phase des sinus, des puissances analytiques des trois cases Hann et de sommes d’énergies de tons orthogonaux. Les tests couvrent 0°, 60°, 90°, 180°, gains différents, aigus opposés sous des graves alignés, opposition localisée, grand DC constant, audio ordinaire après une première valeur extrême de poids nul, normalisation Parseval dans les quatre bandes, frontières, bord exclusif à 20 kHz, cumul pondéré par l’énergie, porte RMS, erreurs, fenêtres incomplètes, taux et Nyquist. Le test WAV complet vérifie temps, bandes, CSV, JSON et anciens rapports. Les tests frontend couvrent valeurs signées, tri, absences, infobulles et recherche.
 
 ## Exemples avec FFmpeg ou Audacity
 

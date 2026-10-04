@@ -15,7 +15,7 @@
 //!
 //! # Size
 //!
-//! Over CLAUDE.md's 300-line ceiling, deliberately. Each metric already lives
+//! Over AGENTS.md's 300-line ceiling, deliberately. Each metric already lives
 //! in its own module ([`spectrum`], [`clipping`], [`stereo`](super::stereo),
 //! [`bitdepth`], [`loudness`](super::loudness), [`mdct`](super::mdct)); what is left here is the single hot
 //! loop that feeds them all from one pass over the samples,
@@ -167,6 +167,7 @@ pub struct StreamAnalyzer {
     cross_energy: f64,
     identical_frames: u64,
     total_frames: u64,
+    stereo_valid: bool,
 
     // --- bit depth ---
     bit_depth: Option<bitdepth::BitDepthAnalyzer>,
@@ -249,6 +250,7 @@ impl StreamAnalyzer {
             cross_energy: 0.0,
             identical_frames: 0,
             total_frames: 0,
+            stereo_valid: true,
             bit_depth: selection
                 .bit_depth()
                 .then(|| bitdepth::BitDepthAnalyzer::new(channels.max(1))),
@@ -276,6 +278,13 @@ impl StreamAnalyzer {
     /// optionally accompanied by the raw integer sample values for the same
     /// frame (used for effective bit-depth estimation).
     pub fn push_frame(&mut self, samples: &[f32], int_samples: Option<&[i32]>) {
+        // A malformed tail must not turn prefix energies into a whole-file
+        // channel relationship. Keep other measurement paths independent.
+        if self.selection.stereo()
+            && (samples.len() != self.channels || samples.iter().any(|s| !s.is_finite()))
+        {
+            self.stereo_valid = false;
+        }
         if let Some(loudness) = &mut self.loudness {
             loudness.push_frame(samples);
         }
@@ -333,7 +342,7 @@ impl StreamAnalyzer {
             if self.selection.enabled(Kind::Stereo) {
                 let d = l - r;
                 self.diff_energy += d * d;
-                if d.abs() < 1e-9 {
+                if l == r {
                     self.identical_frames += 1;
                 }
             }
@@ -522,20 +531,19 @@ impl StreamAnalyzer {
             None
         };
 
-        let fake_stereo = if self.selection.enabled(Kind::Stereo) && self.channels >= 2 {
-            super::stereo::is_fake(
-                self.diff_energy,
-                self.l_energy,
-                self.r_energy,
-                self.identical_frames,
-                self.total_frames,
-            )
-        } else {
-            false
-        };
-        let phase = self
-            .selection
-            .enabled(Kind::Phase)
+        let fake_stereo =
+            if self.stereo_valid && self.selection.enabled(Kind::Stereo) && self.channels >= 2 {
+                super::stereo::is_fake(
+                    self.diff_energy,
+                    self.l_energy,
+                    self.r_energy,
+                    self.identical_frames,
+                    self.total_frames,
+                )
+            } else {
+                false
+            };
+        let phase = (self.stereo_valid && self.selection.enabled(Kind::Phase))
             .then(|| super::stereo::analyze_phase(self.l_energy, self.r_energy, self.cross_energy));
         let high_frequency_stereo = self
             .high_frequency_stereo
@@ -583,7 +591,10 @@ impl StreamAnalyzer {
             fake_stereo,
             phase_correlation: phase.as_ref().and_then(|phase| phase.correlation),
             phase_inverted: phase.is_some_and(|phase| phase.likely_inverted),
-            stereo_balance: if self.selection.enabled(Kind::Stereo) && self.channels == 2 {
+            stereo_balance: if self.stereo_valid
+                && self.selection.enabled(Kind::Stereo)
+                && self.channels == 2
+            {
                 super::stereo::analyze_balance(self.l_energy, self.r_energy)
             } else {
                 None

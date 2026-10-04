@@ -4,7 +4,11 @@
 //! It does not retain decoded samples. Channel positions are required
 //! for a correct multichannel measurement, so unsupported layouts yield no
 //! value rather than incorrectly weighted loudness measurements.
+//! This is one streaming meter: filter history, overlapping gates and the
+//! shared M/S windows must advance together; splitting the state would obscure
+//! that invariant even though the complete algorithm exceeds 300 lines.
 
+use super::compensated_sum::CompensatedSum;
 use super::loudness_peaks::{LoudnessPeaks, LoudnessPeaksMeter};
 
 /// ITU-R BS.1770-5, Annex 1, Tables 1 and 2 (48 kHz reference filters).
@@ -42,10 +46,9 @@ struct Biquad {
 
 impl Biquad {
     fn new(reference: ([f64; 3], [f64; 3]), sample_rate: u32) -> Self {
-        // Invert the bilinear transform at the specified 48 kHz reference,
-        // then apply it at the stream's rate. The resulting digital response
-        // equals the published coefficients at 48 kHz and tracks the same
-        // analogue frequency response at 44.1, 96, 192 kHz, etc.
+        // Recover the analogue polynomial from BS.1770-5 Tables 1/2.
+        // Prewarp its pole frequency when remapping to a different rate:
+        // a plain Fs/48000 ratio shifts the shelf at low sample rates.
         fn retune(c: [f64; 3], ratio: f64) -> [f64; 3] {
             let c0 = c[0] + c[1] + c[2];
             let c1 = c[0] - c[2];
@@ -56,13 +59,22 @@ impl Biquad {
                 c0 - 2.0 * ratio * c1 + ratio * ratio * c2,
             ]
         }
-        let ratio = sample_rate as f64 / 48_000.0;
-        let b = retune(reference.0, ratio);
-        let a = retune(reference.1, ratio);
-        let scale = a[0];
+        let (b, a) = if sample_rate == 48_000 {
+            reference
+        } else {
+            let denominator = reference.1;
+            let pole = ((denominator[0] + denominator[1] + denominator[2])
+                / (denominator[0] - denominator[1] + denominator[2]))
+                .sqrt();
+            let ratio = pole / (pole.atan() * 48_000.0 / sample_rate as f64).tan();
+            let b = retune(reference.0, ratio);
+            let a = retune(reference.1, ratio);
+            let scale = a[0];
+            (b.map(|v| v / scale), [1.0, a[1] / scale, a[2] / scale])
+        };
         Self {
-            b: b.map(|v| v / scale),
-            a: [1.0, a[1] / scale, a[2] / scale],
+            b,
+            a,
             x1: 0.0,
             x2: 0.0,
             y1: 0.0,
@@ -89,9 +101,14 @@ struct ChannelFilter {
 
 impl ChannelFilter {
     fn new(sample_rate: u32) -> Self {
+        let mut high_pass = Biquad::new(HIGH_PASS_48K, sample_rate);
+        // Table 2's numerator is the unit second difference. Preserve it
+        // while retuning the poles; scaling it with the analogue prototype
+        // introduces a rate-dependent gain error (about 0.2 LU at 8 kHz).
+        high_pass.b = HIGH_PASS_48K.0;
         Self {
             shelf: Biquad::new(SHELF_48K, sample_rate),
-            high_pass: Biquad::new(HIGH_PASS_48K, sample_rate),
+            high_pass,
         }
     }
 
@@ -106,13 +123,14 @@ pub struct LoudnessMeter {
     filters: Vec<ChannelFilter>,
     power_ring: Vec<f64>,
     ring_at: usize,
-    window_power: f64,
+    window_power: CompensatedSum,
     frames: u64,
     step_frames: u64,
+    absolute_gate_power: f64,
     block_powers: Vec<f64>,
     short_ring: Vec<f32>,
     short_ring_at: usize,
-    short_window_power: f64,
+    short_window_power: CompensatedSum,
     short_powers: Vec<f64>,
     short_valid: bool,
     valid: bool,
@@ -140,13 +158,14 @@ impl LoudnessMeter {
                 .collect(),
             power_ring: vec![0.0; block_frames],
             ring_at: 0,
-            window_power: 0.0,
+            window_power: CompensatedSum::default(),
             frames: 0,
             step_frames,
+            absolute_gate_power: 10f64.powf((ABSOLUTE_GATE_LUFS - LOUDNESS_OFFSET) / 10.0),
             block_powers: Vec::new(),
             short_ring: vec![0.0; short_frames],
             short_ring_at: 0,
-            short_window_power: 0.0,
+            short_window_power: CompensatedSum::default(),
             short_powers: Vec::new(),
             short_valid: true,
             valid: true,
@@ -170,7 +189,10 @@ impl LoudnessMeter {
             .zip(samples)
             .map(|(filter, &sample)| filter.push(sample))
             .sum();
-        self.window_power += power - self.power_ring[self.ring_at];
+        // Add and remove separately: forming power-old first can erase quiet
+        // terms after a large float-PCM passage, even with compensated sums.
+        self.window_power.push(-self.power_ring[self.ring_at]);
+        self.window_power.push(power);
         self.power_ring[self.ring_at] = power;
         self.ring_at = (self.ring_at + 1) % self.power_ring.len();
 
@@ -183,26 +205,36 @@ impl LoudnessMeter {
             self.short_valid = false;
         }
         let short_power = if self.short_valid { power as f32 } else { 0.0 };
-        self.short_window_power += short_power as f64 - self.short_ring[self.short_ring_at] as f64;
+        self.short_window_power
+            .push(-f64::from(self.short_ring[self.short_ring_at]));
+        self.short_window_power.push(f64::from(short_power));
         self.short_ring[self.short_ring_at] = short_power;
         self.short_ring_at = (self.short_ring_at + 1) % self.short_ring.len();
         self.frames += 1;
+        let window_power = self.window_power.total();
+        let short_window_power = self.short_window_power.total();
         self.peaks
-            .push(self.window_power, self.short_window_power, self.frames);
+            .push(window_power, short_window_power, self.frames);
 
         let block_frames = self.power_ring.len() as u64;
         if self.frames >= block_frames
             && (self.frames - block_frames).is_multiple_of(self.step_frames)
         {
-            self.block_powers
-                .push((self.window_power / block_frames as f64).max(0.0));
+            let power = window_power / block_frames as f64;
+            // Below the fixed absolute gate a block can never contribute,
+            // regardless of the programme's eventual relative threshold.
+            if power > self.absolute_gate_power {
+                self.block_powers.push(power);
+            }
         }
         let short_frames = self.short_ring.len() as u64;
         if self.frames >= short_frames
             && (self.frames - short_frames).is_multiple_of(self.step_frames)
         {
-            self.short_powers
-                .push((self.short_window_power / short_frames as f64).max(0.0));
+            let power = short_window_power / short_frames as f64;
+            if power >= self.absolute_gate_power && self.short_valid {
+                self.short_powers.push(power);
+            }
         }
     }
 
@@ -212,7 +244,7 @@ impl LoudnessMeter {
         if !self.valid {
             return None;
         }
-        let absolute_power = 10f64.powf((ABSOLUTE_GATE_LUFS - LOUDNESS_OFFSET) / 10.0);
+        let absolute_power = self.absolute_gate_power;
         let (sum, count) = self
             .block_powers
             .iter()
@@ -244,18 +276,15 @@ impl LoudnessMeter {
     }
 
     /// EBU Tech 3342 loudness range in LU. Consumes the meter because the
-    /// standard's file measurement extends the stream by 1.5 s of silence to
-    /// centre the last 3 s analysis window on the end of the actual audio.
+    /// file measurement extends the stream by at least 1.5 s of silence.
+    /// The final 3 s window's centre is within one update of the real end.
     pub fn loudness_range_lu(mut self) -> Option<f32> {
         if !self.valid || !self.short_valid || self.frames < self.short_ring.len() as u64 {
             return None;
         }
-        let silence = vec![0.0; self.filters.len()];
-        for _ in 0..self.short_ring.len() / 2 {
-            self.push_frame(&silence);
-        }
+        self.pad_lra_tail();
 
-        let absolute_power = 10f64.powf((ABSOLUTE_GATE_LUFS - LOUDNESS_OFFSET) / 10.0);
+        let absolute_power = self.absolute_gate_power;
         let (sum, count) = self
             .short_powers
             .iter()
@@ -267,19 +296,39 @@ impl LoudnessMeter {
             return None;
         }
         let relative_power = (sum / count as f64) / 10f64.powf(LRA_RELATIVE_GATE_LU / 10.0);
-        let mut gated: Vec<f64> = self
-            .short_powers
-            .into_iter()
-            .filter(|&power| power >= absolute_power && power >= relative_power)
-            .collect();
-        if gated.is_empty() {
+        self.short_powers
+            .retain(|&power| power >= absolute_power && power >= relative_power);
+        if self.short_powers.is_empty() {
             return None;
         }
-        gated.sort_by(f64::total_cmp);
-        let percentile = |fraction: f64| ((gated.len() - 1) as f64 * fraction).round() as usize;
-        let low = gated[percentile(LRA_LOW_PERCENTILE)];
-        let high = gated[percentile(LRA_HIGH_PERCENTILE)];
+        // Only two order statistics are needed. Reuse the recorded powers
+        // instead of allocating and sorting another programme-sized vector.
+        let last = self.short_powers.len() - 1;
+        let low_at = (last as f64 * LRA_LOW_PERCENTILE).round() as usize;
+        let high_at = (last as f64 * LRA_HIGH_PERCENTILE).round() as usize;
+        if low_at > last || high_at > last {
+            return None;
+        }
+        // Both indices have just been checked against the nonempty vector.
+        let low = *self
+            .short_powers
+            .select_nth_unstable_by(low_at, f64::total_cmp)
+            .1;
+        let high = *self
+            .short_powers
+            .select_nth_unstable_by(high_at, f64::total_cmp)
+            .1;
         Some((10.0 * (high / low).log10()) as f32)
+    }
+
+    fn pad_lra_tail(&mut self) {
+        // Tech 3342's file measurement uses at least 1.5 s of trailing
+        // silence; round upward when 3*Fs is odd (for example 11025 Hz).
+        let channels = self.filters.len();
+        let silence = [0.0; 2];
+        for _ in 0..self.short_ring.len().div_ceil(2) {
+            self.push_frame(&silence[..channels]);
+        }
     }
 }
 

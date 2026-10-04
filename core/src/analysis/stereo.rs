@@ -2,7 +2,7 @@
 //!
 //! A file can claim to be stereo while both channels carry an identical signal.
 //! Two independent conditions flag it:
-//! 1. Every frame had L == R (bit-exact dual mono), or
+//! 1. Every frame had L == R (exact decoded dual mono), or
 //! 2. The L-R difference energy is >= 60 dB below the total channel energy.
 
 use serde::{Deserialize, Serialize};
@@ -67,15 +67,18 @@ pub fn analyze_phase(l_energy: f64, r_energy: f64, cross_energy: f64) -> PhaseAn
     if !l_energy.is_finite()
         || !r_energy.is_finite()
         || !cross_energy.is_finite()
-        || l_energy <= f64::EPSILON
-        || r_energy <= f64::EPSILON
+        || l_energy <= 0.0
+        || r_energy <= 0.0
     {
         return PhaseAnalysis {
             correlation: None,
             likely_inverted: false,
         };
     }
-    let correlation = (cross_energy / (l_energy * r_energy).sqrt()).clamp(-1.0, 1.0);
+    // Taking the roots separately avoids overflow/underflow in E_L * E_R.
+    // Correlation has no absolute energy gate: finite non-zero float audio
+    // must retain its coefficient when the same gain is applied to both sides.
+    let correlation = (cross_energy / l_energy.sqrt() / r_energy.sqrt()).clamp(-1.0, 1.0);
     PhaseAnalysis {
         correlation: Some(correlation as f32),
         likely_inverted: correlation <= INVERTED_CORRELATION,
@@ -83,7 +86,7 @@ pub fn analyze_phase(l_energy: f64, r_energy: f64, cross_energy: f64) -> PhaseAn
 }
 
 /// Decide whether a >= 2 channel signal is really dual-mono, from accumulated
-/// energies and the count of bit-identical frames.
+/// energies and the count of exactly equal decoded frames.
 pub fn is_fake(
     diff_energy: f64,
     l_energy: f64,
@@ -106,9 +109,8 @@ pub fn is_fake(
     if identical_frames == total_frames {
         return true;
     }
-    if sig_energy <= f64::EPSILON {
-        return false; // both channels silent
-    }
+    // The ratio is dimensionless: an absolute epsilon would change the
+    // finding when the same finite gain is applied to both channels.
     let ratio_db = 10.0 * (diff_energy / sig_energy).max(1e-30).log10();
     ratio_db < DIFF_FLOOR_DB
 }

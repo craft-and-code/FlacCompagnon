@@ -14,7 +14,7 @@ display       = 100 × max_abs
 
 L’amplitude est normalisée : `+1.0` correspond à la pleine échelle positive, `0.01` à 1 %. Silence et dernière trame sont inclus, sans pondération fréquentielle, porte, rééchantillonnage, filtre ni durée minimale. Chaque canal dispose d’une somme compensée en double précision pour préserver les petites contributions quand de grandes valeurs opposées se compensent. Les décalages opposés de plusieurs canaux ne s’annulent donc pas dans un mélange mono.
 
-Cette définition par la moyenne arithmétique est décrite dans le [manuel Audacity](https://manual.audacityteam.org/man/dc_offset.html) et la [documentation FFmpeg](https://ffmpeg.org/ffmpeg-filters.html#dynaudnorm). Un déplacement persistant réduit la marge disponible d’un côté de l’onde.
+Cette définition par la moyenne arithmétique est décrite dans le [manuel Audacity](https://manual.audacityteam.org/man/dc_offset.html) et la [documentation FFmpeg](https://ffmpeg.org/ffmpeg-filters.html#dynaudnorm). Un déplacement persistant réduit la marge disponible d’un côté de l’onde. La somme utilise la [correction de Neumaier](https://doi.org/10.1002/zamm.19740540106) ; elle améliore la précision flottante sans garantir un calcul exact pour toutes les entrées possibles.
 
 ## Disponibilité et limites
 
@@ -28,6 +28,14 @@ Cette définition par la moyenne arithmétique est décrite dans le [manuel Auda
 - Les flottants hors de ±1 sont mesurés sans écrêtage ; le pourcentage peut dépasser 100 %.
 
 Cette mesure descriptive n’a pas de seuil automatique d’alerte. Elle ne prouve ni panne, ni audibilité, ni provenance, et ne modifie pas les verdicts d’authenticité ou le fichier.
+
+Par exemple, un fondu linéaire de `0.5` à zéro a une moyenne globale de `0.25`, alors qu’il varie constamment. Deux sections de même durée avec des décalages opposés ont une moyenne globale nulle. Ces moyennes arithmétiques sont correctes et demandent du contexte avant d’être interprétées comme un décalage persistant.
+
+## Coût et alternatives
+
+Le calcul parcourt chaque échantillon décodé une fois et conserve deux valeurs en double précision par canal, indépendamment de la durée du fichier. Il partage l’outil de sommation numérique des détecteurs de discontinuités et ne met pas la piste en mémoire.
+
+Une médiane ou une moyenne tronquée répondrait à une autre question et pourrait masquer la contribution de courtes sections décalées. Une moyenne par fenêtre localiserait les variations, mais demanderait une durée de fenêtre, un recouvrement et des champs de rapport supplémentaires. Un filtre passe-haut modifierait le signal mesuré. Ces alternatives ne sont pas implémentées ; aucune n’est nécessaire pour définir la moyenne arithmétique globale actuelle.
 
 ## Rapports
 
@@ -43,7 +51,7 @@ cargo test -p flaccompagnon-core --test dc_offset -- --ignored
 node --test tests/analysis-cells.test.mjs tests/search.test.mjs
 ```
 
-Les tests utilisent des décalages exacts entiers ou en fractions binaires. Ils couvrent canaux indépendants, silence, ondes asymétriques de moyenne nulle, périodes partielles, erreurs finales, grands flottants, WAV multicanaux et unités CSV/JSON. Le test facultatif compare les moyennes `astats` de FFmpeg et un FLAC encodé indépendamment, avec la tolérance de son affichage à six décimales.
+Les tests utilisent des décalages exacts entiers ou en fractions binaires. Ils couvrent canaux indépendants, silence, ondes asymétriques de moyenne nulle, périodes partielles, fondus, sections opposées, erreurs finales, compensation des grands flottants, dépassement du compteur de trames, WAV float d’une seule trame hors pleine échelle, WAV multicanaux et unités CSV/JSON. Le test facultatif compare les moyennes `astats` de FFmpeg et un FLAC encodé indépendamment, avec la tolérance de son affichage à six décimales.
 
 ## Exemple manuel
 

@@ -438,6 +438,8 @@ With FFmpeg installed, also run `cargo test -p flaccompagnon-core --test loudnes
 
 The [security and maintenance audit](docs/maintenance-audit.md) records the 4 October 2026 fixes, measured performance improvements and remaining dependency and validation limits.
 
+The [0.9.6 measurement audit](docs/release-0.9.6-analysis-audit.md) records the follow-up standards review, numerical corrections and performance checks for phase, stereo balance, HF Stereo, DC, discontinuities and loudness.
+
 ---
 
 ## Documentation (rustdoc)

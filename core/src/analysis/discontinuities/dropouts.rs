@@ -1,11 +1,13 @@
 //! Abrupt digital silence bounded by signal; not a general silence detector.
 
 use super::{context_frames, DiscontinuityEvent, EventSummary};
+use crate::analysis::compensated_sum::CompensatedSum;
 
 // Project thresholds: both boundaries must jump by >=0.02 full scale (~−34
 // dBFS). Context must exceed −60 dBFS RMS, and the resumed signal must stay
-// within 12 dB of the preceding RMS. These conservative checks exclude fades,
-// leading/trailing silence, and most unrelated starts/stops.
+// within 12 dB of the preceding RMS. These checks reject leading/trailing
+// silence and smooth fades with subthreshold edges. Abrupt intentional mutes
+// can still meet the rule; no musical false-positive rate is established.
 const MIN_EDGE: f64 = 0.02;
 const MIN_POWER: f64 = 1e-6;
 const CONTEXT_POWER_RATIO: f64 = 16.0;
@@ -18,7 +20,7 @@ struct Gap {
 struct Resumption {
     gap: Gap,
     duration: u64,
-    power: f64,
+    power: CompensatedSum,
     nonzero: usize,
     frames: usize,
 }
@@ -26,7 +28,7 @@ struct Resumption {
 pub(super) struct DropoutDetector {
     history: Vec<f64>,
     at: usize,
-    power: f64,
+    power: CompensatedSum,
     previous: f64,
     frames: u64,
     gap: Option<Gap>,
@@ -40,7 +42,7 @@ impl DropoutDetector {
         Self {
             history: vec![0.0; context_frames(rate)],
             at: 0,
-            power: 0.0,
+            power: CompensatedSum::default(),
             previous: 0.0,
             frames: 0,
             gap: None,
@@ -53,7 +55,7 @@ impl DropoutDetector {
     pub(super) fn push(&mut self, sample: f64, output: &mut EventSummary) {
         let context = self.history.len();
         if sample == 0.0 && self.previous != 0.0 {
-            let before_power = self.power.max(0.0) / context as f64;
+            let before_power = self.power.total().max(0.0) / context as f64;
             if self.frames >= context as u64
                 && self.previous.abs() >= MIN_EDGE
                 && before_power >= MIN_POWER
@@ -74,7 +76,7 @@ impl DropoutDetector {
                     self.resumption = Some(Resumption {
                         gap,
                         duration,
-                        power: 0.0,
+                        power: CompensatedSum::default(),
                         nonzero: 0,
                         frames: 0,
                     });
@@ -82,11 +84,11 @@ impl DropoutDetector {
             }
         }
         if let Some(after) = &mut self.resumption {
-            after.power += sample * sample;
+            after.power.push(sample * sample);
             after.nonzero += usize::from(sample != 0.0);
             after.frames += 1;
             if after.frames == context {
-                let power = after.power / context as f64;
+                let power = after.power.total() / context as f64;
                 if power >= MIN_POWER
                     && after.nonzero * 10 >= context * 9
                     && power >= after.gap.before_power / CONTEXT_POWER_RATIO
@@ -101,7 +103,10 @@ impl DropoutDetector {
                 self.resumption = None;
             }
         }
-        self.power += sample * sample - self.history[self.at];
+        // Combining these two terms before addition loses a quiet new sample
+        // when an extreme float leaves the window. Compensate each separately.
+        self.power.push(sample * sample);
+        self.power.push(-self.history[self.at]);
         self.history[self.at] = sample * sample;
         self.at = (self.at + 1) % context;
         self.previous = sample;

@@ -6,6 +6,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::compensated_sum::CompensatedSum;
+
 /// Signed per-channel means and their largest absolute magnitude.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DcOffset {
@@ -15,29 +17,9 @@ pub struct DcOffset {
     pub max_abs: f64,
 }
 
-#[derive(Clone, Default)]
-struct ChannelSum {
-    sum: f64,
-    correction: f64,
-}
-
-impl ChannelSum {
-    fn push(&mut self, sample: f64) {
-        // Compensate rounding in both operand orders. A tiny bias should not
-        // disappear when accumulated beside large positive/negative samples.
-        let next = self.sum + sample;
-        self.correction += if self.sum.abs() >= sample.abs() {
-            (self.sum - next) + sample
-        } else {
-            (sample - next) + self.sum
-        };
-        self.sum = next;
-    }
-}
-
 /// Streaming mean with bounded memory for mono through 32-channel audio.
 pub struct DcOffsetMeter {
-    sums: Vec<ChannelSum>,
+    sums: Vec<CompensatedSum>,
     frames: u64,
     valid: bool,
 }
@@ -50,7 +32,7 @@ impl DcOffsetMeter {
             return None;
         }
         Some(Self {
-            sums: vec![ChannelSum::default(); channels],
+            sums: vec![CompensatedSum::default(); channels],
             frames: 0,
             valid: true,
         })
@@ -85,7 +67,7 @@ impl DcOffsetMeter {
         let channel_means: Vec<f64> = self
             .sums
             .iter()
-            .map(|sum| (sum.sum + sum.correction) / self.frames as f64)
+            .map(|sum| sum.total() / self.frames as f64)
             .collect();
         if channel_means.iter().any(|x| !x.is_finite()) {
             return None;
