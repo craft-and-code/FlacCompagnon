@@ -2,7 +2,7 @@
 <a href=#2 id=2 data-nosnippet>2</a>//!
 <a href=#3 id=3 data-nosnippet>3</a>//! A file can claim to be stereo while both channels carry an identical signal.
 <a href=#4 id=4 data-nosnippet>4</a>//! Two independent conditions flag it:
-<a href=#5 id=5 data-nosnippet>5</a>//! 1. Every frame had L == R (bit-exact dual mono), or
+<a href=#5 id=5 data-nosnippet>5</a>//! 1. Every frame had L == R (exact decoded dual mono), or
 <a href=#6 id=6 data-nosnippet>6</a>//! 2. The L-R difference energy is &gt;= 60 dB below the total channel energy.
 <a href=#7 id=7 data-nosnippet>7</a>
 <a href=#8 id=8 data-nosnippet>8</a></span><span class="kw">use </span>serde::{Deserialize, Serialize};
@@ -67,53 +67,55 @@
 <a href=#67 id=67 data-nosnippet>67</a>    <span class="kw">if </span>!l_energy.is_finite()
 <a href=#68 id=68 data-nosnippet>68</a>        || !r_energy.is_finite()
 <a href=#69 id=69 data-nosnippet>69</a>        || !cross_energy.is_finite()
-<a href=#70 id=70 data-nosnippet>70</a>        || l_energy &lt;= f64::EPSILON
-<a href=#71 id=71 data-nosnippet>71</a>        || r_energy &lt;= f64::EPSILON
-<a href=#72 id=72 data-nosnippet>72</a>    {
+<a href=#70 id=70 data-nosnippet>70</a>        || l_energy &lt;= <span class="number">0.0
+<a href=#71 id=71 data-nosnippet>71</a>        </span>|| r_energy &lt;= <span class="number">0.0
+<a href=#72 id=72 data-nosnippet>72</a>    </span>{
 <a href=#73 id=73 data-nosnippet>73</a>        <span class="kw">return </span>PhaseAnalysis {
 <a href=#74 id=74 data-nosnippet>74</a>            correlation: <span class="prelude-val">None</span>,
 <a href=#75 id=75 data-nosnippet>75</a>            likely_inverted: <span class="bool-val">false</span>,
 <a href=#76 id=76 data-nosnippet>76</a>        };
 <a href=#77 id=77 data-nosnippet>77</a>    }
-<a href=#78 id=78 data-nosnippet>78</a>    <span class="kw">let </span>correlation = (cross_energy / (l_energy * r_energy).sqrt()).clamp(-<span class="number">1.0</span>, <span class="number">1.0</span>);
-<a href=#79 id=79 data-nosnippet>79</a>    PhaseAnalysis {
-<a href=#80 id=80 data-nosnippet>80</a>        correlation: <span class="prelude-val">Some</span>(correlation <span class="kw">as </span>f32),
-<a href=#81 id=81 data-nosnippet>81</a>        likely_inverted: correlation &lt;= INVERTED_CORRELATION,
-<a href=#82 id=82 data-nosnippet>82</a>    }
-<a href=#83 id=83 data-nosnippet>83</a>}
-<a href=#84 id=84 data-nosnippet>84</a>
-<a href=#85 id=85 data-nosnippet>85</a><span class="doccomment">/// Decide whether a &gt;= 2 channel signal is really dual-mono, from accumulated
-<a href=#86 id=86 data-nosnippet>86</a>/// energies and the count of bit-identical frames.
-<a href=#87 id=87 data-nosnippet>87</a></span><span class="kw">pub fn </span>is_fake(
-<a href=#88 id=88 data-nosnippet>88</a>    diff_energy: f64,
-<a href=#89 id=89 data-nosnippet>89</a>    l_energy: f64,
-<a href=#90 id=90 data-nosnippet>90</a>    r_energy: f64,
-<a href=#91 id=91 data-nosnippet>91</a>    identical_frames: u64,
-<a href=#92 id=92 data-nosnippet>92</a>    total_frames: u64,
-<a href=#93 id=93 data-nosnippet>93</a>) -&gt; bool {
-<a href=#94 id=94 data-nosnippet>94</a>    <span class="kw">let </span>sig_energy = l_energy + r_energy;
-<a href=#95 id=95 data-nosnippet>95</a>    <span class="kw">if </span>total_frames == <span class="number">0
-<a href=#96 id=96 data-nosnippet>96</a>        </span>|| !diff_energy.is_finite()
-<a href=#97 id=97 data-nosnippet>97</a>        || !sig_energy.is_finite()
-<a href=#98 id=98 data-nosnippet>98</a>        || diff_energy &lt; <span class="number">0.0
-<a href=#99 id=99 data-nosnippet>99</a>        </span>|| l_energy &lt; <span class="number">0.0
-<a href=#100 id=100 data-nosnippet>100</a>        </span>|| r_energy &lt; <span class="number">0.0
-<a href=#101 id=101 data-nosnippet>101</a>        </span>|| sig_energy == <span class="number">0.0
-<a href=#102 id=102 data-nosnippet>102</a>    </span>{
-<a href=#103 id=103 data-nosnippet>103</a>        <span class="kw">return </span><span class="bool-val">false</span>;
-<a href=#104 id=104 data-nosnippet>104</a>    }
-<a href=#105 id=105 data-nosnippet>105</a>    <span class="comment">// Equality of two silent channels is not evidence of a mono programme.
-<a href=#106 id=106 data-nosnippet>106</a>    </span><span class="kw">if </span>identical_frames == total_frames {
-<a href=#107 id=107 data-nosnippet>107</a>        <span class="kw">return </span><span class="bool-val">true</span>;
-<a href=#108 id=108 data-nosnippet>108</a>    }
-<a href=#109 id=109 data-nosnippet>109</a>    <span class="kw">if </span>sig_energy &lt;= f64::EPSILON {
-<a href=#110 id=110 data-nosnippet>110</a>        <span class="kw">return </span><span class="bool-val">false</span>; <span class="comment">// both channels silent
-<a href=#111 id=111 data-nosnippet>111</a>    </span>}
-<a href=#112 id=112 data-nosnippet>112</a>    <span class="kw">let </span>ratio_db = <span class="number">10.0 </span>* (diff_energy / sig_energy).max(<span class="number">1e-30</span>).log10();
-<a href=#113 id=113 data-nosnippet>113</a>    ratio_db &lt; DIFF_FLOOR_DB
-<a href=#114 id=114 data-nosnippet>114</a>}
-<a href=#115 id=115 data-nosnippet>115</a>
-<a href=#116 id=116 data-nosnippet>116</a><span class="attr">#[cfg(test)]
-<a href=#117 id=117 data-nosnippet>117</a>#[path = <span class="string">"../../tests/unit/analysis/stereo.rs"</span>]
-<a href=#118 id=118 data-nosnippet>118</a></span><span class="kw">mod </span>tests;
+<a href=#78 id=78 data-nosnippet>78</a>    <span class="comment">// Taking the roots separately avoids overflow/underflow in E_L * E_R.
+<a href=#79 id=79 data-nosnippet>79</a>    // Correlation has no absolute energy gate: finite non-zero float audio
+<a href=#80 id=80 data-nosnippet>80</a>    // must retain its coefficient when the same gain is applied to both sides.
+<a href=#81 id=81 data-nosnippet>81</a>    </span><span class="kw">let </span>correlation = (cross_energy / l_energy.sqrt() / r_energy.sqrt()).clamp(-<span class="number">1.0</span>, <span class="number">1.0</span>);
+<a href=#82 id=82 data-nosnippet>82</a>    PhaseAnalysis {
+<a href=#83 id=83 data-nosnippet>83</a>        correlation: <span class="prelude-val">Some</span>(correlation <span class="kw">as </span>f32),
+<a href=#84 id=84 data-nosnippet>84</a>        likely_inverted: correlation &lt;= INVERTED_CORRELATION,
+<a href=#85 id=85 data-nosnippet>85</a>    }
+<a href=#86 id=86 data-nosnippet>86</a>}
+<a href=#87 id=87 data-nosnippet>87</a>
+<a href=#88 id=88 data-nosnippet>88</a><span class="doccomment">/// Decide whether a &gt;= 2 channel signal is really dual-mono, from accumulated
+<a href=#89 id=89 data-nosnippet>89</a>/// energies and the count of exactly equal decoded frames.
+<a href=#90 id=90 data-nosnippet>90</a></span><span class="kw">pub fn </span>is_fake(
+<a href=#91 id=91 data-nosnippet>91</a>    diff_energy: f64,
+<a href=#92 id=92 data-nosnippet>92</a>    l_energy: f64,
+<a href=#93 id=93 data-nosnippet>93</a>    r_energy: f64,
+<a href=#94 id=94 data-nosnippet>94</a>    identical_frames: u64,
+<a href=#95 id=95 data-nosnippet>95</a>    total_frames: u64,
+<a href=#96 id=96 data-nosnippet>96</a>) -&gt; bool {
+<a href=#97 id=97 data-nosnippet>97</a>    <span class="kw">let </span>sig_energy = l_energy + r_energy;
+<a href=#98 id=98 data-nosnippet>98</a>    <span class="kw">if </span>total_frames == <span class="number">0
+<a href=#99 id=99 data-nosnippet>99</a>        </span>|| !diff_energy.is_finite()
+<a href=#100 id=100 data-nosnippet>100</a>        || !sig_energy.is_finite()
+<a href=#101 id=101 data-nosnippet>101</a>        || diff_energy &lt; <span class="number">0.0
+<a href=#102 id=102 data-nosnippet>102</a>        </span>|| l_energy &lt; <span class="number">0.0
+<a href=#103 id=103 data-nosnippet>103</a>        </span>|| r_energy &lt; <span class="number">0.0
+<a href=#104 id=104 data-nosnippet>104</a>        </span>|| sig_energy == <span class="number">0.0
+<a href=#105 id=105 data-nosnippet>105</a>    </span>{
+<a href=#106 id=106 data-nosnippet>106</a>        <span class="kw">return </span><span class="bool-val">false</span>;
+<a href=#107 id=107 data-nosnippet>107</a>    }
+<a href=#108 id=108 data-nosnippet>108</a>    <span class="comment">// Equality of two silent channels is not evidence of a mono programme.
+<a href=#109 id=109 data-nosnippet>109</a>    </span><span class="kw">if </span>identical_frames == total_frames {
+<a href=#110 id=110 data-nosnippet>110</a>        <span class="kw">return </span><span class="bool-val">true</span>;
+<a href=#111 id=111 data-nosnippet>111</a>    }
+<a href=#112 id=112 data-nosnippet>112</a>    <span class="comment">// The ratio is dimensionless: an absolute epsilon would change the
+<a href=#113 id=113 data-nosnippet>113</a>    // finding when the same finite gain is applied to both channels.
+<a href=#114 id=114 data-nosnippet>114</a>    </span><span class="kw">let </span>ratio_db = <span class="number">10.0 </span>* (diff_energy / sig_energy).max(<span class="number">1e-30</span>).log10();
+<a href=#115 id=115 data-nosnippet>115</a>    ratio_db &lt; DIFF_FLOOR_DB
+<a href=#116 id=116 data-nosnippet>116</a>}
+<a href=#117 id=117 data-nosnippet>117</a>
+<a href=#118 id=118 data-nosnippet>118</a><span class="attr">#[cfg(test)]
+<a href=#119 id=119 data-nosnippet>119</a>#[path = <span class="string">"../../tests/unit/analysis/stereo.rs"</span>]
+<a href=#120 id=120 data-nosnippet>120</a></span><span class="kw">mod </span>tests;
 </code></pre></div></section></main></body></html>

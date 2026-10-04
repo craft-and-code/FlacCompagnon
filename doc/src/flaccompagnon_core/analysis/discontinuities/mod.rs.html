@@ -97,58 +97,59 @@
 <a href=#97 id=97 data-nosnippet>97</a>            <span class="kw">return </span><span class="prelude-val">None</span>;
 <a href=#98 id=98 data-nosnippet>98</a>        }
 <a href=#99 id=99 data-nosnippet>99</a>        <span class="kw">let </span>context = context_frames(sample_rate);
-<a href=#100 id=100 data-nosnippet>100</a>        <span class="kw">let </span>max_pulse = pulse_frames(sample_rate);
-<a href=#101 id=101 data-nosnippet>101</a>        <span class="prelude-val">Some</span>(<span class="self">Self </span>{
-<a href=#102 id=102 data-nosnippet>102</a>            channels: (<span class="number">1</span>..=channels)
-<a href=#103 id=103 data-nosnippet>103</a>                .map(|channel| Channel {
-<a href=#104 id=104 data-nosnippet>104</a>                    clicks: clicks.then(|| clicks::ClickDetector::new(sample_rate, channel <span class="kw">as </span>u16)),
-<a href=#105 id=105 data-nosnippet>105</a>                    dropouts: dropouts
-<a href=#106 id=106 data-nosnippet>106</a>                        .then(|| dropouts::DropoutDetector::new(sample_rate, channel <span class="kw">as </span>u16)),
-<a href=#107 id=107 data-nosnippet>107</a>                })
-<a href=#108 id=108 data-nosnippet>108</a>                .collect(),
-<a href=#109 id=109 data-nosnippet>109</a>            result: DiscontinuityAnalysis::default(),
-<a href=#110 id=110 data-nosnippet>110</a>            frames: <span class="number">0</span>,
-<a href=#111 id=111 data-nosnippet>111</a>            min_frames: (<span class="number">2 </span>* context + max_pulse + <span class="number">2</span>) <span class="kw">as </span>u64,
-<a href=#112 id=112 data-nosnippet>112</a>            valid: <span class="bool-val">true</span>,
-<a href=#113 id=113 data-nosnippet>113</a>        })
-<a href=#114 id=114 data-nosnippet>114</a>    }
-<a href=#115 id=115 data-nosnippet>115</a>
-<a href=#116 id=116 data-nosnippet>116</a>    <span class="doccomment">/// Feed one complete frame. A malformed frame invalidates the whole
-<a href=#117 id=117 data-nosnippet>117</a>    /// reading, rather than silently presenting a count from a valid prefix.
-<a href=#118 id=118 data-nosnippet>118</a>    </span><span class="kw">pub fn </span>push_frame(<span class="kw-2">&amp;mut </span><span class="self">self</span>, samples: <span class="kw-2">&amp;</span>[f32]) {
-<a href=#119 id=119 data-nosnippet>119</a>        <span class="kw">if </span>samples.len() != <span class="self">self</span>.channels.len() || samples.iter().any(|s| !s.is_finite()) {
-<a href=#120 id=120 data-nosnippet>120</a>            <span class="self">self</span>.valid = <span class="bool-val">false</span>;
-<a href=#121 id=121 data-nosnippet>121</a>        }
-<a href=#122 id=122 data-nosnippet>122</a>        <span class="kw">if </span>!<span class="self">self</span>.valid {
-<a href=#123 id=123 data-nosnippet>123</a>            <span class="kw">return</span>;
-<a href=#124 id=124 data-nosnippet>124</a>        }
-<a href=#125 id=125 data-nosnippet>125</a>        <span class="kw">for </span>(channel, <span class="kw-2">&amp;</span>sample) <span class="kw">in </span><span class="self">self</span>.channels.iter_mut().zip(samples) {
-<a href=#126 id=126 data-nosnippet>126</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(clicks) = <span class="kw-2">&amp;mut </span>channel.clicks {
-<a href=#127 id=127 data-nosnippet>127</a>                clicks.push(sample <span class="kw">as </span>f64, <span class="kw-2">&amp;mut </span><span class="self">self</span>.result.clicks);
-<a href=#128 id=128 data-nosnippet>128</a>            }
-<a href=#129 id=129 data-nosnippet>129</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(dropouts) = <span class="kw-2">&amp;mut </span>channel.dropouts {
-<a href=#130 id=130 data-nosnippet>130</a>                dropouts.push(sample <span class="kw">as </span>f64, <span class="kw-2">&amp;mut </span><span class="self">self</span>.result.dropouts);
-<a href=#131 id=131 data-nosnippet>131</a>            }
-<a href=#132 id=132 data-nosnippet>132</a>        }
-<a href=#133 id=133 data-nosnippet>133</a>        <span class="self">self</span>.frames += <span class="number">1</span>;
-<a href=#134 id=134 data-nosnippet>134</a>    }
-<a href=#135 id=135 data-nosnippet>135</a>
-<a href=#136 id=136 data-nosnippet>136</a>    <span class="doccomment">/// Flush candidates with full real context; never pad file boundaries
-<a href=#137 id=137 data-nosnippet>137</a>    /// with silence, which would manufacture apparent transitions.
-<a href=#138 id=138 data-nosnippet>138</a>    </span><span class="kw">pub fn </span>finish(<span class="kw-2">mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;DiscontinuityAnalysis&gt; {
-<a href=#139 id=139 data-nosnippet>139</a>        <span class="kw">if </span>!<span class="self">self</span>.valid || <span class="self">self</span>.frames &lt; <span class="self">self</span>.min_frames {
-<a href=#140 id=140 data-nosnippet>140</a>            <span class="kw">return </span><span class="prelude-val">None</span>;
-<a href=#141 id=141 data-nosnippet>141</a>        }
-<a href=#142 id=142 data-nosnippet>142</a>        <span class="kw">for </span>channel <span class="kw">in </span><span class="kw-2">&amp;mut </span><span class="self">self</span>.channels {
-<a href=#143 id=143 data-nosnippet>143</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(clicks) = <span class="kw-2">&amp;mut </span>channel.clicks {
-<a href=#144 id=144 data-nosnippet>144</a>                clicks.finish(<span class="kw-2">&amp;mut </span><span class="self">self</span>.result.clicks);
-<a href=#145 id=145 data-nosnippet>145</a>            }
-<a href=#146 id=146 data-nosnippet>146</a>        }
-<a href=#147 id=147 data-nosnippet>147</a>        <span class="prelude-val">Some</span>(<span class="self">self</span>.result)
-<a href=#148 id=148 data-nosnippet>148</a>    }
-<a href=#149 id=149 data-nosnippet>149</a>}
-<a href=#150 id=150 data-nosnippet>150</a>
-<a href=#151 id=151 data-nosnippet>151</a><span class="attr">#[cfg(test)]
-<a href=#152 id=152 data-nosnippet>152</a>#[path = <span class="string">"../../../tests/unit/analysis/discontinuities.rs"</span>]
-<a href=#153 id=153 data-nosnippet>153</a></span><span class="kw">mod </span>tests;
+<a href=#100 id=100 data-nosnippet>100</a>        <span class="prelude-val">Some</span>(<span class="self">Self </span>{
+<a href=#101 id=101 data-nosnippet>101</a>            channels: (<span class="number">1</span>..=channels)
+<a href=#102 id=102 data-nosnippet>102</a>                .map(|channel| Channel {
+<a href=#103 id=103 data-nosnippet>103</a>                    clicks: clicks.then(|| clicks::ClickDetector::new(sample_rate, channel <span class="kw">as </span>u16)),
+<a href=#104 id=104 data-nosnippet>104</a>                    dropouts: dropouts
+<a href=#105 id=105 data-nosnippet>105</a>                        .then(|| dropouts::DropoutDetector::new(sample_rate, channel <span class="kw">as </span>u16)),
+<a href=#106 id=106 data-nosnippet>106</a>                })
+<a href=#107 id=107 data-nosnippet>107</a>                .collect(),
+<a href=#108 id=108 data-nosnippet>108</a>            result: DiscontinuityAnalysis::default(),
+<a href=#109 id=109 data-nosnippet>109</a>            frames: <span class="number">0</span>,
+<a href=#110 id=110 data-nosnippet>110</a>            <span class="comment">// One-sample pulses need only their own two edges and real
+<a href=#111 id=111 data-nosnippet>111</a>            // context, even when longer candidates are also supported.
+<a href=#112 id=112 data-nosnippet>112</a>            </span>min_frames: (<span class="number">2 </span>* context + <span class="number">3</span>) <span class="kw">as </span>u64,
+<a href=#113 id=113 data-nosnippet>113</a>            valid: <span class="bool-val">true</span>,
+<a href=#114 id=114 data-nosnippet>114</a>        })
+<a href=#115 id=115 data-nosnippet>115</a>    }
+<a href=#116 id=116 data-nosnippet>116</a>
+<a href=#117 id=117 data-nosnippet>117</a>    <span class="doccomment">/// Feed one complete frame. A malformed frame invalidates the whole
+<a href=#118 id=118 data-nosnippet>118</a>    /// reading, rather than silently presenting a count from a valid prefix.
+<a href=#119 id=119 data-nosnippet>119</a>    </span><span class="kw">pub fn </span>push_frame(<span class="kw-2">&amp;mut </span><span class="self">self</span>, samples: <span class="kw-2">&amp;</span>[f32]) {
+<a href=#120 id=120 data-nosnippet>120</a>        <span class="kw">if </span>samples.len() != <span class="self">self</span>.channels.len() || samples.iter().any(|s| !s.is_finite()) {
+<a href=#121 id=121 data-nosnippet>121</a>            <span class="self">self</span>.valid = <span class="bool-val">false</span>;
+<a href=#122 id=122 data-nosnippet>122</a>        }
+<a href=#123 id=123 data-nosnippet>123</a>        <span class="kw">if </span>!<span class="self">self</span>.valid {
+<a href=#124 id=124 data-nosnippet>124</a>            <span class="kw">return</span>;
+<a href=#125 id=125 data-nosnippet>125</a>        }
+<a href=#126 id=126 data-nosnippet>126</a>        <span class="kw">for </span>(channel, <span class="kw-2">&amp;</span>sample) <span class="kw">in </span><span class="self">self</span>.channels.iter_mut().zip(samples) {
+<a href=#127 id=127 data-nosnippet>127</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(clicks) = <span class="kw-2">&amp;mut </span>channel.clicks {
+<a href=#128 id=128 data-nosnippet>128</a>                clicks.push(sample <span class="kw">as </span>f64, <span class="kw-2">&amp;mut </span><span class="self">self</span>.result.clicks);
+<a href=#129 id=129 data-nosnippet>129</a>            }
+<a href=#130 id=130 data-nosnippet>130</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(dropouts) = <span class="kw-2">&amp;mut </span>channel.dropouts {
+<a href=#131 id=131 data-nosnippet>131</a>                dropouts.push(sample <span class="kw">as </span>f64, <span class="kw-2">&amp;mut </span><span class="self">self</span>.result.dropouts);
+<a href=#132 id=132 data-nosnippet>132</a>            }
+<a href=#133 id=133 data-nosnippet>133</a>        }
+<a href=#134 id=134 data-nosnippet>134</a>        <span class="self">self</span>.frames += <span class="number">1</span>;
+<a href=#135 id=135 data-nosnippet>135</a>    }
+<a href=#136 id=136 data-nosnippet>136</a>
+<a href=#137 id=137 data-nosnippet>137</a>    <span class="doccomment">/// Flush candidates with full real context; never pad file boundaries
+<a href=#138 id=138 data-nosnippet>138</a>    /// with silence, which would manufacture apparent transitions.
+<a href=#139 id=139 data-nosnippet>139</a>    </span><span class="kw">pub fn </span>finish(<span class="kw-2">mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;DiscontinuityAnalysis&gt; {
+<a href=#140 id=140 data-nosnippet>140</a>        <span class="kw">if </span>!<span class="self">self</span>.valid || <span class="self">self</span>.frames &lt; <span class="self">self</span>.min_frames {
+<a href=#141 id=141 data-nosnippet>141</a>            <span class="kw">return </span><span class="prelude-val">None</span>;
+<a href=#142 id=142 data-nosnippet>142</a>        }
+<a href=#143 id=143 data-nosnippet>143</a>        <span class="kw">for </span>channel <span class="kw">in </span><span class="kw-2">&amp;mut </span><span class="self">self</span>.channels {
+<a href=#144 id=144 data-nosnippet>144</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(clicks) = <span class="kw-2">&amp;mut </span>channel.clicks {
+<a href=#145 id=145 data-nosnippet>145</a>                clicks.finish(<span class="kw-2">&amp;mut </span><span class="self">self</span>.result.clicks);
+<a href=#146 id=146 data-nosnippet>146</a>            }
+<a href=#147 id=147 data-nosnippet>147</a>        }
+<a href=#148 id=148 data-nosnippet>148</a>        <span class="prelude-val">Some</span>(<span class="self">self</span>.result)
+<a href=#149 id=149 data-nosnippet>149</a>    }
+<a href=#150 id=150 data-nosnippet>150</a>}
+<a href=#151 id=151 data-nosnippet>151</a>
+<a href=#152 id=152 data-nosnippet>152</a><span class="attr">#[cfg(test)]
+<a href=#153 id=153 data-nosnippet>153</a>#[path = <span class="string">"../../../tests/unit/analysis/discontinuities.rs"</span>]
+<a href=#154 id=154 data-nosnippet>154</a></span><span class="kw">mod </span>tests;
 </code></pre></div></section></main></body></html>
