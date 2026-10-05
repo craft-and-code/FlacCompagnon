@@ -423,6 +423,7 @@ Run the full verification from the repository root:
 
 ```sh
 cargo fmt --all --check
+npm run check:tauri
 npx tsc --noEmit
 npm run build
 npm test
@@ -435,6 +436,8 @@ RUSTDOCFLAGS="-D warnings" cargo doc --workspace --locked --no-deps
 ```
 
 With FFmpeg installed, also run `cargo test -p flaccompagnon-core --test loudness_reference --test dc_offset -- --ignored` for the independent reference comparisons. [Frontend checks](tests/README.md) describe the browser fixture and performance measurements. `npm test` discovers every `tests/*.test.mjs` suite, including state, detection display, stereo, search, table and website regressions.
+
+`npm run check:tauri` compares the resolved Rust `tauri` and JavaScript `@tauri-apps/api` major/minor versions. Run it after dependency updates and before tagging: Cargo and Vite can build successfully even when Tauri rejects their version pairing during packaging.
 
 The [security and maintenance audit](docs/maintenance-audit.md) records the 4 October 2026 fixes, measured performance improvements and remaining dependency and validation limits.
 

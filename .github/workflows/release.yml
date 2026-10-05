@@ -95,6 +95,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Check Tauri Rust/JavaScript compatibility
+        run: npm run check:tauri
+
       # Build only — the artifacts are renamed below so every download says
       # which platform it is for, then uploaded in a separate step.
       - name: Build the app
