@@ -26,7 +26,8 @@ serde_json = "1"
 flaccompagnon-core = { path = "../core" }
 flaccompagnon-services = { path = "../services" }
 # Audio output for the results table's hover-to-preview playback button.
-cpal = "0.18"
+# 0.18.2 keeps the Windows API and COM core on the same minor version.
+cpal = "0.18.2"
 # HTTP client for the tag panel's optional "Search online" lookup
 # (MusicBrainz + Discogs) — the only feature in this app that reaches the
 # network, and only ever on explicit user action (see src/lookup.rs).

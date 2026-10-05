@@ -353,7 +353,7 @@ Build the standalone command separately with `cargo build --release -p flaccompa
 
 Four GitHub Actions workflows are included:
 
-- **CI** (`.github/workflows/ci.yml`) runs on every push and pull request: it tests the entire Rust workspace, type-checks and bundles the frontend, and compiles all four crates on Linux. The badges at the top of this README reflect its status.
+- **CI** (`.github/workflows/ci.yml`) runs on every push and pull request: it tests the entire Rust workspace, type-checks and bundles the frontend, and compiles all four crates on Linux. A separate Windows job checks the whole workspace, including tests and platform-specific audio and credential-store dependencies. The badges at the top of this README reflect its status.
 - **Docs** (`.github/workflows/docs.yml`) and **Site** (`.github/workflows/site.yml`) publish, respectively, the rustdoc API reference and the static landing page to the `gh-pages` branch (see [Documentation](#documentation-rustdoc) below for the one-time Pages setup).
 - **Release** (`.github/workflows/release.yml`) builds the desktop installers and, in a separate job, standalone CLI archives for **macOS (Apple Silicon), Windows and Linux**. It publishes both to one GitHub Release when you push a version tag:
 

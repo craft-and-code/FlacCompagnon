@@ -10,6 +10,22 @@ permissions:
   contents: read
 
 jobs:
+  windows-check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      # Validate platform-specific audio and credential-store dependencies on
+      # main so Windows compilation failures are caught before tagging a release.
+      - name: Compile the whole workspace for Windows (tests included)
+        run: cargo check --workspace --all-targets --locked
+
   build-and-test:
     runs-on: ubuntu-22.04
     steps:
