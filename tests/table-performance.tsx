@@ -13,7 +13,10 @@ import "../src/shared.css";
 import "../src/App.css";
 
 const noop = () => {};
-const count = Number(new URLSearchParams(location.search).get("count")) || 2000;
+const params = new URLSearchParams(location.search);
+const count = Number(params.get("count")) || 2000;
+const width = Number(params.get("width")) || undefined;
+const extraTools = params.has("extraTools");
 const initialFiles: FileAnalysis[] = Array.from({ length: count }, (_, i) => ({
   path: `/fixture/track-${i}.flac`,
   file_name: `${String(i).padStart(5, "0")} ${i % 100 === 0 ? "Zakk Wylde" : "Other Artist"}.flac`,
@@ -36,6 +39,7 @@ function Fixture() {
   const [selected, setSelected] = useState<string[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [metrics, setMetrics] = useState("Ready");
+  const [toolbarLayout, setToolbarLayout] = useState("");
   const start = useRef(performance.now());
   const tableRef = useRef<TableScrollHandle>(null);
   const empty = useMemo(() => new Map(), []);
@@ -59,16 +63,34 @@ function Fixture() {
     });
     return () => { cancelAnimationFrame(first); cancelAnimationFrame(second); };
   }, [query, files, sort]);
-  return <div id="app" onPointerDownCapture={() => { start.current = performance.now(); }}
+  useLayoutEffect(() => {
+    const bar = document.querySelector<HTMLElement>(".topbar");
+    if (!bar) return;
+    const controls = [...bar.querySelectorAll("button, input")];
+    const observer = new ResizeObserver(() => {
+      const bounds = bar.getBoundingClientRect();
+      const rectangles = controls.map(el => el.getBoundingClientRect());
+      const centers = rectangles.map(rect => rect.top + rect.height / 2);
+      const oneRow = Math.max(...centers) - Math.min(...centers) < 1;
+      const contained = rectangles.every(rect => rect.left >= bounds.left && rect.right <= bounds.right + 1);
+      const searchWidth = bar.querySelector("input")?.getBoundingClientRect().width ?? 0;
+      setToolbarLayout(`Toolbar: ${oneRow ? "one row" : "WRAPPED"}; ${contained ? "all controls visible" : "OVERFLOW"}; width ${Math.round(bounds.width)} px; search ${Math.round(searchWidth)} px`);
+    });
+    observer.observe(bar);
+    controls.forEach(control => observer.observe(control));
+    return () => observer.disconnect();
+  }, [query]);
+  return <div id="app" style={{ width }} onPointerDownCapture={() => { start.current = performance.now(); }}
     onInputCapture={() => { start.current = performance.now(); }}>
     <TopBar busy={false} hasReport canGenerateSpectrograms={false} ffmpegAvailable={false}
       onSearchChange={setQuery} selectedCount={selected.length} onSelectAll={() => setSelected(files.map(f => f.path))}
       onDeselectAll={() => setSelected([])} onInvertSelection={noop} renumberBusy={false}
       onRenumberTracks={noop} onPick={noop} onSave={noop} onExportPlaylist={noop}
       onGenerateSpectrograms={noop} onReset={noop} onOpenConvert={noop}
-      onRefreshPresence={noop} checkingPresence={false} missingCount={0}
-      onRelocateMissing={noop} canUpdateReport={false} onUpdateReport={noop} />
+      onRefreshPresence={noop} checkingPresence={false} missingCount={extraTools ? 1 : 0}
+      onRelocateMissing={noop} canUpdateReport={extraTools} onUpdateReport={noop} />
     <p>{files.length} files; {visible?.size ?? files.length} matches; selected {selected.length}. {metrics}</p>
+    <p>{toolbarLayout}</p>
     <div><button onClick={() => tableRef.current?.scrollToPath(files[files.length - 1].path)}>Jump to last row</button>
       <button onClick={() => tableRef.current?.scrollToPath(files[0].path)}>Jump to first row</button></div>
     <ResultsTable files={files} tags={empty} covers={empty} missing={missing} filterKey={query} scrollRef={tableRef}

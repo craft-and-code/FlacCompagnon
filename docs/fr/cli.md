@@ -89,7 +89,7 @@ Un export JSON exige toujours toutes les analyses. Pour afficher les mesures com
 flaccompagnon "Music/Album" --show-results -j "Music/Album/FlacCompagnon.json"
 ```
 
-## Un rapport par album avec Aède
+## Rapports d’analyse avec Aède
 
 [Aède](https://craft-and-code.github.io/aede/) est un catalogue de bibliothèque musicale écrit en Rust. Il organise les pistes et leurs métadonnées et intègre directement le moteur FlacCompagnon. Il n’a pas besoin de lancer cet exécutable.
 
@@ -100,7 +100,7 @@ aede scan "Music"
 aede analyze "Music" --json
 ```
 
-Aède analyse les pistes cataloguées et écrit un `<album>.json` dans chaque dossier d’album, selon les regroupements de son catalogue, y compris le dossier commun des albums multidisques. Un rapport existant peut être importé avec `aede import "Music/Album/FlacCompagnon.json"`. Le README d’Aède précise les options de sa version.
+Aède analyse les pistes cataloguées et écrit un `<album>.json` par album, selon les regroupements de son catalogue, y compris les albums multidisques. Les rapports peuvent être enregistrés dans les dossiers des albums ou des groupes, selon l’option `--json-layout album|artist` choisie ; `--json` utilise les dossiers d’album par défaut. Un rapport existant peut être importé avec `aede import "Music/Album/FlacCompagnon.json"`. Le README d’Aède précise les options de sa version.
 
 ## DSD et FFmpeg
 

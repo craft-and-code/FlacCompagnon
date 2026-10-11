@@ -5,27 +5,30 @@
   gap: 12px;
   flex-wrap: wrap;
 }
-/* No `.brand` block anymore — the window's own titlebar already shows
-   "FlacCompagnon", so a second title + tagline here was a duplicate.
-   `margin-left: auto` keeps the actions flush right regardless of whether
-   `.topbar-search` is its only sibling or not. */
-.actions {
+.topbar-actions {
   display: flex;
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
+  flex: none;
+  max-width: 100%;
   margin-left: auto;
 }
 
 /* Display-only filter for the results table (see ResultsTable's
-   `visiblePaths`) — sits at the opposite end of the bar from `.actions`.
+   `visiblePaths`) — sits at the opposite end of the bar from the actions.
    `position: relative` anchors the icon and the clear button inside the
    field itself, rather than as separate elements alongside it. */
 .topbar-search {
   position: relative;
   display: flex;
   align-items: center;
-  flex: none;
+  /* Flex line packing reserves the minimum search width first, then grows
+     it into the remaining space. A 272px basis would wrap the commands
+     before the input had a chance to shrink. */
+  flex: 1 1 120px;
+  min-width: 120px;
+  max-width: 272px;
 }
 .topbar-search-icon {
   position: absolute;
@@ -36,9 +39,8 @@
   pointer-events: none;
 }
 .topbar-search input {
-  /* Matches .tag-panel's width (TagPanel.css) so the field lines up with the
-     panel that appears below it once a row is selected. */
-  width: 272px;
+  width: 100%;
+  min-width: 0;
   background: var(--bg-elev2);
   border: 1px solid var(--border);
   /* --radius-md, the button/input tier — same curve as the selection pill
@@ -47,7 +49,7 @@
      the tag panel below (same width), but that made it the odd one out
      against its actual row neighbours, which sit right next to it and are
      compared far more directly than a panel that only appears once a row is
-     selected. The width match with the tag panel still holds either way. */
+     selected. */
   border-radius: var(--radius-md);
   /* Left room for the search icon, right room for the clear button — kept
      even while it's hidden, so text doesn't shift under it once it appears. */

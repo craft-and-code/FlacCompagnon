@@ -249,7 +249,7 @@ cargo run --release -p flaccompagnon-cli -- track.flac --analysis loudness --ana
 
 The installed executable is named `flaccompagnon`. `--analysis` runs only the selected measurements and their necessary dependencies when no JSON output is requested. Combine names with commas or repeat the option. Without `--analysis`, the engine runs every analysis. JSON exports always contain every measurement; combining `--analysis` with `--json` or `--json-layout` is rejected before scanning. Use `--show-results` to display the complete analysis while exporting JSON. A standalone `-a flac-md5` check uses `flac -t` when the optional `flac` executable is on `PATH`, and the internal Rust verifier otherwise. Use `flaccompagnon --help` for the available names and scan options.
 
-[Aède](https://craft-and-code.github.io/aede/) uses this Rust engine directly through `flaccompagnon-core`. Its `aede analyze [folder…] --json` command groups tracks by album and saves one FlacCompagnon report in each album folder. Aède stores the measurements with their FlacCompagnon source attribution; it can also import an existing report with `aede import`.
+[Aède](https://craft-and-code.github.io/aede/) uses this Rust engine directly through `flaccompagnon-core`. Its `aede analyze` command can save one FlacCompagnon report per album in album or artist folders, according to the chosen `--json-layout` option. Aède stores the measurements with their FlacCompagnon source attribution; it can also import an existing report with `aede import`.
 
 ---
 
@@ -533,6 +533,7 @@ On the tagging side: **AcoustID/Chromaprint audio fingerprinting** so a track ca
 
 ## Projects using FlacCompagnon
 
+- [Aède](https://craft-and-code.github.io/aede/) is a Rust music catalog that integrates `flaccompagnon-core` to analyze tracks and save analysis reports in artist or album folders, as you choose.
 - [Audio Fake Detector PRO](https://github.com/alessandrocomito/audiofakedetectorpro) offers an alternative lossless PCM verification mode through FlacCompagnonCLI, its custom command-line frontend based on FlacCompagnon.
 
 ## References

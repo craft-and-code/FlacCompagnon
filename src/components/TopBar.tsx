@@ -229,7 +229,7 @@ export function TopBar({
           onClick={onUpdateReport}
         />
       )}
-      <div className="actions">
+      <div className="topbar-actions">
         <button className="btn" disabled={busy} onClick={onPick}>
           Add titles…
         </button>

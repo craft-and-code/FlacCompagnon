@@ -51,5 +51,17 @@ using synthetic files without reading audio or invoking the Tauri backend.
   away while editing: the editor must remain mounted with its draft intact.
 - Check drag reordering in natural order and column visibility/reordering.
 
+Toolbar wrapping regression (issue #2): open `/?count=2&width=1680&extraTools`,
+then repeat with `width=1152` and `width=950`. The fixture constrains the app
+width, including its normal side padding; `extraTools` enables both optional
+toolbar commands. At 1680px the geometry check must report `one row; all controls
+visible`, with the search at its preferred 272px width. At 1152px it must still
+report one row, with a narrower search. At 950px the commands may wrap, with
+all controls still visible and no horizontal overflow. Button padding and
+height must retain the shared `.btn` styles at every width.
+Check the search input and clear button, and cycle Auto/Light/Dark to verify the
+theme button remains accessible. At widths below the desktop minimum, the
+action group may also wrap its buttons rather than hide commands.
+
 Native file drops and audio playback require the desktop app; the fixture
 intentionally does not simulate their backend.
