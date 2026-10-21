@@ -11,6 +11,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 [[package]]
 name = "aede-audio"
 version = "0.6.1"
+source = "git+https://github.com/craft-and-code/aede?rev=d8c0f1a8c134b7366da0983367a9f063527085b7#d8c0f1a8c134b7366da0983367a9f063527085b7"
 dependencies = [
  "aede-dsp",
  "cpal",
@@ -21,6 +22,7 @@ dependencies = [
 [[package]]
 name = "aede-dsp"
 version = "0.6.1"
+source = "git+https://github.com/craft-and-code/aede?rev=d8c0f1a8c134b7366da0983367a9f063527085b7#d8c0f1a8c134b7366da0983367a9f063527085b7"
 dependencies = [
  "biquad",
  "rubato",

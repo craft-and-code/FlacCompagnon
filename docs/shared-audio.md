@@ -10,7 +10,9 @@ Pause retains the stream without consuming samples; mute preserves volume. Expli
 
 ## Development and publication
 
-This coordinated local development uses relative path dependencies. Keep `FlacCompagnon` and `aede` as sibling checkouts. Before independently publishing FlacCompagnon, publish Aède's shared crate and pin the dependency to that immutable source/version; the existing release workflow is not certified for this local-only binding. Do not copy the implementation into this repository.
+The workspace declares `aede-audio` once, pinned to public revision `d8c0f1a8c134b7366da0983367a9f063527085b7` of `https://github.com/craft-and-code/aede`. Core decoding, the native preview adapter and its test harness inherit that declaration with their required features. Cargo resolves `aede-dsp` from the same Git revision, and the lockfile records both identities. No adjacent Aède checkout or local Cargo patch is needed. The technical source tag `audio-core-d8c0f1a8` makes the commit retrievable without publishing App installers; the dependency uses the full SHA rather than the tag.
+
+Before updating this pin, publish the reviewed Aède source, update the workspace declaration and lockfile, and verify an independent checkout with `cargo metadata --locked` plus the relevant library tests. Do not copy the shared implementation into this repository. Dependency resolution alone does not certify native or cross-platform execution.
 
 ## Verification without the App
 
