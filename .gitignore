@@ -467,3 +467,6 @@ $RECYCLE.BIN/
 **/spectres/
 FlacCompagnon.csv
 output/
+
+# Build-time stable Aède source and selection.
+.audio-source/

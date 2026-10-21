@@ -34,7 +34,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  audio-source:
+    runs-on: ubuntu-22.04
+    outputs:
+      release: ${{ steps.audio.outputs.release }}
+      revision: ${{ steps.audio.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Select the latest published stable Aède release once
+        id: audio
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/audio-source.mjs --resolve
+
   docs:
+    needs: audio-source
+    env:
+      AEDE_AUDIO_RELEASE: ${{ needs.audio-source.outputs.release }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -42,6 +61,11 @@ jobs:
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Prepare the selected stable audio dependency
+        run: node scripts/audio-source.mjs
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
 

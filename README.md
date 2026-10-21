@@ -343,7 +343,9 @@ npm run tauri build
 
 The installer/app bundle is written to `target/release/bundle/`.
 
-Build the standalone command separately with `cargo build --release -p flaccompagnon-cli`. The binary is `target/release/flaccompagnon` (or `.exe` on Windows).
+Native dev/build commands automatically prepare the latest published stable Aède audio foundation before compiling. This requires network access; all platforms in a GitHub run share one selected SHA. See [shared audio preparation](docs/shared-audio.md) for source tracing and the required first stable Aède release containing the shared crates.
+
+Build the standalone command separately with `npm run build:cli`. The binary is `target/release/flaccompagnon` (or `.exe` on Windows).
 
 > **Cross-platform note:** native desktop apps are normally built **on** their target OS. Build the Windows app on Windows, the macOS app on macOS, and the Linux app on Linux. The easiest way to produce all three from one place is a CI matrix (e.g. GitHub Actions) that runs `npm run tauri build` on `windows-latest`, `macos-latest`, and `ubuntu-latest`.
 

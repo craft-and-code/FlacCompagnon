@@ -17,7 +17,26 @@ permissions:
   contents: write
 
 jobs:
+  audio-source:
+    runs-on: ubuntu-22.04
+    outputs:
+      release: ${{ steps.audio.outputs.release }}
+      revision: ${{ steps.audio.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Select the latest published stable Aède release once
+        id: audio
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/audio-source.mjs --resolve
+
   release:
+    needs: audio-source
+    env:
+      AEDE_AUDIO_RELEASE: ${{ needs.audio-source.outputs.release }}
     strategy:
       fail-fast: false
       matrix:
@@ -46,6 +65,8 @@ jobs:
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
+      - name: Prepare the selected stable audio dependency
+        run: node scripts/audio-source.mjs
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
 
@@ -121,7 +142,7 @@ jobs:
       - name: Check AppImage opens a window
         if: matrix.platform == 'ubuntu-22.04'
         env:
-          LIBGL_ALWAYS_SOFTWARE: '1'
+          LIBGL_ALWAYS_SOFTWARE: "1"
         run: xvfb-run -a dbus-run-session -- python3 scripts/appimage_smoke.py paths.json
 
       # Rename every produced installer to FlacCompagnon-App_<version>_<Platform>.<ext>
@@ -190,6 +211,9 @@ jobs:
           retention-days: 1
 
   cli:
+    needs: audio-source
+    env:
+      AEDE_AUDIO_RELEASE: ${{ needs.audio-source.outputs.release }}
     name: CLI (${{ matrix.label }})
     strategy:
       fail-fast: false
@@ -211,6 +235,11 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Prepare the selected stable audio dependency
+        run: node scripts/audio-source.mjs
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
       - name: Build the standalone CLI

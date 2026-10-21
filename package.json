@@ -16,7 +16,9 @@
     "test:search": "node --test tests/search.test.mjs",
     "test:table": "node --test tests/table-window.test.mjs",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "audio:prepare": "node scripts/audio-source.mjs",
+    "build:cli": "node scripts/audio-source.mjs && cargo build --release --locked -p flaccompagnon-cli"
   },
   "dependencies": {
     "@tauri-apps/api": "~2.12.1",

@@ -7,8 +7,8 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeDevCommand": "node scripts/audio-source.mjs && npm run dev",
+    "beforeBuildCommand": "node scripts/audio-source.mjs && npm run build"
   },
   "app": {
     "windows": [
