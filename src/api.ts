@@ -26,13 +26,10 @@ import type {
 export const analyzePaths = (targets: string[]) =>
   invoke<FolderReport>("analyze_paths", { targets });
 
-export const generateSpectrograms = (
-  targets: string[],
-  size: SpectrogramSize = "half",
-) => invoke<SpectroSummary>("generate_spectrograms", { targets, size });
+export const generateSpectrograms = (targets: string[], size: SpectrogramSize = "half") =>
+  invoke<SpectroSummary>("generate_spectrograms", { targets, size });
 
-export const syncSpectrogramSize = (size: SpectrogramSize) =>
-  emit("spectrogram://size", size);
+export const syncSpectrogramSize = (size: SpectrogramSize) => emit("spectrogram://size", size);
 
 // Report export is two separate commands (not one that always writes both)
 // so the menu bar's standalone "Export CSV"/"Export JSON" can write just one
@@ -46,15 +43,13 @@ export const saveReportJson = (dest: string, report: FolderReport) =>
   invoke<string>("save_report_json", { dest, report });
 
 // Re-imports a previously-saved JSON report (dropped onto the window).
-export const loadReport = (path: string) =>
-  invoke<FolderReport>("load_report", { path });
+export const loadReport = (path: string) => invoke<FolderReport>("load_report", { path });
 
 export const ffmpegAvailable = () => invoke<boolean>("ffmpeg_available");
 
 export const cancelTask = () => invoke("cancel_task");
 
-export const revealInFolder = (path: string) =>
-  invoke("reveal_in_folder", { path });
+export const revealInFolder = (path: string) => invoke("reveal_in_folder", { path });
 
 // Opens a folder's own contents in the OS file browser — unlike
 // `revealInFolder`, which selects a file within its *parent*. Backs the
@@ -66,8 +61,7 @@ export const openFolder = (path: string) => invoke("open_folder", { path });
 // Backs the results table's refresh button and the automatic check after a
 // saved report is reloaded — see useMissingFiles.ts for why the answer is
 // never stored in `FileAnalysis`.
-export const missingPaths = (paths: string[]) =>
-  invoke<string[]>("missing_paths", { paths });
+export const missingPaths = (paths: string[]) => invoke<string[]>("missing_paths", { paths });
 
 // Looks for each missing file by name under `root`, returning the moves it
 // found. Nothing is written — the caller repoints the listing, and the user
@@ -97,16 +91,20 @@ export const writeTagsBatch = (paths: string[], edits: TagEdits) =>
 // A plain image file (not one of the analyzed audio files) dropped onto the
 // tag panel's cover box — backs "drop an image to replace every selected
 // file's cover".
-export const readCoverImage = (path: string) =>
-  invoke<CoverArt>("read_cover_image", { path });
+export const readCoverImage = (path: string) => invoke<CoverArt>("read_cover_image", { path });
 
 // Writes a cover (already in hand as base64 — no re-read from any tag) out as
 // a plain file in `dir`, backing the tag panel's "extract cover(s)" button.
 // `pictureType` selects the base name ("cover", "back", etc.), and `index`
 // numbers additional images of that type so they do not overwrite each other.
 // Returns the path actually written.
-export const extractCoverArt = (dir: string, mime: string, dataBase64: string, pictureType: string, index: number) =>
-  invoke<string>("extract_cover_art", { dir, mime, dataBase64, pictureType, index });
+export const extractCoverArt = (
+  dir: string,
+  mime: string,
+  dataBase64: string,
+  pictureType: string,
+  index: number,
+) => invoke<string>("extract_cover_art", { dir, mime, dataBase64, pictureType, index });
 
 // The extended-tags pop-in's "+" picker: common tags this one representative
 // file's format can actually take, curated on the Rust side (lofty has no
@@ -125,12 +123,14 @@ export const stopPlayback = () => invoke("stop_playback");
 // Playback: pause the current track in place (the footer's play/pause
 // button) and resume it — unlike `stopPlayback`, which tears the stream down
 // and forgets the position, this keeps both, so resuming is instant.
-export const pausePlayback = () => invoke("pause_playback");
-export const resumePlayback = () => invoke("resume_playback");
+/** Control only the exact accepted Play request, never whichever track starts later. */
+export const pausePlayback = (requestId: number) => invoke("pause_playback", { requestId });
+export const resumePlayback = (requestId: number) => invoke("resume_playback", { requestId });
 
 // Playback: move the current track's playhead — the footer's seek bar,
 // dragged or clicked.
-export const seekPlayback = (seconds: number) => invoke("seek_playback", { seconds });
+export const seekPlayback = (requestId: number, seconds: number) =>
+  invoke("seek_playback", { requestId, seconds });
 
 // Playback: volume (0..1) and mute. Plain atomics on the Rust side (see
 // `playback::set_volume`'s doc comment), so neither can fail.
@@ -153,8 +153,7 @@ export const getDiscogsCredentialStatus = () =>
 export const saveDiscogsToken = (token: string) =>
   invoke<DiscogsCredentialStatus>("save_discogs_token", { token });
 
-export const deleteDiscogsToken = () =>
-  invoke<DiscogsCredentialStatus>("delete_discogs_token");
+export const deleteDiscogsToken = () => invoke<DiscogsCredentialStatus>("delete_discogs_token");
 
 export const migrateDiscogsToken = (token: string) =>
   invoke<DiscogsCredentialStatus>("migrate_discogs_token", { token });

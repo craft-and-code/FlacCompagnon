@@ -21,7 +21,7 @@ src-tauri/                The Tauri v2 desktop app wrapping `core` and `services
   src/commands/           One file per command domain.
   src/lookup/             Online tag lookup, one file per provider.
   src/menu.rs             Native menu bar.
-  src/playback.rs         Audio engine (owns the cpal stream on its own thread).
+  src/playback.rs         Command/event adapter over aede-audio's minimal player.
 src/                      Frontend: React + TypeScript, built by Vite.
 index.html                App shell only — see "index.html" below.
 site/                     The GitHub Pages marketing site (unrelated to the app build).

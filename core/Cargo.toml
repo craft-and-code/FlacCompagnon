@@ -13,6 +13,8 @@ name = "flaccompagnon_core"
 path = "src/lib.rs"
 
 [dependencies]
+# Playback only; no catalogue/server/account or loudness-measurement dependency.
+aede-audio = { path = "../../aede/crates/aede-audio", features = ["decode"] }
 # Multi-format audio decoding (FLAC, WAV, AIFF, ALAC/MP4, MP3, AAC, OGG/Vorbis, ...)
 symphonia = { version = "0.5", features = ["all"] }
 # FFT for spectral analysis
@@ -36,6 +38,7 @@ tempfile = "3"    # atomic report replacement beside its destination
 libc = "0.2"     # nonblocking, no-follow opens for untrusted report paths
 
 [dev-dependencies]
+aede-audio = { path = "../../aede/crates/aede-audio", features = ["output"] }
 rustfft = "6"     # synthesize truly band-limited test signals (inverse FFT)
 flacenc = "0.5"   # reference encoder for FLAC decoder tests
 hound = "3"      # independent WAV fixtures for decoder tests

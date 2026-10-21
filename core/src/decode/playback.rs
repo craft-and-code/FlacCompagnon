@@ -1,26 +1,14 @@
 //! Decoding for the preview player rather than for analysis: no analyzer, no
 //! integer reconstruction, just interleaved `f32` out.
 //!
-//! Two shapes, because the player needs both:
-//!
-//! * [`PcmStreamDecoder`] — progressive. Exposes the sample rate and channel
-//!   count from the header alone, then yields one packet at a time, so the
-//!   audio device can open and start sounding before the file has finished
-//!   decoding. This is the normal path.
-//! * [`decode_to_pcm`] — whole file in memory. Only the resampling fallback
-//!   needs this (it has to know the whole signal before it can resample it);
-//!   a typical track is well under 100 MB decoded.
+//! The progressive reader delegates to aede-audio. The whole-file helper remains
+//! for explicit conversion/analysis workflows; preview playback never uses it.
 //!
 //! DSD (`.dsf`/`.dff`) is not handled here — Symphonia cannot decode it, and
 //! callers check for it before getting this far.
 
 use std::path::Path;
 
-use symphonia::core::codecs::Decoder;
-use symphonia::core::errors::Error as SymError;
-use symphonia::core::formats::FormatReader;
-
-use super::probe::{probe, validate_decoded_spec, validate_pcm_samples, InterleavedBuf};
 use crate::AnalysisError;
 
 /// Fully-decoded PCM audio: interleaved `f32` samples in `[-1.0, 1.0]`, at the
@@ -75,73 +63,30 @@ pub fn decode_to_pcm(path: &Path) -> Result<PcmAudio, AnalysisError> {
     })
 }
 
-/// Progressive decoder: opens the file and exposes its `sample_rate` /
-/// `channels` immediately (from the container header, before decoding any
-/// audio), then hands out one packet's worth of interleaved `f32` samples at
-/// a time via [`next_chunk`](Self::next_chunk).
+/// Compatibility adapter over the shared catalogue-independent progressive reader.
+/// Analysis decoding retains its separate original-precision paths.
 pub struct PcmStreamDecoder {
-    format: Box<dyn FormatReader>,
-    decoder: Box<dyn Decoder>,
-    track_id: u32,
-    buf: InterleavedBuf,
-    /// Sample rate read from the container header, in Hz.
+    inner: aede_audio::decode::PcmStreamDecoder,
+    /// Source frames per second.
     pub sample_rate: u32,
-    /// Channel count read from the container header.
+    /// Interleaved channels per frame.
     pub channels: usize,
 }
-
 impl PcmStreamDecoder {
-    /// Open `path` and probe its header, without decoding any packets yet.
+    /// Probe a local audio file without decoding the whole track.
     pub fn open(path: &Path) -> Result<Self, AnalysisError> {
-        let probed = probe(path, true)?;
-        let sample_rate = probed.sample_rate()?;
-        let channels = probed.channels()?;
-        let decoder = probed.make_decoder()?;
+        let inner = aede_audio::decode::PcmStreamDecoder::open(path)
+            .map_err(|e| AnalysisError::Decode(e.to_string()))?;
         Ok(Self {
-            format: probed.format,
-            decoder,
-            track_id: probed.track_id,
-            buf: InterleavedBuf::default(),
-            sample_rate,
-            channels,
+            sample_rate: inner.sample_rate,
+            channels: inner.channels,
+            inner,
         })
     }
-
-    /// Decode and return the next packet's interleaved `f32` samples, or
-    /// `Ok(None)` at end of stream. A corrupt packet is skipped rather than
-    /// ending the stream early — one bad packet in the middle of a file
-    /// should cost a few milliseconds of audio, not the rest of the track.
+    /// Yield finite complete PCM packets using the shared decoder.
     pub fn next_chunk(&mut self) -> Result<Option<Vec<f32>>, AnalysisError> {
-        loop {
-            let packet = match self.format.next_packet() {
-                Ok(p) => p,
-                Err(SymError::IoError(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-                    return Ok(None)
-                }
-                Err(SymError::ResetRequired) => {
-                    return Err(AnalysisError::Decode(
-                        "stream changed during playback".into(),
-                    ));
-                }
-                Err(e) => return Err(AnalysisError::Decode(format!("packet error: {e}"))),
-            };
-            if packet.track_id() != self.track_id {
-                continue;
-            }
-
-            match self.decoder.decode(&packet) {
-                Ok(decoded) => {
-                    validate_decoded_spec(&decoded, self.sample_rate, self.channels)?;
-                    let samples = self.buf.fill(decoded);
-                    validate_pcm_samples(samples)?;
-                    return Ok(Some(samples.to_vec()));
-                }
-                Err(SymError::DecodeError(_)) => continue, // skip a corrupt packet
-                Err(SymError::IoError(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-                    return Ok(None)
-                }
-                Err(e) => return Err(AnalysisError::Decode(format!("decode error: {e}"))),
-            }
-        }
+        self.inner
+            .next_chunk()
+            .map_err(|e| AnalysisError::Decode(e.to_string()))
     }
 }

@@ -2,7 +2,7 @@
 //!
 //! Play and stop are queued before scheduling a blocking worker so a delayed
 //! play cannot arrive after a newer stop. Waiting for playback, pause, resume,
-//! or seek happens off the async runtime. Volume and mute are a pair of plain
+//! or seek happens off the async runtime after the command is queued for its exact request. Volume and mute are a pair of plain
 //! atomics the output callback reads directly (see `playback::set_volume`'s
 //! doc comment) — nothing to wait on, so those two stay synchronous.
 
@@ -34,16 +34,18 @@ pub fn stop_playback() -> Result<(), String> {
 /// button, as opposed to a row's play button (which stops outright, see
 /// `stop_playback`).
 #[tauri::command]
-pub async fn pause_playback() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(playback::pause)
+pub async fn pause_playback(request_id: u64) -> Result<(), String> {
+    let request = playback::request_pause(request_id)?;
+    tauri::async_runtime::spawn_blocking(move || request.wait())
         .await
         .map_err(|e| e.to_string())?
 }
 
 /// Resume a track paused with [`pause_playback`].
 #[tauri::command]
-pub async fn resume_playback() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(playback::resume)
+pub async fn resume_playback(request_id: u64) -> Result<(), String> {
+    let request = playback::request_resume(request_id)?;
+    tauri::async_runtime::spawn_blocking(move || request.wait())
         .await
         .map_err(|e| e.to_string())?
 }
@@ -51,8 +53,9 @@ pub async fn resume_playback() -> Result<(), String> {
 /// Move the currently playing track's playhead, in seconds from its start —
 /// the footer's seek bar, dragged or clicked.
 #[tauri::command]
-pub async fn seek_playback(seconds: f64) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || playback::seek(seconds))
+pub async fn seek_playback(request_id: u64, seconds: f64) -> Result<(), String> {
+    let request = playback::request_seek(request_id, seconds)?;
+    tauri::async_runtime::spawn_blocking(move || request.wait())
         .await
         .map_err(|e| e.to_string())?
 }

@@ -21,7 +21,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { PlaybackFinished, PlaybackPosition } from "../types";
+import type { PlaybackFinished, PlaybackPosition, PlaybackFailure } from "../types";
 import * as api from "../api";
 import { listen } from "@tauri-apps/api/event";
 import { effectiveQueue } from "./playbackQueue";
@@ -164,7 +164,9 @@ export function usePlayback(
     if (!nowPlaying) return;
     const next = !paused;
     setPaused(next);
-    const call = next ? api.pausePlayback() : api.resumePlayback();
+    const call = next
+      ? api.pausePlayback(nowPlaying.requestId)
+      : api.resumePlayback(nowPlaying.requestId);
     call.catch((e) => {
       if (current.current?.requestId !== nowPlaying.requestId) return;
       setPaused(!next); // the backend didn't actually change state — undo
@@ -176,7 +178,10 @@ export function usePlayback(
     (seconds: number) => {
       if (!nowPlaying) return;
       setPosition(seconds); // optimistic — see `position`'s doc comment
-      api.seekPlayback(seconds).catch((e) => onToast(String(e), "error"));
+      const owner = nowPlaying.requestId;
+      api.seekPlayback(owner, seconds).catch((e) => {
+        if (current.current?.requestId === owner) onToast(String(e), "error");
+      });
     },
     [nowPlaying, onToast],
   );
@@ -260,10 +265,20 @@ export function usePlayback(
     };
   }, [startTrack, setActiveQueue]);
 
+  useEffect(() => {
+    const unlisten = listen<PlaybackFailure>("playback://error", (e) => {
+      if (e.payload.request_id !== current.current?.requestId) return;
+      stop();
+      onToast(e.payload.message, "error");
+    });
+    return () => {
+      void unlisten.then((f) => f());
+    };
+  }, [stop, onToast]);
+
   // Drives the footer's seek bar while a track plays — throttled on the
   // backend (same cadence as the equalizer bars' level events), and simply
-  // stops arriving while paused, which is exactly right: the bar should hold
-  // still, not creep toward 0.
+  // stays fixed while paused: repeated snapshots must not advance the bar.
   useEffect(() => {
     const unlisten = listen<PlaybackPosition>("playback://position", (e) => {
       const playing = current.current;

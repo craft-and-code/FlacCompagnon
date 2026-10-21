@@ -404,3 +404,9 @@ export interface ConvertSummary {
   // failures would send the user looking for output that is already there.
   tag_warnings: string[];
 }
+
+/** Exact-request decode/device failure; separate from natural completion. */
+export interface PlaybackFailure {
+  request_id: number;
+  message: string;
+}
