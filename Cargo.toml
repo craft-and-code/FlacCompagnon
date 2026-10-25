@@ -16,7 +16,7 @@ authors = ["FlacCompagnon contributors"]
 
 [workspace.dependencies]
 # One immutable shared source for decode-only analysis and minimal App playback.
-aede-audio = { git = "https://github.com/craft-and-code/aede", rev = "d8c0f1a8c134b7366da0983367a9f063527085b7", default-features = false }
+aede-audio = { git = "https://github.com/craft-and-code/aede", rev = "b00c38fd2078fc2fcd03f90fb6306cf9019279f9", default-features = false }
 
 [profile.release]
 opt-level = 3
