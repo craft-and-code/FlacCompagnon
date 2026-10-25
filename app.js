@@ -26,6 +26,9 @@ function applyLang(l) {
   document.querySelectorAll("[data-doc]").forEach((el) => {
     el.href = `${docsRoot}/${lang}/${el.dataset.doc}.html`;
   });
+  document.querySelectorAll("[data-report]").forEach((el) => {
+    el.href = `${docsRoot}/../${lang === "en" ? "en/" : ""}report.html`;
+  });
   document.documentElement.lang = lang;
   $("#lang-fr").classList.toggle("on", lang === "fr");
   $("#lang-en").classList.toggle("on", lang === "en");

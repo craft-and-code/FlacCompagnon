@@ -1,0 +1,122 @@
+.report-page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 54px 24px;
+  --radius-card: 14px;
+  --radius-md: 10px;
+}
+.report-page h1 {
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: 1.2;
+}
+.report-page .lead {
+  margin-bottom: 28px;
+}
+flac-report-viewer {
+  display: block;
+  --analysis-background: var(--bg);
+  --analysis-surface: var(--card);
+  --analysis-text: var(--text);
+  --analysis-muted: var(--text-2);
+  --analysis-border: var(--border);
+  --analysis-accent: var(--link);
+  --analysis-good: var(--clean);
+  --analysis-warning: var(--upscaled);
+  --analysis-error: var(--transcoded);
+}
+.report-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 188px;
+  padding: 28px 18px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.report-drop:hover,
+.report-drop[data-dragging] {
+  border-color: var(--link);
+  background: var(--border-soft);
+}
+.report-drop strong {
+  font-size: 20px;
+}
+.report-drop > span:last-child {
+  color: var(--text-3);
+  font-size: 14px;
+}
+.report-drop-icon {
+  color: var(--link);
+  font: 32px/1 var(--mono);
+}
+.report-privacy {
+  color: var(--text-2);
+  font-size: 14px;
+  margin-top: 14px;
+}
+.report-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 22px;
+}
+.report-name {
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.report-tools button {
+  font-family: inherit;
+}
+.report-status {
+  color: var(--link);
+}
+.report-error {
+  color: var(--transcoded);
+}
+.report-status:not(:empty),
+.report-error:not(:empty) {
+  margin: 14px 0;
+}
+.report-output:not(:empty) {
+  margin-top: 24px;
+}
+.report-page [hidden] {
+  display: none;
+}
+.report-output .flac-analysis-report {
+  border-radius: var(--radius-card);
+}
+@media (max-width: 600px) {
+  .report-page {
+    padding: 32px 16px;
+  }
+  .report-drop strong {
+    font-size: 18px;
+  }
+}
+.report-page + .footer {
+  max-width: 1280px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.nav .lang a {
+  padding: 6px 11px;
+  font: 12px var(--mono);
+  color: var(--text-3);
+}
+.nav .lang a[aria-current] {
+  background: var(--accent);
+  color: var(--text);
+}
