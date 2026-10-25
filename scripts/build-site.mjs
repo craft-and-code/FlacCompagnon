@@ -4,6 +4,7 @@ import { pages, baseUrl } from "./site/catalog.mjs";
 import { renderMarkdown } from "./site/markdown.mjs";
 import { guidePage, articleList } from "./site/template.mjs";
 import { DICT } from "../site/copy.js";
+import { reportPage } from "./site/report-page.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const output = resolve(root, "dist-site");
@@ -101,7 +102,9 @@ const englishLocalizedHome = localizeHome(homeSource, "en").replace(
 await writeFile(resolve(output, "index.html"), frenchHome);
 await mkdir(resolve(output, "en"), { recursive: true });
 await writeFile(resolve(output, "en", "index.html"), englishHome(englishLocalizedHome));
-const urls = [baseUrl, `${baseUrl}en/`];
+await writeFile(resolve(output, "report.html"), reportPage("fr"));
+await writeFile(resolve(output, "en", "report.html"), reportPage("en"));
+const urls = [baseUrl, `${baseUrl}en/`, `${baseUrl}report.html`, `${baseUrl}en/report.html`];
 for (const lang of ["fr", "en"]) {
   const dir = resolve(output, "docs", lang);
   await mkdir(dir, { recursive: true });

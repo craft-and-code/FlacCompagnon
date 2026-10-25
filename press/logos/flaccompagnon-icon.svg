@@ -1,0 +1,11 @@
+<svg role="img" aria-labelledby="title" xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title id="title">FlacCompagnon — application icon</title>
+  <defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#222a27"/><stop offset="1" stop-color="#101413"/></linearGradient>
+    <radialGradient id="light" cx=".25" cy=".15" r=".85"><stop stop-color="#d8f36a" stop-opacity=".08"/><stop offset="1" stop-color="#d8f36a" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect x="48" y="48" width="928" height="928" rx="216" fill="url(#surface)"/>
+  <rect x="48" y="48" width="928" height="928" rx="216" fill="url(#light)" stroke="#e1eadc" stroke-opacity=".12" stroke-width="3"/>
+  <path fill="#f1f0eb" transform="matrix(1.12948405 0 0 -1.12948405 367 762)" d="M52.70000 261.64000 L52.70000 0.00000 L140.74000 0.00000 L140.74000 261.64000 L201.50000 261.64000 L201.50000 320.54000 L140.74000 320.54000 L140.74000 339.76000 Q140.74000 359.60000 148.49000 367.97000 Q156.24000 376.34000 174.22000 376.34000 Q190.96000 376.34000 206.46000 374.48000 L206.46000 440.20000 Q195.30000 440.82000 183.52000 441.75000 Q171.74000 442.68000 159.96000 442.68000 Q106.02000 442.68000 79.36000 415.40000 Q52.70000 388.12000 52.70000 345.34000 L52.70000 320.54000 L0.00000 320.54000 L0.00000 261.64000 Z"/>
+  <circle cx="613" cy="718" r="44" fill="#d8f36a"/>
+</svg>

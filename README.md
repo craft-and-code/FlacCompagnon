@@ -6,6 +6,8 @@
 
 **A cross-platform desktop tool that checks whether your "lossless" audio is actually lossless.**
 
+[Press assets and approved logo](press/README.md).
+
 > [!NOTE]
 > **Transcoding detection.** My sincere thanks to Olivier Derrien for agreeing to release his original MATLAB implementation of the transcoding detector as open source: [craft-and-code/lac-transcoded](https://github.com/craft-and-code/lac-transcoded). It has been fully reimplemented in Rust and integrated into FlacCompagnon. In current comparisons, FlacCompagnon identifies the files reported as transcoded by Lossless Audio Checker, as well as additional candidates. The two implementations are not identical, however, and their remaining differences and calibration are being reviewed with Olivier. A transcoding result is statistical evidence, not proof of a file's origin.
 >
