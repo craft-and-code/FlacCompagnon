@@ -1,0 +1,80 @@
+<!doctype html><html lang="en"><head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>PNG spectrograms — FlacCompagnon Docs</title>
+    <meta name="description" content="Native Rust rendering, dimensions, palettes and level interpretation."/>
+    <meta name="robots" content="index,follow"/>
+    <meta name="theme-color" content="#0d0e13"/>
+    <link rel="canonical" href="https://craft-and-code.github.io/FlacCompagnon/docs/en/spectrograms.html"/>
+    <link rel="alternate" hreflang="fr" href="https://craft-and-code.github.io/FlacCompagnon/docs/fr/spectrograms.html"/><link rel="alternate" hreflang="en" href="https://craft-and-code.github.io/FlacCompagnon/docs/en/spectrograms.html"/>
+    <link rel="alternate" hreflang="x-default" href="https://craft-and-code.github.io/FlacCompagnon/docs/en/spectrograms.html"/>
+    <meta property="og:type" content="article"/>
+    <meta property="og:url" content="https://craft-and-code.github.io/FlacCompagnon/docs/en/spectrograms.html"/>
+    <meta property="og:site_name" content="FlacCompagnon"/>
+    <meta property="og:title" content="PNG spectrograms — FlacCompagnon"/>
+    <meta property="og:description" content="Native Rust rendering, dimensions, palettes and level interpretation."/>
+    <meta property="og:image" content="https://craft-and-code.github.io/FlacCompagnon/assets/og-image.png"/>
+    <meta property="og:image:alt" content="FlacCompagnon audio analysis tool"/>
+    <meta property="og:locale" content="en_US"/>
+    <meta property="og:locale:alternate" content="fr_FR"/>
+    <meta name="twitter:card" content="summary_large_image"/>
+    <meta name="twitter:title" content="PNG spectrograms — FlacCompagnon"/>
+    <meta name="twitter:description" content="Native Rust rendering, dimensions, palettes and level interpretation."/>
+    <meta name="twitter:image" content="https://craft-and-code.github.io/FlacCompagnon/assets/og-image.png"/>
+    <meta name="twitter:image:alt" content="FlacCompagnon audio analysis tool"/>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"FlacCompagnon","item":"https://craft-and-code.github.io/FlacCompagnon/"},{"@type":"ListItem","position":2,"name":"Documentation","item":"https://craft-and-code.github.io/FlacCompagnon/docs/en/index.html"},{"@type":"ListItem","position":3,"name":"PNG spectrograms"}]}</script>
+    <link rel="icon" href="../../assets/favicon.ico"/>
+    <link rel="stylesheet" href="../../styles.css"/>
+    <link rel="stylesheet" href="../../directory.css"/>
+    <link rel="stylesheet" href="../../guide.css"/>
+    <script src="../../guide.js" type="module"></script>
+  </head><body class="guide-body"><a class="skip-link" href="#content">Skip to content</a><header class="nav guide-header"><a class="brand" href="../../"><img src="../../assets/logo.svg" alt="" width="28" height="28"/><span>FlacCompagnon</span></a><a class="guide-header-label" href="user-guide.html">Docs</a><div class="nav-right"><a class="guide-rustdoc" href="https://craft-and-code.github.io/FlacCompagnon/doc/" target="_blank" rel="noopener">Rustdoc ↗</a><nav class="lang" aria-label="Language"><a href="../en/spectrograms.html" lang="en" hreflang="en" data-language="en" aria-current="page">EN</a><a href="../fr/spectrograms.html" lang="fr" hreflang="fr" data-language="fr" >FR</a></nav></div></header><div class="guide-layout"><aside class="guide-sidebar"><nav class="guide-nav" aria-label="Documentation"><details class="guide-nav-section" data-guide-nav-section="user-guide"><summary class="guide-nav-section-title">User guide<span aria-hidden="true"></span></summary><ul><li><a href="user-guide.html" >User guide</a></li></ul></details><details class="guide-nav-section" data-guide-nav-section="analyses" open><summary class="guide-nav-section-title">Analyses<span aria-hidden="true"></span></summary><a class="guide-overview" href="index.html" >Overview</a><div class="guide-nav-group"><h2>Authenticity &amp; spectrum</h2><ul><li><a href="spectrograms.html" aria-current="page">PNG spectrograms</a></li><li><a href="upscaling.html" >Real bit depth</a></li><li><a href="upsampling.html" >Upsampling</a></li><li><a href="transcoding.html" >AAC / MP3 transcoding</a></li><li><a href="spectral-cutoff.html" >Spectral cutoff</a></li></ul></div><div class="guide-nav-group"><h2>Stereo &amp; phase</h2><ul><li><a href="fake-stereo.html" >Dual mono</a></li><li><a href="stereo-polarity.html" >Global polarity</a></li><li><a href="local-phase.html" >Local &amp; band phase</a></li><li><a href="stereo-balance.html" >Stereo balance</a></li><li><a href="high-frequency-stereo.html" >HF Stereo</a></li></ul></div><div class="guide-nav-group"><h2>Levels &amp; dynamics</h2><ul><li><a href="dc-offset.html" >DC offset</a></li><li><a href="clipping.html" >Clipping</a></li><li><a href="true-peak.html" >True peak</a></li><li><a href="dynamic-range.html" >Dynamics (DR)</a></li></ul></div><div class="guide-nav-group"><h2>Loudness</h2><ul><li><a href="integrated-loudness.html" >Integrated LUFS</a></li><li><a href="momentary-loudness.html" >LUFS-M max</a></li><li><a href="short-term-loudness.html" >LUFS-S max</a></li><li><a href="loudness-range.html" >Loudness Range (LRA)</a></li></ul></div><div class="guide-nav-group"><h2>Integrity &amp; discontinuities</h2><ul><li><a href="impulses.html" >Impulses</a></li><li><a href="dropouts.html" >Dropouts</a></li><li><a href="flac-md5.html" >FLAC MD5 signature</a></li><li><a href="fingerprints.html" >MD5 &amp; CRC32 fingerprints</a></li></ul></div><div class="guide-nav-group"><h2>DSD sources</h2><ul><li><a href="dsd-pcm-source.html" >PCM source in DSD</a></li><li><a href="dsd-heritage.html" >DSD heritage in PCM</a></li></ul></div></details><details class="guide-nav-section" data-guide-nav-section="cli"><summary class="guide-nav-section-title">Command line<span aria-hidden="true"></span></summary><ul><li><a href="cli.html" >Using the CLI</a></li></ul></details><div class="guide-api-block"><a class="guide-api" href="https://craft-and-code.github.io/FlacCompagnon/doc/" target="_blank" rel="noopener">Rustdoc · API Rust ↗</a></div></nav></aside><main id="content" class="guide-main"><p class="kicker">Authenticity &amp; spectrum</p><h1>PNG spectrograms</h1><p class="guide-intro">Native Rust rendering, dimensions, palettes and level interpretation.</p><div class="guide-prose"><p>Select <strong>Generate spectrograms</strong> to create one PNG per track in a <code>spectrograms/</code>
+folder beside the audio. The source files are opened read-only. Successful PNGs
+replace previous images atomically; errors and cancellation preserve them.</p>
+<p>The complete calculation, image composition, text and PNG encoding run in Rust.
+There is no Python process or external renderer. <strong>FFmpeg is only needed to
+decode DSD (<code>.dsf</code>/<code>.dff</code>) content</strong>, including for spectrograms; ordinary PCM and
+supported compressed formats use the native decoders already used by analysis.</p>
+<h2 id="size-and-color">Size and color<a class="heading-link" href="#size-and-color" aria-label="Size and color">#</a></h2><p>The <strong>Spectrograms</strong> menu contains <strong>Size</strong> and <strong>Color</strong> submenus:</p>
+<ul>
+<li><strong>Standard (1200 × 627)</strong> is the default. The height rounds 1200 × 470 / 900.</li>
+<li><strong>Large (1800 × 940)</strong> retains the existing detailed plot.</li>
+<li><strong>Green</strong> is the shared default for FlacCompagnon and Aède. <strong>Blue</strong>, <strong>Amber</strong>
+and <strong>Violet</strong> are other monochrome ramps with the same fixed level scale.</li>
+</ul>
+<p>Choices survive restarts. Selecting a menu item changes the preference; it does
+not generate or overwrite images until <strong>Generate spectrograms</strong> is selected.
+Existing <code>half</code> preferences now select Standard; <code>full</code> still selects Large.</p>
+<p>The dimensions above describe the spectral area. With the default frame the
+complete PNG measures 1448 × 903 or 2048 × 1216. PNG encoding is lossless.</p>
+<h2 id="reading-the-image">Reading the image<a class="heading-link" href="#reading-the-image" aria-label="Reading the image">#</a></h2><p>Time runs horizontally, frequency vertically up to the decoded Nyquist limit.
+The right-hand color bar maps −120…0 dBFS/bin from dark to light. Colors describe
+level; they do not represent detection categories or channels. No automatic
+per-track gain changes that mapping.</p>
+<p>The application signature appears at the top right, title/artist at the bottom
+left, and actual decoded sample rate, available bit depth and Mono/Stereo/channel
+count at the bottom right. Missing titles use the file stem. Unknown bit depth
+is not guessed. DSD is explicitly labeled as a decoded PCM view.</p>
+<p>Each channel is transformed before powers are combined, avoiding cancellation
+of opposite-polarity content. A Hann-windowed FFT with 87.5% overlap is the
+default. Pixel reduction retains peaks, including brief events. The footer and
+PNG metadata record settings. Read the <a href="https://github.com/craft-and-code/FlacCompagnon/tree/main/spectrogram#readme">crate contract</a>
+for amplitude normalization and the time/frequency resolution limits.</p>
+<p>A spectral boundary can come from filtering, recording conditions or an
+encoder. It is not a proof of lossy provenance. The renderer supports optional
+measured cutoff/time markers; the app does not draw a guessed cutoff line.</p>
+<h2 id="reuse-and-verification">Reuse and verification<a class="heading-link" href="#reuse-and-verification" aria-label="Reuse and verification">#</a></h2><p><code>flaccompagnon-spectrogram</code> has no app, Tauri, decoder or filesystem dependency.
+<code>flaccompagnon-core::spectrogram</code> re-exports it and supplies the read-only file
+adapter. Aède uses this same tagged crate through its existing core dependency.
+The host chooses the signature, labels, colors, dimensions and annotations.</p>
+<p>For a reproducible render through the desktop application&#39;s Rust service:</p>
+<pre><code class="language-sh">cargo run -p flaccompagnon-services --example spectrogram -- input.flac output.png green
+cargo run -p flaccompagnon-services --example spectrogram -- input.flac output.png blue 1800 940
+</code></pre>
+<p>DSD examples additionally need <code>FLACCOMPAGNON_FFMPEG</code> set to the decoder path.
+Native application generation resolves it automatically for DSD only.</p>
+<pre><code class="language-sh">cargo test -p flaccompagnon-spectrogram
+cargo test -p flaccompagnon-core spectrogram
+cargo test -p flaccompagnon --lib spectrogram
+</code></pre>
+</div><nav class="guide-neighbors" aria-label="Adjacent pages"><span></span><a href="upscaling.html"><small>Next →</small>Real bit depth</a></nav><div class="guide-api-note"><p>Integrating the engine in your software?</p><a class="btn btn-outline" href="https://craft-and-code.github.io/FlacCompagnon/doc/" target="_blank" rel="noopener">Browse the Rust API in Rustdoc ↗</a></div></main><aside class="guide-toc"><p>On this page</p><a href="#size-and-color">Size and color</a><a href="#reading-the-image">Reading the image</a><a href="#reuse-and-verification">Reuse and verification</a></aside></div><footer class="footer"><span>FlacCompagnon · App MIT · Core MPL-2.0 · Rust + Tauri</span><span class="ft-links"><a href="../../">Home</a><a href="https://github.com/craft-and-code/FlacCompagnon">GitHub</a><a href="https://craft-and-code.github.io/aede/" target="_blank" rel="noopener">Aède</a></span></footer></body></html>
