@@ -362,14 +362,15 @@ jobs:
           (Alternatively: right-click the app → **Open** → **Open**, or allow it
           from **System Settings → Privacy & Security**.)
 
-          **ffmpeg** is **not** bundled — install it separately for spectrograms
-          and DSD content analysis (macOS: `brew install ffmpeg`,
+          PNG spectrograms are generated entirely in Rust. **ffmpeg** is **not**
+          bundled and is only needed to decode DSD content (macOS: `brew install ffmpeg`,
           Debian/Ubuntu: `sudo apt install ffmpeg`, Windows: `choco install ffmpeg`).
 
           **Licenses.** The desktop application, CLI and services are MIT. The
-          reusable `flaccompagnon-core` analysis engine included in the app and
-          CLI is MPL-2.0. Its corresponding source and license are available at
-          https://github.com/craft-and-code/FlacCompagnon/tree/${{ github.ref_name }}/core.
+          reusable `flaccompagnon-core` analysis engine and `flaccompagnon-spectrogram`
+          PNG renderer are MPL-2.0. Its corresponding source and license are available at
+          https://github.com/craft-and-code/FlacCompagnon/tree/${{ github.ref_name }}/core
+          and https://github.com/craft-and-code/FlacCompagnon/tree/${{ github.ref_name }}/spectrogram.
           EOF
 
       - name: Publish the draft release

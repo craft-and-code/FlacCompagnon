@@ -8,10 +8,9 @@
 use std::path::Path;
 
 use symphonia::core::audio::AudioBufferRef;
-use symphonia::core::errors::Error as SymError;
 
 use super::container::{codec_label, format_label};
-use super::probe::{probe, validate_decoded_spec, validate_pcm_samples, InterleavedBuf};
+use super::probe::{probe, validate_pcm_samples, InterleavedBuf};
 use super::{validate_decoded_frames, DecodeOutcome};
 use crate::analysis::analyzer::StreamAnalyzer;
 use crate::AnalysisError;
@@ -40,8 +39,6 @@ pub(crate) fn decode_and_analyze_selected(
         .n_frames
         .map(|n| n as f64 / sample_rate as f64)
         .unwrap_or(0.0);
-    let track_id = probed.track_id;
-    let mut decoder = probed.make_decoder()?;
 
     // Symphonia integer conversion aligns samples to 32 bits. Restore the
     // declared width without a float round-trip, which erases low bits >24.
@@ -53,56 +50,34 @@ pub(crate) fn decode_and_analyze_selected(
     let mut buf = InterleavedBuf::<f32>::default();
     let mut int_buf = InterleavedBuf::<i32>::default();
     let mut int_packet: Vec<i32> = Vec::new();
-    let mut frame_count: u64 = 0;
     let mut saw_integer = false;
 
-    loop {
-        let packet = match probed.format.next_packet() {
-            Ok(p) => p,
-            Err(SymError::IoError(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
-            Err(SymError::ResetRequired) => {
-                return Err(AnalysisError::Decode(
-                    "stream changed during analysis".into(),
-                ));
-            }
-            Err(e) => return Err(AnalysisError::Decode(format!("packet error: {e}"))),
-        };
-        if packet.track_id() != track_id {
-            continue;
+    let frame_count = probed.visit_decoded(&|| false, &mut |decoded| {
+        // Float sources carry no meaningful integer bit depth.
+        let is_int = !matches!(&decoded, AudioBufferRef::F32(_) | AudioBufferRef::F64(_));
+        if is_int && declared_bits.is_some() && int_shift.is_none() {
+            return Err(AnalysisError::Decode("invalid integer sample width".into()));
         }
 
-        match decoder.decode(&packet) {
-            Ok(decoded) => {
-                validate_decoded_spec(&decoded, sample_rate, channels)?;
-                // Float sources carry no meaningful integer bit depth.
-                let is_int = !matches!(&decoded, AudioBufferRef::F32(_) | AudioBufferRef::F64(_));
-                if is_int && declared_bits.is_some() && int_shift.is_none() {
-                    return Err(AnalysisError::Decode("invalid integer sample width".into()));
-                }
-
-                // Reconstruct native integers for the whole packet, once, into
-                // a buffer reused across packets rather than a fresh Vec each
-                // time (this runs per packet for the length of the file).
-                int_packet.clear();
-                if let (true, Some(shift)) = (is_int && selection.bit_depth(), int_shift) {
-                    int_packet.extend(int_buf.fill(decoded.clone()).iter().map(|&s| s >> shift));
-                }
-                let f32_samples = buf.fill(decoded);
-                if !is_int {
-                    validate_pcm_samples(f32_samples)?;
-                }
-                saw_integer |= is_int;
-
-                let n_frames = f32_samples.len() / channels;
-                let mut int_frames = int_packet.chunks_exact(channels);
-                for frame in f32_samples.chunks_exact(channels) {
-                    analyzer.push_frame(frame, int_frames.next());
-                }
-                frame_count += n_frames as u64;
-            }
-            Err(e) => return Err(AnalysisError::Decode(format!("decode error: {e}"))),
+        // Reconstruct native integers for the whole packet, once, into
+        // a buffer reused across packets rather than a fresh Vec each
+        // time (this runs per packet for the length of the file).
+        int_packet.clear();
+        if let (true, Some(shift)) = (is_int && selection.bit_depth(), int_shift) {
+            int_packet.extend(int_buf.fill(decoded.clone()).iter().map(|&s| s >> shift));
         }
-    }
+        let f32_samples = buf.fill(decoded);
+        if !is_int {
+            validate_pcm_samples(f32_samples)?;
+        }
+        saw_integer |= is_int;
+
+        let mut int_frames = int_packet.chunks_exact(channels);
+        for frame in f32_samples.chunks_exact(channels) {
+            analyzer.push_frame(frame, int_frames.next());
+        }
+        Ok(())
+    })?;
 
     // A corrupt or truncated tail may hold the only non-zero low bit.
     // Integer formats have exact frame counts; lossy duration hints may

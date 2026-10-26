@@ -63,7 +63,7 @@ The **MD5** column only appears when the analysis actually includes FLAC files, 
 
 ### 4. Spectrogram generation
 
-Click **Generate spectrograms** to render a spectrogram image for every track using **ffmpeg** installed on your system (resolved automatically at runtime — see prerequisites). The default **Small Size** uses a 900 × 470 spectrum canvas; **Large Size** in the **Spectrograms** menu uses 1800 × 940. The PNG is larger than the canvas because ffmpeg adds a legend. The menu only saves the preferred size; generation starts when you click the button. For each folder that contains audio, a `spectrograms/` sub-folder is created next to the files, and one PNG is written per track. The image includes a labelled **frequency axis** (its top equals Nyquist = sample-rate ÷ 2) and a caption spelling out the **sample rate**, bit depth, channel count, and format — so the cutoff and the sampling are visible at a glance.
+Click **Generate spectrograms** to render a lossless PNG per track entirely in Rust. **Spectrograms → Size** offers a **1200 × 627** standard plot (default) or **1800 × 940**; margins hold the time/frequency axes, level color bar, title/artist, audio properties and FlacCompagnon signature. **Spectrograms → Color** chooses **Green** (shared with Aède), **Blue**, **Amber** or **Violet**, remembered across restarts. Images are written atomically in `spectrograms/` beside the audio. The reusable `flaccompagnon-spectrogram` crate owns computation and rendering; there is no Python, system-font or FFmpeg renderer. Only DSD content still needs FFmpeg decoding. See the [spectrogram guide](docs/spectrograms.md) and [reusable crate API](spectrogram/README.md).
 
 ### 5. Audio quality, channel and restoration checks
 
@@ -209,7 +209,7 @@ flowchart LR
     end
 
     save["Save…<br/>CSV + JSON"]
-    spectro["Spectrograms<br/>▸ system ffmpeg ▸ spectrograms/"]
+    spectro["Spectrograms<br/>▸ native Rust PNG ▸ spectrograms/"]
     m3u["Export playlist…<br/>M3U / Extended M3U"]
 
     subgraph tagging["Tag panel — the only writer"]
@@ -236,6 +236,7 @@ flowchart LR
 The project is a Cargo workspace with four crates:
 
 - **`core/`** — the reusable Rust analysis engine and the CSV/JSON report format, with no Tauri dependency.
+- **`spectrogram/`** — reusable streaming STFT and lossless PNG rendering (MPL-2.0), shared with Aède.
 - **`services/`** — tag editing, conversion, playlists, and file relocation used by the desktop app.
 - **`cli/`** — the standalone `flaccompagnon` command.
 - **`src-tauri/`** — the Tauri desktop app that wraps the engine and services.
@@ -300,12 +301,12 @@ All cut-off-based detection assumes genuine music has energy up near Nyquist. Ac
 - **autoconf, automake and libtool** — build-time only, for the Opus encoder. The `audiopus_sys` crate compiles a vendored libopus with the autotools, so `autoreconf` has to be on `PATH` or the build stops at "Failed to autogen Opus". Most Linux setups already have them; macOS does not:
   - macOS: `brew install autoconf automake libtool`
   - Debian/Ubuntu: `sudo apt install autoconf automake libtool`
-- **ffmpeg** — only needed for the spectrogram feature. Install it with your package manager:
+- **ffmpeg** — optional, only for decoding DSD content for analysis and spectrograms. Install it with your package manager:
   - macOS: `brew install ffmpeg`
   - Debian/Ubuntu: `sudo apt install ffmpeg`
   - Windows: `choco install ffmpeg` (or download from ffmpeg.org and add it to `PATH`)
 
-`ffmpeg` is located automatically at runtime (it checks `PATH` plus common install locations such as Homebrew's `/opt/homebrew/bin`). If it lives somewhere unusual, point the app at it with the `FLACCOMPAGNON_FFMPEG` environment variable. Analysis, MD5 verification, and reports do **not** require ffmpeg for FLAC/WAV/AIFF/ALAC/CAF/OGG/MP3/AAC — only spectrogram rendering does. **DSD (`.dsf`/`.dff`) is the one exception**: its container header is always verified natively, but the content-level checks (dynamic range, clipping, cutoff, and the real-DSD-vs-PCM-sourced authenticity check) need ffmpeg to decode the 1-bit stream. Without it, a DSD file only gets header verification and its quality badge is marked "(unverified)".
+`ffmpeg` is located automatically at runtime (it checks `PATH` plus common install locations such as Homebrew's `/opt/homebrew/bin`). If it lives somewhere unusual, point the app at it with the `FLACCOMPAGNON_FFMPEG` environment variable. Analysis, MD5 verification, reports and native PNG spectrograms do **not** require ffmpeg for FLAC/WAV/AIFF/ALAC/CAF/OGG/MP3/AAC. **DSD (`.dsf`/`.dff`) is the one exception**: its container header is always verified natively, but the content-level checks (dynamic range, clipping, cutoff, and the real-DSD-vs-PCM-sourced authenticity check) need ffmpeg to decode the 1-bit stream. Without it, a DSD file only gets header verification and its quality badge is marked "(unverified)".
 
 **Optional, for the online tag lookup:** a free [Discogs personal access token](https://www.discogs.com/settings/developers) if you want Discogs results alongside MusicBrainz. Save it from the search pop-in to the system credential store. Linux needs an available, unlocked Secret Service provider, such as the desktop's password manager. The OS may request permission to access its store. MusicBrainz needs no key, and the whole feature is optional — the app works fully offline without it.
 
@@ -368,7 +369,7 @@ Four GitHub Actions workflows are included:
 
 Before tagging, commit the intended release with matching versions in `Cargo.toml` (`workspace.package.version`), `src-tauri/tauri.conf.json`, `package.json` and `package-lock.json`. The tag starts both the desktop and CLI builds; pushing to the main branch separately triggers the Site workflow.
 
-(or from the Actions tab via "Run workflow"). The release is created as a **draft** — review the attached installers, then publish it. Your downloads then live on the repository's **Releases** page. ffmpeg is not bundled; users install it themselves for the spectrogram feature.
+(or from the Actions tab via "Run workflow"). The release is created as a **draft** — review the attached installers, then publish it. Your downloads then live on the repository's **Releases** page. ffmpeg is not bundled; users only need it for DSD content decoding.
 
 **Every release asset names its product first**, so the graphical application and the command-line archive are distinct before the platform suffix:
 

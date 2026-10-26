@@ -5,11 +5,11 @@
 # `cli`       -> standalone analysis command
 # `src-tauri` -> the Tauri desktop application that wraps `core`
 [workspace]
-members = ["core", "services", "cli", "src-tauri"]
+members = ["core", "services", "spectrogram", "cli", "src-tauri"]
 resolver = "2"
 
 [workspace.package]
-version = "0.9.6"
+version = "0.10.0"
 edition = "2021"
 license = "MIT"
 authors = ["FlacCompagnon contributors"]
@@ -31,4 +31,6 @@ strip = true
 [profile.dev.package.flaccompagnon-core]
 opt-level = 3
 [profile.dev.package.rustfft]
+opt-level = 3
+[profile.dev.package.flaccompagnon-spectrogram]
 opt-level = 3

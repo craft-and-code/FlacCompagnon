@@ -60,6 +60,10 @@ Choisissez le format voulu, puis les options proposées pour ce format. Pour les
 
 Quand la liste et les réglages vous conviennent, sélectionnez **Convert** et choisissez le dossier de destination. FlacCompagnon laisse la liste d’analyse intacte : convertir n’efface ni ne remplace les originaux. Choisissez un dossier vide pour une nouvelle conversion : les fichiers existants sont conservés, les noms de sortie en doublon sont refusés et les liens symboliques ne permettent pas de sortir du dossier de destination. **Also copy other files** conserve également les sorties existantes et évite de recopier le dossier de sortie lorsqu’il se trouve dans le dossier source.
 
+## Générer des spectrogrammes PNG
+
+**Generate spectrograms** produit des PNG en Rust. **Spectrograms → Size** propose **Standard (1200 × 627)** et **Large (1800 × 940)**. **Color** offre **Green** (défaut), **Blue**, **Amber** et **Violet**. Ces choix sont mémorisés ; le bouton démarre la génération. FFmpeg sert uniquement au décodage DSD. Consultez [Spectrogrammes PNG natifs](spectrograms.md).
+
 ## Écouter une piste
 
 La barre inférieure est le lecteur. Cliquez sur le bouton lecture d’une ligne, ou sélectionnez des pistes puis utilisez le bouton principal de la barre.

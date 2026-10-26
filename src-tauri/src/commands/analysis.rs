@@ -12,7 +12,6 @@ use super::batch::{
     cancelled, display_root, gather_targets, parallel_map_ordered, reset_cancel, Progress,
 };
 use super::file_name;
-use crate::spectrogram;
 
 /// Analyze the dropped/selected `targets` — any mix of audio files and folders —
 /// and return the structured result. No files are written; use the commands in
@@ -22,14 +21,16 @@ pub async fn analyze_paths(app: AppHandle, targets: Vec<String>) -> Result<Folde
     if targets.is_empty() {
         return Err("Nothing to analyze.".to_string());
     }
-    let opts = ScanOptions {
-        // ffmpeg (when present) enables DSD content analysis.
-        ffmpeg: spectrogram::resolve_ffmpeg(),
-        ..ScanOptions::default()
-    };
+    let mut opts = ScanOptions::default();
     let paths = gather_targets(&targets, opts.recursive);
     if paths.is_empty() {
         return Err("No supported audio files found.".to_string());
+    }
+    if paths
+        .iter()
+        .any(|path| core::spectrogram::requires_dsd_decoder(path))
+    {
+        opts.ffmpeg = crate::ffmpeg::resolve_ffmpeg();
     }
     let total = paths.len();
     let root_str = display_root(&targets);
@@ -75,14 +76,4 @@ pub async fn analyze_paths(app: AppHandle, targets: Vec<String>) -> Result<Folde
         },
     );
     Ok(report)
-}
-
-/// Whether a usable `ffmpeg` is present on the system (gates the spectrogram UI
-/// and DSD content analysis).
-#[tauri::command]
-pub async fn ffmpeg_available() -> bool {
-    // Probing launches external processes; keep it off the async command executor.
-    tauri::async_runtime::spawn_blocking(|| spectrogram::resolve_ffmpeg().is_some())
-        .await
-        .unwrap_or(false)
 }

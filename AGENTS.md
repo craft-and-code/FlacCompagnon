@@ -13,7 +13,8 @@ A cross-platform desktop app (Rust + Tauri v2) that detects fake "lossless" audi
 core/                     Pure Rust analysis library. No Tauri dependency, fully unit-testable.
   src/decode/             One module per decode path (generic, FLAC+MD5, DSD, playback).
   src/dsd/                DSD container parsing + the spectral heuristics, kept apart.
-services/                 Tag editing, conversion, playlists, and relocation.
+spectrogram/              Streaming spectral engine + native PNG renderer; no app or decoder dependency.
+services/                 Tag editing, conversion, playlists, relocation, and tagged PNG composition.
   src/tags/               Tag read/write; cover art in its own file.
 cli/                      Standalone `flaccompagnon` analysis executable.
 src-tauri/                The Tauri v2 desktop app wrapping `core` and `services`.

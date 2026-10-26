@@ -13,6 +13,7 @@ name = "flaccompagnon_core"
 path = "src/lib.rs"
 
 [dependencies]
+flaccompagnon-spectrogram = { path = "../spectrogram" }
 # Playback only; no catalogue/server/account or loudness-measurement dependency.
 aede-audio = { workspace = true, features = ["decode"] }
 # Multi-format audio decoding (FLAC, WAV, AIFF, ALAC/MP4, MP3, AAC, OGG/Vorbis, ...)

@@ -14,3 +14,6 @@ pub mod tags;
 /// Shared read-only decoder used by conversion.
 pub use flaccompagnon_core::decode;
 pub use relocate::{match_moved_files, Relocation};
+
+/// Native PNG spectrogram composition with optional track metadata.
+pub mod spectrogram;

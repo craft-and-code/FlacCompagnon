@@ -60,6 +60,10 @@ Choose the output format, then the options available for it. Lossy formats expos
 
 When the list and settings are right, select **Convert** and choose a destination folder. FlacCompagnon leaves the analysis list intact: conversion does not erase or replace the originals. Choose an empty folder for a new conversion: existing output files are preserved, duplicate output names are rejected and symbolic links cannot redirect output outside the chosen folder. **Also copy other files** also preserves existing outputs and skips the output folder when it is inside the source folder.
 
+## Generate PNG spectrograms
+
+Select **Generate spectrograms** for native Rust PNGs. In **Spectrograms → Size**, choose **Standard (1200 × 627)** or **Large (1800 × 940)**. **Color** offers **Green** (default), **Blue**, **Amber** and **Violet**. Choices survive restarts; generation starts with the button. FFmpeg is only needed for DSD decoding. See [Native PNG spectrograms](spectrograms.md).
+
 ## Listen to a track
 
 The bottom bar is the player. Click a row’s play button, or select tracks and use the main button in the bar.

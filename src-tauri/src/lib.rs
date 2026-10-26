@@ -39,6 +39,7 @@
 
 mod commands;
 mod credentials;
+mod ffmpeg;
 mod lookup;
 mod menu;
 mod playback;
@@ -58,7 +59,6 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::analysis::analyze_paths,
-            commands::analysis::ffmpeg_available,
             commands::batch::cancel_task,
             commands::convert::convert_files,
             commands::convert::list_convert_sources,

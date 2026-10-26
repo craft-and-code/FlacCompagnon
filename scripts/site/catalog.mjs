@@ -10,6 +10,14 @@ export const groups = [
 
 const entries = [
   [
+    "spectrograms",
+    "authenticity",
+    "Spectrogrammes PNG",
+    "PNG spectrograms",
+    "Rendu Rust natif, dimensions, palettes et lecture des niveaux.",
+    "Native Rust rendering, dimensions, palettes and level interpretation.",
+  ],
+  [
     "upscaling",
     "authenticity",
     "Profondeur réelle",

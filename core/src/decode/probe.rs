@@ -72,6 +72,51 @@ pub(super) fn probe(path: &Path, gapless: bool) -> Result<ProbedTrack, AnalysisE
 }
 
 impl ProbedTrack {
+    // The strict analysis and spectrogram paths share packet selection, reset
+    // handling and format validation; playback has its own recovery policy.
+    pub(super) fn visit_decoded(
+        &mut self,
+        cancelled: &dyn Fn() -> bool,
+        sink: &mut dyn FnMut(AudioBufferRef<'_>) -> Result<(), AnalysisError>,
+    ) -> Result<u64, AnalysisError> {
+        use symphonia::core::errors::Error as SymError;
+        let sample_rate = self.sample_rate()?;
+        let channels = self.channels()?;
+        let mut decoder = self.make_decoder()?;
+        let mut frames = 0_u64;
+        loop {
+            if cancelled() {
+                return Err(AnalysisError::Decode("cancelled".into()));
+            }
+            let packet = match self.format.next_packet() {
+                Ok(packet) => packet,
+                Err(SymError::IoError(error))
+                    if error.kind() == std::io::ErrorKind::UnexpectedEof =>
+                {
+                    break
+                }
+                Err(SymError::ResetRequired) => {
+                    return Err(AnalysisError::Decode(
+                        "stream changed during analysis".into(),
+                    ))
+                }
+                Err(error) => return Err(AnalysisError::Decode(format!("packet error: {error}"))),
+            };
+            if packet.track_id() != self.track_id {
+                continue;
+            }
+            let decoded = decoder
+                .decode(&packet)
+                .map_err(|e| AnalysisError::Decode(format!("decode error: {e}")))?;
+            validate_decoded_spec(&decoded, sample_rate, channels)?;
+            frames = frames
+                .checked_add(decoded.frames() as u64)
+                .ok_or_else(|| AnalysisError::Decode("audio frame count overflow".into()))?;
+            sink(decoded)?;
+        }
+        Ok(frames)
+    }
+
     pub(super) fn sample_rate(&self) -> Result<u32, AnalysisError> {
         self.params
             .sample_rate

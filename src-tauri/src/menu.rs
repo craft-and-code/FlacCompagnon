@@ -13,8 +13,10 @@
 //! alongside the app-specific ones; some are no-ops on Linux where the
 //! underlying toolkit doesn't support them, which is harmless.
 
-use tauri::menu::{CheckMenuItem, MenuBuilder, SubmenuBuilder};
-use tauri::{Emitter, Listener};
+mod spectrogram;
+
+use tauri::menu::{MenuBuilder, SubmenuBuilder};
+use tauri::Emitter;
 
 #[cfg(target_os = "macos")]
 use tauri::menu::AboutMetadata;
@@ -28,8 +30,6 @@ const APP_ACTIONS: &[&str] = &[
     "export_csv",
     "export_json",
     "reset",
-    "spectrogram_size_small",
-    "spectrogram_size_full",
 ];
 
 /// Build and install the menu bar, and wire its events.
@@ -44,30 +44,7 @@ pub fn build(app: &tauri::App) -> tauri::Result<()> {
         .text("export_json", "JSON")
         .build()?;
 
-    // Keep the two sizes together so the default is visible and the full-size
-    // variant is discoverable without adding a second top-level File action.
-    // They are check items rather than plain labels so the active choice is
-    // visible in the native menu; the event handler below keeps them mutually
-    // exclusive after either one is clicked.
-    let spectrograms_small = CheckMenuItem::with_id(
-        handle,
-        "spectrogram_size_small",
-        "Small Size",
-        true,
-        true,
-        None::<&str>,
-    )?;
-    let spectrograms_full = CheckMenuItem::with_id(
-        handle,
-        "spectrogram_size_full",
-        "Large Size",
-        true,
-        false,
-        None::<&str>,
-    )?;
-    let spectrograms_menu = SubmenuBuilder::new(handle, "Spectrograms")
-        .items(&[&spectrograms_small, &spectrograms_full])
-        .build()?;
+    let spectrograms_menu = spectrogram::build(app)?;
 
     // Quit lives in the macOS app menu below on that platform (the standard
     // place for it); everywhere else, without that menu, File is where it
@@ -130,34 +107,10 @@ pub fn build(app: &tauri::App) -> tauri::Result<()> {
         .build()?;
     app.set_menu(menu)?;
 
-    // The frontend owns persisted preferences. It sends the saved value back
-    // after startup so a previous choice is reflected in the native checkmark
-    // before the user opens the menu.
-    let small_for_sync = spectrograms_small.clone();
-    let full_for_sync = spectrograms_full.clone();
-    app.listen("spectrogram://size", move |event| match event.payload() {
-        "half" => {
-            let _ = small_for_sync.set_checked(true);
-            let _ = full_for_sync.set_checked(false);
-        }
-        "full" => {
-            let _ = small_for_sync.set_checked(false);
-            let _ = full_for_sync.set_checked(true);
-        }
-        _ => {}
-    });
-
     let app_handle = app.handle().clone();
     app.on_menu_event(move |_app, event| {
         let id = event.id().as_ref();
-        if APP_ACTIONS.contains(&id) {
-            if id == "spectrogram_size_small" {
-                let _ = spectrograms_small.set_checked(true);
-                let _ = spectrograms_full.set_checked(false);
-            } else if id == "spectrogram_size_full" {
-                let _ = spectrograms_small.set_checked(false);
-                let _ = spectrograms_full.set_checked(true);
-            }
+        if APP_ACTIONS.contains(&id) || spectrogram::is_action(id) {
             let _ = app_handle.emit("menu://action", id);
         }
     });

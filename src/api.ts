@@ -18,6 +18,7 @@ import type {
   RenameResult,
   SpectroSummary,
   SpectrogramSize,
+  SpectrogramColor,
   TagEdits,
   TagReadResult,
   TagWriteSummary,
@@ -26,10 +27,14 @@ import type {
 export const analyzePaths = (targets: string[]) =>
   invoke<FolderReport>("analyze_paths", { targets });
 
-export const generateSpectrograms = (targets: string[], size: SpectrogramSize = "half") =>
-  invoke<SpectroSummary>("generate_spectrograms", { targets, size });
+export const generateSpectrograms = (
+  targets: string[],
+  size: SpectrogramSize = "half",
+  color: SpectrogramColor = "green",
+) => invoke<SpectroSummary>("generate_spectrograms", { targets, size, color });
 
 export const syncSpectrogramSize = (size: SpectrogramSize) => emit("spectrogram://size", size);
+export const syncSpectrogramColor = (color: SpectrogramColor) => emit("spectrogram://color", color);
 
 // Report export is two separate commands (not one that always writes both)
 // so the menu bar's standalone "Export CSV"/"Export JSON" can write just one
@@ -44,8 +49,6 @@ export const saveReportJson = (dest: string, report: FolderReport) =>
 
 // Re-imports a previously-saved JSON report (dropped onto the window).
 export const loadReport = (path: string) => invoke<FolderReport>("load_report", { path });
-
-export const ffmpegAvailable = () => invoke<boolean>("ffmpeg_available");
 
 export const cancelTask = () => invoke("cancel_task");
 

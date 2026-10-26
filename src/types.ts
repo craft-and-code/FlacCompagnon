@@ -187,6 +187,7 @@ export interface SpectroSummary {
 }
 
 export type SpectrogramSize = "half" | "full";
+export type SpectrogramColor = "green" | "blue" | "amber" | "violet";
 
 export type Theme = "auto" | "light" | "dark";
 

@@ -7,7 +7,6 @@
 
 use std::path::{Path, PathBuf};
 
-use flaccompagnon_core as core;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
@@ -24,13 +23,6 @@ pub struct SpectroSummary {
     spectrogram_dirs: Vec<String>,
     errors: Vec<String>,
 }
-
-/// Shown when ffmpeg is missing. Long on purpose: this is the one dependency
-/// the app cannot bundle, and "not found" alone leaves the user stuck.
-const NO_FFMPEG: &str = "ffmpeg was not found on your system. Install it and try again \
-     (macOS: `brew install ffmpeg`, Debian/Ubuntu: `sudo apt install ffmpeg`, \
-     Windows: `choco install ffmpeg`). You can also set the FLACCOMPAGNON_FFMPEG \
-     environment variable to its full path.";
 
 // This generated directory is chosen by the app, not by a destination picker.
 // A pre-existing link must not redirect output into another folder.
@@ -56,14 +48,11 @@ pub async fn generate_spectrograms(
     app: AppHandle,
     targets: Vec<String>,
     size: Option<crate::spectrogram::SpectrogramSize>,
+    color: Option<crate::spectrogram::SpectrogramColor>,
 ) -> Result<SpectroSummary, String> {
     if targets.is_empty() {
         return Err("Nothing to render.".to_string());
     }
-
-    // Resolve ffmpeg before doing anything else, so a missing install fails
-    // immediately rather than once per file.
-    let ffmpeg = spectrogram::resolve_ffmpeg().ok_or_else(|| NO_FFMPEG.to_string())?;
 
     let paths = gather_targets(&targets, true);
     if paths.is_empty() {
@@ -71,6 +60,7 @@ pub async fn generate_spectrograms(
     }
     let total = paths.len();
     let size = size.unwrap_or_default();
+    let color = color.unwrap_or_default();
 
     reset_cancel();
     let app_bg = app.clone();
@@ -107,9 +97,7 @@ pub async fn generate_spectrograms(
 
             let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("track");
             let out = spectrogram_dir.join(format!("{stem}.png"));
-            let info = core::probe_info(p).ok();
-
-            match spectrogram::render(&ffmpeg, p, &out, info.as_ref(), size) {
+            match spectrogram::render(p, &out, size, color, &cancelled) {
                 Ok(()) => rendered += 1,
                 Err(e) => errors.push(format!("{}: {e}", file_name(p))),
             }

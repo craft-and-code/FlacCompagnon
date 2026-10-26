@@ -2,8 +2,8 @@
 //!
 //! Symphonia has no DSD decoder, and demodulating a 1-bit sigma-delta stream
 //! to PCM properly is a filter design problem in its own right — so this shells
-//! out to the ffmpeg the user already has (the same one the spectrogram
-//! feature needs). No shell is involved: arguments go through `Command::arg`,
+//! out to the ffmpeg the user already has. Spectrograms share only this optional
+//! DSD decoder; their spectral calculation and PNG rendering are native Rust. No shell is involved: arguments go through `Command::arg`,
 //! never a command line.
 
 use std::io::Read;
@@ -48,11 +48,42 @@ pub(crate) fn decode_and_analyze_dsd_selected(
     decoded_rate: u32,
     selection: crate::AnalysisSelection,
 ) -> Result<DecodeOutcome, AnalysisError> {
-    if !(1..=8).contains(&channels) || decoded_rate == 0 {
-        return Err(AnalysisError::Decode(
-            "DSD: invalid stream parameters".into(),
-        ));
-    }
+    validate_parameters(channels, decoded_rate)?;
+    let mut analyzer = StreamAnalyzer::new_selected(channels, decoded_rate, selection);
+    let frame_count = visit_dsd_pcm(
+        ffmpeg,
+        path,
+        channels,
+        decoded_rate,
+        &mut |frame| {
+            analyzer.push_frame(frame, None);
+            Ok(())
+        },
+        &|| false,
+    )?;
+
+    Ok(DecodeOutcome {
+        format: "DSD".to_string(),
+        codec: None, // container already says everything this field would
+        sample_rate: decoded_rate,
+        channels,
+        declared_bits: None, // 1-bit stream; PCM bit depth does not apply
+        duration_secs: frame_count as f64 / decoded_rate.max(1) as f64,
+        analyzer,
+    })
+}
+
+/// Stream finite decoded DSD PCM frames through the existing optional FFmpeg decoder.
+/// Dropping or cancelling the visitor kills and reaps the child process.
+pub fn visit_dsd_pcm(
+    ffmpeg: &str,
+    path: &Path,
+    channels: usize,
+    decoded_rate: u32,
+    sink: &mut dyn FnMut(&[f32]) -> Result<(), AnalysisError>,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<u64, AnalysisError> {
+    validate_parameters(channels, decoded_rate)?;
 
     let mut child = DecodeProcess(
         local_ffmpeg_command(ffmpeg)
@@ -74,8 +105,7 @@ pub(crate) fn decode_and_analyze_dsd_selected(
         .take()
         .ok_or_else(|| AnalysisError::Decode("ffmpeg produced no output pipe".into()))?;
 
-    let (analyzer, frame_count) =
-        analyze_pcm_output(&mut stdout, channels, decoded_rate, selection)?;
+    let frame_count = visit_pcm_output(&mut stdout, channels, sink, cancelled)?;
 
     let status = child
         .0
@@ -87,15 +117,7 @@ pub(crate) fn decode_and_analyze_dsd_selected(
         ));
     }
 
-    Ok(DecodeOutcome {
-        format: "DSD".to_string(),
-        codec: None, // container already says everything this field would
-        sample_rate: decoded_rate,
-        channels,
-        declared_bits: None, // 1-bit stream; PCM bit depth does not apply
-        duration_secs: frame_count as f64 / decoded_rate.max(1) as f64,
-        analyzer,
-    })
+    Ok(frame_count)
 }
 
 // Dropping std::process::Child does not stop or reap it. Read/validation errors
@@ -109,13 +131,12 @@ impl Drop for DecodeProcess {
     }
 }
 
-fn analyze_pcm_output(
+fn visit_pcm_output(
     stdout: &mut impl Read,
     channels: usize,
-    decoded_rate: u32,
-    selection: crate::AnalysisSelection,
-) -> Result<(StreamAnalyzer, u64), AnalysisError> {
-    let mut analyzer = StreamAnalyzer::new_selected(channels, decoded_rate, selection);
+    sink: &mut dyn FnMut(&[f32]) -> Result<(), AnalysisError>,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<u64, AnalysisError> {
     let mut carry: Vec<u8> = Vec::new();
     let mut buf = vec![0u8; PIPE_CHUNK];
     let mut frame = vec![0f32; channels];
@@ -123,6 +144,9 @@ fn analyze_pcm_output(
     let mut frame_count: u64 = 0;
 
     loop {
+        if cancelled() {
+            return Err(AnalysisError::Decode("cancelled".into()));
+        }
         let n = stdout
             .read(&mut buf)
             .map_err(|e| AnalysisError::Decode(format!("ffmpeg read failed: {e}")))?;
@@ -139,7 +163,7 @@ fn analyze_pcm_output(
                 *s = f32::from_le_bytes([chunk[o], chunk[o + 1], chunk[o + 2], chunk[o + 3]]);
             }
             validate_pcm_samples(&frame)?;
-            analyzer.push_frame(&frame, None);
+            sink(&frame)?;
             frame_count += 1;
         }
         carry.drain(..whole);
@@ -148,7 +172,36 @@ fn analyze_pcm_output(
     if !carry.is_empty() {
         return Err(AnalysisError::Decode("incomplete FFmpeg PCM frame".into()));
     }
-    Ok((analyzer, frame_count))
+    Ok(frame_count)
+}
+
+fn validate_parameters(channels: usize, decoded_rate: u32) -> Result<(), AnalysisError> {
+    if !(1..=8).contains(&channels) || decoded_rate == 0 {
+        return Err(AnalysisError::Decode(
+            "DSD: invalid stream parameters".into(),
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+fn analyze_pcm_output(
+    stdout: &mut impl Read,
+    channels: usize,
+    decoded_rate: u32,
+    selection: crate::AnalysisSelection,
+) -> Result<(StreamAnalyzer, u64), AnalysisError> {
+    let mut analyzer = StreamAnalyzer::new_selected(channels, decoded_rate, selection);
+    let frames = visit_pcm_output(
+        stdout,
+        channels,
+        &mut |frame| {
+            analyzer.push_frame(frame, None);
+            Ok(())
+        },
+        &|| false,
+    )?;
+    Ok((analyzer, frames))
 }
 
 #[cfg(test)]

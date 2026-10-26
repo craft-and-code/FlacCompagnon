@@ -8,7 +8,7 @@ const { outputFiles } = await build({
     contents: `export { ALL_COLUMNS } from "./src/components/resultColumns";
       export { sortFiles } from "./src/components/tableSort";
       export { reconcile } from "./src/components/useColumnPrefs";
-      export { SPECTROGRAM_SIZE_STORAGE_KEY, readSpectrogramSize, writeSpectrogramSize } from "./src/components/useSpectrogramSize";
+      export { SPECTROGRAM_SIZE_STORAGE_KEY, readSpectrogramSize, writeSpectrogramSize, readSpectrogramColor } from "./src/components/useSpectrogramSettings";
       export { LookupModal } from "./src/components/LookupModal";
       export { createElement } from "react";
       export { renderToStaticMarkup } from "react-dom/server";`,
@@ -26,6 +26,7 @@ const {
   reconcile,
   SPECTROGRAM_SIZE_STORAGE_KEY,
   readSpectrogramSize,
+  readSpectrogramColor,
   writeSpectrogramSize,
   LookupModal,
   createElement,
@@ -95,6 +96,11 @@ test("spectrogram size accepts only supported values and persists the menu choic
   const writes = [];
   writeSpectrogramSize({ setItem: (key, value) => writes.push([key, value]) }, "full");
   assert.deepEqual(writes, [[SPECTROGRAM_SIZE_STORAGE_KEY, "full"]]);
+});
+
+test("spectrogram colors accept the four palettes and default to green", () => {
+  for (const color of ["green", "blue", "amber", "violet"]) assert.equal(readSpectrogramColor(color), color);
+  for (const value of [null, "", "rainbow", "GREEN"]) assert.equal(readSpectrogramColor(value), "green");
 });
 
 test("loudness maxima are inserted after LUFS even with existing preferences, then stay movable", () => {

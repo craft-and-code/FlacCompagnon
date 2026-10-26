@@ -41,37 +41,24 @@ use crate::AnalysisError;
 pub fn decode_flac_to_pcm(path: &Path) -> Result<crate::decode::PcmAudio, AnalysisError> {
     let mut reader = open_flac(path)?;
     let info = reader.streaminfo();
-    let (sample_rate, channels, bits) = (
+    let (sample_rate, channels, _bits) = (
         info.sample_rate,
         info.channels as usize,
         info.bits_per_sample,
     );
-    let scale = 1.0f32 / (1u64 << (bits - 1)) as f32;
-
     let mut samples: Vec<f32> = Vec::new();
     if let Some(total) = info.samples {
         reserve_pcm_hint(&mut samples, total, channels)?;
     }
 
-    let mut blocks = reader.blocks();
-    let mut buffer: Vec<i32> = Vec::new();
-    let mut frame_count = 0;
-    loop {
-        let block = match blocks.read_next_or_eof(buffer) {
-            Ok(Some(b)) => b,
-            Ok(None) => break,
-            Err(e) => return Err(AnalysisError::Decode(format!("flac decode error: {e}"))),
-        };
-        validate_block_channels(&block, channels)?;
-        for t in 0..block.duration() as usize {
-            for c in 0..channels {
-                samples.push(block_sample(&block, c, t)? as f32 * scale);
-            }
-        }
-        frame_count += u64::from(block.duration());
-        buffer = block.into_buffer();
-    }
-    validate_decoded_frames(frame_count, info.samples)?;
+    super::pcm::visit_flac_reader(
+        &mut reader,
+        &mut |packet| {
+            samples.extend_from_slice(packet);
+            Ok(())
+        },
+        &|| false,
+    )?;
     Ok(crate::decode::PcmAudio {
         samples,
         sample_rate,
@@ -152,7 +139,7 @@ pub fn flac_md5_signature(path: &Path) -> Result<FlacMd5Status, AnalysisError> {
     })
 }
 
-fn open_flac(path: &Path) -> Result<claxon::FlacReader<std::fs::File>, AnalysisError> {
+pub(super) fn open_flac(path: &Path) -> Result<claxon::FlacReader<std::fs::File>, AnalysisError> {
     let reader = claxon::FlacReader::open(path)
         .map_err(|e| AnalysisError::Decode(format!("flac open failed: {e}")))?;
     let info = reader.streaminfo();
@@ -266,7 +253,7 @@ fn decode_flac(
     })
 }
 
-fn validate_block_channels(
+pub(super) fn validate_block_channels(
     block: &claxon::frame::Block,
     channels: usize,
 ) -> Result<(), AnalysisError> {
@@ -278,7 +265,7 @@ fn validate_block_channels(
     Ok(())
 }
 
-fn block_sample(
+pub(super) fn block_sample(
     block: &claxon::frame::Block,
     channel: usize,
     frame: usize,

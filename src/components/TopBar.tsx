@@ -24,9 +24,6 @@ export interface TopBarProps {
   busy: boolean;
   hasReport: boolean;
   canGenerateSpectrograms: boolean;
-  /// ffmpeg wasn't found — the spectrogram button explains why it's disabled
-  /// rather than looking broken.
-  ffmpegAvailable: boolean;
   /// Filters which rows the table *renders* — see ResultsTable's
   /// `visiblePaths`. Matches everything a row displays (format, bit depth,
   /// detections, tags, ...), not just the file name — see `fileSearchFields`. Never
@@ -77,7 +74,6 @@ export function TopBar({
   busy,
   hasReport,
   canGenerateSpectrograms,
-  ffmpegAvailable,
   onSearchChange,
   selectedCount,
   onSelectAll,
@@ -238,12 +234,8 @@ export function TopBar({
         </button>
         <button
           className="btn btn-secondary"
-          disabled={busy || !canGenerateSpectrograms || !ffmpegAvailable}
-          title={
-            ffmpegAvailable
-              ? ""
-              : "ffmpeg was not found on your system — install it to enable spectrograms"
-          }
+          disabled={busy || !canGenerateSpectrograms}
+          title="Generate lossless PNG spectrograms"
           onClick={onGenerateSpectrograms}
         >
           Generate spectrograms

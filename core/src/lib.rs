@@ -86,6 +86,7 @@ pub mod pipeline;
 pub mod report;
 pub mod scan;
 pub mod selection;
+pub mod spectrogram;
 pub mod transcode;
 pub mod types;
 

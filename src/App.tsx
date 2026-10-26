@@ -34,11 +34,8 @@ import { useExports } from "./components/useExports";
 import { useNativeDrop } from "./components/useNativeDrop";
 import { usePlayback } from "./components/usePlayback";
 import { usePlaybackQueue } from "./components/usePlaybackQueue";
-import {
-  useSelection,
-  type SelectionModifiers,
-} from "./components/useSelection";
-import { useSpectrogramSize } from "./components/useSpectrogramSize";
+import { useSelection, type SelectionModifiers } from "./components/useSelection";
+import { useSpectrogramSettings } from "./components/useSpectrogramSettings";
 import { useRenameFile } from "./components/useRenameFile";
 import { useRenumberTracks } from "./components/useRenumberTracks";
 import { useGlobalShortcut } from "./components/useGlobalShortcut";
@@ -49,9 +46,7 @@ import "./App.css";
 
 // These panels are absent from the initial screen; load their code and CSS
 // only when needed, without delaying window reveal or native event listeners.
-const TagPanel = lazy(() =>
-  import("./components/TagPanel").then((m) => ({ default: m.TagPanel })),
-);
+const TagPanel = lazy(() => import("./components/TagPanel").then((m) => ({ default: m.TagPanel })));
 const ConvertPanel = lazy(() =>
   import("./components/ConvertPanel").then((m) => ({ default: m.ConvertPanel })),
 );
@@ -64,7 +59,6 @@ export function App() {
   const discogsCredential = useDiscogsCredential((message) => showToast(message, "error"));
   const tagPanelRef = useRef<TagPanelHandle>(null);
   const resultsTableRef = useRef<TableScrollHandle>(null);
-  const [ffmpegAvailable, setFfmpegAvailable] = useState(false);
   const [playlistModalOpen, setPlaylistModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [renumberConfirmOpen, setRenumberConfirmOpen] = useState(false);
@@ -72,7 +66,7 @@ export function App() {
   // "click twice on the name" rename. `null` for every row rendering its
   // plain name cell as usual.
   const [editingPath, setEditingPath] = useState<string | null>(null);
-  const spectrogram = useSpectrogramSize();
+  const spectrogram = useSpectrogramSettings();
 
   const cache = useTagCache();
   const { clear: clearCache, invalidate, retain: retainCache } = cache;
@@ -108,7 +102,6 @@ export function App() {
     onReappeared: cache.invalidate,
     onToast: showToast,
   });
-
 
   // Search box in the top bar: a pure display filter over the table. The
   // selection, drag-reorder and every export read from
@@ -172,7 +165,11 @@ export function App() {
   const relocateMissing = useCallback(async () => {
     const missing = [...presence.missing];
     if (missing.length === 0) return;
-    const root = await open({ directory: true, multiple: false, title: "Where did these files move to?" });
+    const root = await open({
+      directory: true,
+      multiple: false,
+      title: "Where did these files move to?",
+    });
     if (typeof root !== "string") return;
     try {
       const moves = await api.relocatePaths(missing, root);
@@ -280,17 +277,14 @@ export function App() {
   // the row's identity (its path) is about to change under the tag panel —
   // same discard risk as actually reselecting, so it goes through the same
   // guard.
-  const guardedStartRename = useCallback(
-    (path: string) => {
-      const run = () => setEditingPath(path);
-      if (tagPanelRef.current?.isDirty()) {
-        setPendingAction(() => run);
-        return;
-      }
-      run();
-    },
-    [],
-  );
+  const guardedStartRename = useCallback((path: string) => {
+    const run = () => setEditingPath(path);
+    if (tagPanelRef.current?.isDirty()) {
+      setPendingAction(() => run);
+      return;
+    }
+    run();
+  }, []);
   const cancelRename = useCallback(() => setEditingPath(null), []);
   const confirmPendingAction = useCallback(() => {
     if (pendingAction) {
@@ -392,13 +386,6 @@ export function App() {
   useRevealWindow();
   useSuppressContextMenu();
 
-  useEffect(() => {
-    api
-      .ffmpegAvailable()
-      .then(setFfmpegAvailable)
-      .catch(() => setFfmpegAvailable(false));
-  }, []);
-
   const menuActions = useMemo(
     () => ({
       exportM3u: () => void exports.exportPlaylist("Simple"),
@@ -411,8 +398,9 @@ export function App() {
         setSearchQuery("");
       },
       setSpectrogramSize: spectrogram.setSize,
+      setSpectrogramColor: spectrogram.setColor,
     }),
-    [exports, analysis, playback, spectrogram.setSize],
+    [exports, analysis, playback, spectrogram.setSize, spectrogram.setColor],
   );
   useMenuActions(menuActions, !appBusy);
 
@@ -515,8 +503,7 @@ export function App() {
     [exports],
   );
 
-  const hasResults =
-    analysis.report != null && analysis.orderedFiles.length > 0;
+  const hasResults = analysis.report != null && analysis.orderedFiles.length > 0;
   // Memoized, not just computed: this array feeds the tag panel's derived
   // state (distinct covers, extended rows), and a fresh identity on every
   // render would keep resetting the cover carousel to the first image.
@@ -588,7 +575,6 @@ export function App() {
         busy={appBusy}
         hasReport={hasResults}
         canGenerateSpectrograms={analysis.targets.length > 0}
-        ffmpegAvailable={ffmpegAvailable}
         onSearchChange={setSearchQuery}
         selectedCount={selection.selectedPaths.length}
         onSelectAll={guardedSelectAll}
@@ -599,7 +585,9 @@ export function App() {
         onPick={() => void pickFolder()}
         onSave={() => void exports.saveReport()}
         onExportPlaylist={() => setPlaylistModalOpen(true)}
-        onGenerateSpectrograms={() => void analysis.generateSpectrograms(spectrogram.size)}
+        onGenerateSpectrograms={() =>
+          void analysis.generateSpectrograms(spectrogram.size, spectrogram.color)
+        }
         onReset={menuActions.reset}
         onOpenConvert={convert.togglePanel}
         onRefreshPresence={() => void presence.refresh()}
@@ -628,68 +616,60 @@ export function App() {
         )}
 
         <div className="main-col">
-          {!hasResults && !analysis.busy && (
-            <Dropzone dragOver={drop.overList} />
-          )}
+          {!hasResults && !analysis.busy && <Dropzone dragOver={drop.overList} />}
 
-          {hasResults &&
-            (!analysis.busy || analysis.keepResultsWhileBusy) &&
-            analysis.report && (
-              <section className="results">
-                <ResultsSummary
-                  report={analysis.report}
-                  rootPath={commonDir(analysis.report.files.map((f) => f.path))}
-                  selectedCount={selection.selectedPaths.length}
-                  visibleCount={visiblePaths == null ? null : visiblePaths.size}
-                  missing={presence.missing}
-                  onToast={showToast}
-                />
-                <ResultsTable
-                  scrollRef={resultsTableRef}
-                  filterKey={searchQuery}
-                  files={analysis.orderedFiles}
-                  covers={cache.covers}
-                  tags={cache.tags}
-                  nowPlaying={playback.nowPlaying}
-                  selectedPaths={selection.selectedPaths}
-                  displayedFiles={displayedFiles}
-                  sort={sort}
-                  onSortChange={onSortChange}
-                  editingPath={editingPath}
-                  renameBusy={renameBusy}
-                  missing={presence.missing}
-                  onSelectRow={guardedSelectRow}
-                  onStartRename={guardedStartRename}
-                  onCancelRename={cancelRename}
-                  onSubmitRename={submitRename}
-                  onReorder={analysis.setDisplayOrder}
-                  onReveal={(p) =>
-                    api
-                      .revealInFolder(p)
-                      .catch((e) => showToast(String(e), "error"))
-                  }
-                  onTogglePlay={playback.togglePlay}
-                  onDelete={deleteRow}
-                />
-                <Footer
-                  files={analysis.orderedFiles}
-                  selectedPaths={selection.selectedPaths}
-                  nowPlaying={playback.nowPlaying}
-                  paused={playback.paused}
-                  position={playback.position}
-                  volume={playback.volume}
-                  muted={playback.muted}
-                  canGoPrevious={playbackQueue.canGoPrevious}
-                  canGoNext={playbackQueue.canGoNext}
-                  onPrevious={playbackQueue.onPrevious}
-                  onTogglePause={playbackQueue.onPlayPause}
-                  onNext={playbackQueue.onNext}
-                  onSeek={playback.seek}
-                  onToggleMute={playback.toggleMute}
-                  onVolumeChange={playback.setVolume}
-                />
-              </section>
-            )}
+          {hasResults && (!analysis.busy || analysis.keepResultsWhileBusy) && analysis.report && (
+            <section className="results">
+              <ResultsSummary
+                report={analysis.report}
+                rootPath={commonDir(analysis.report.files.map((f) => f.path))}
+                selectedCount={selection.selectedPaths.length}
+                visibleCount={visiblePaths == null ? null : visiblePaths.size}
+                missing={presence.missing}
+                onToast={showToast}
+              />
+              <ResultsTable
+                scrollRef={resultsTableRef}
+                filterKey={searchQuery}
+                files={analysis.orderedFiles}
+                covers={cache.covers}
+                tags={cache.tags}
+                nowPlaying={playback.nowPlaying}
+                selectedPaths={selection.selectedPaths}
+                displayedFiles={displayedFiles}
+                sort={sort}
+                onSortChange={onSortChange}
+                editingPath={editingPath}
+                renameBusy={renameBusy}
+                missing={presence.missing}
+                onSelectRow={guardedSelectRow}
+                onStartRename={guardedStartRename}
+                onCancelRename={cancelRename}
+                onSubmitRename={submitRename}
+                onReorder={analysis.setDisplayOrder}
+                onReveal={(p) => api.revealInFolder(p).catch((e) => showToast(String(e), "error"))}
+                onTogglePlay={playback.togglePlay}
+                onDelete={deleteRow}
+              />
+              <Footer
+                files={analysis.orderedFiles}
+                selectedPaths={selection.selectedPaths}
+                nowPlaying={playback.nowPlaying}
+                paused={playback.paused}
+                position={playback.position}
+                volume={playback.volume}
+                muted={playback.muted}
+                canGoPrevious={playbackQueue.canGoPrevious}
+                canGoNext={playbackQueue.canGoNext}
+                onPrevious={playbackQueue.onPrevious}
+                onTogglePause={playbackQueue.onPlayPause}
+                onNext={playbackQueue.onNext}
+                onSeek={playback.seek}
+                onToggleMute={playback.toggleMute}
+                onVolumeChange={playback.setVolume}
+              />
+            </section>
+          )}
 
           {analysis.busy && (
             <Progress
@@ -752,13 +732,15 @@ export function App() {
         />
       )}
 
-      {playlistModalOpen && <DeferredPanel>
-        <PlaylistFormatModal
-          open={playlistModalOpen}
-          onClose={() => setPlaylistModalOpen(false)}
-          onConfirm={onPlaylistConfirm}
-        />
-      </DeferredPanel>}
+      {playlistModalOpen && (
+        <DeferredPanel>
+          <PlaylistFormatModal
+            open={playlistModalOpen}
+            onClose={() => setPlaylistModalOpen(false)}
+            onConfirm={onPlaylistConfirm}
+          />
+        </DeferredPanel>
+      )}
 
       <ConfirmDialog
         open={pendingAction != null}

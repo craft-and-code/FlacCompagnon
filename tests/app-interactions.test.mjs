@@ -18,6 +18,7 @@ function menuFixture() {
     exportJson: () => calls.push("json"),
     reset: () => calls.push("reset"),
     setSpectrogramSize: (size) => calls.push(size),
+    setSpectrogramColor: (color) => calls.push(color),
   };
   return { calls, actions };
 }
@@ -30,6 +31,10 @@ const nativeActions = [
   "reset",
   "spectrogram_size_small",
   "spectrogram_size_full",
+  "spectrogram_color_green",
+  "spectrogram_color_blue",
+  "spectrogram_color_amber",
+  "spectrogram_color_violet",
 ];
 
 test("a native Reset cannot clear the listing while the toolbar is unavailable", () => {
@@ -49,7 +54,19 @@ test("conversion blocks every routed native action until the app becomes availab
   for (const action of nativeActions) dispatchMenuAction(action, actions, false);
   assert.deepEqual(calls, []);
   for (const action of nativeActions) dispatchMenuAction(action, actions, true);
-  assert.deepEqual(calls, ["simple", "extended", "csv", "json", "reset", "half", "full"]);
+  assert.deepEqual(calls, [
+    "simple",
+    "extended",
+    "csv",
+    "json",
+    "reset",
+    "half",
+    "full",
+    "green",
+    "blue",
+    "amber",
+    "violet",
+  ]);
   dispatchMenuAction("unknown", actions, true);
   assert.equal(calls.length, nativeActions.length);
 });

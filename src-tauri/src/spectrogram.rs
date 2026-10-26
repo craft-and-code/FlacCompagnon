@@ -1,208 +1,91 @@
-//! Spectrogram rendering through a system-installed `ffmpeg`.
-//!
-//! ffmpeg is resolved at runtime rather than bundled, so the build never
-//! depends on a sidecar binary. Resolution order:
-//!   1. the `FLACCOMPAGNON_FFMPEG` environment variable, if set;
-//!   2. `ffmpeg` on the `PATH`;
-//!   3. a list of common install locations (important on macOS, where an app
-//!      launched from Finder does not inherit the shell `PATH` and therefore
-//!      cannot see Homebrew's `/opt/homebrew/bin`).
-//!
-//! `showspectrumpic` with `legend=1` draws a labelled frequency axis (its top
-//! equals Nyquist = sample_rate / 2); a caption drawn on top spells out the
-//! sample rate / bit depth / format explicitly. If `drawtext` is unavailable we
-//! transparently retry without the caption.
+//! Application adapter for the reusable Rust spectrogram and PNG engine.
 
-use std::path::Path;
-use std::process::{Command, Stdio};
-
-use flaccompagnon_core::BasicInfo;
+use flaccompagnon_spectrogram::{AnalysisOptions, Palette, PlotSize, RenderOptions};
 use serde::Deserialize;
+use std::path::Path;
 
-/// Spectrum canvas dimensions passed to ffmpeg. Its legend extends the final
-/// PNG beyond these dimensions, by an amount determined by ffmpeg.
-///
-/// `Half` is Aède's default: a 900×470 canvas, exactly half of the full canvas
-/// in both directions. `Full` preserves FlacCompagnon's former 1800×940 canvas
-/// for detailed inspection or direct comparison with older images.
+/// Preferred plot size; the legacy `half` storage value now means 1200×627.
 #[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum SpectrogramSize {
+    /// Standard plot, preserving the former 900:470 proportions.
     #[default]
     Half,
+    /// Existing large plot, 1800×940.
     Full,
 }
 
 impl SpectrogramSize {
-    fn dimensions(self) -> &'static str {
+    fn dimensions(self) -> (u32, u32) {
         match self {
-            Self::Half => "900x470",
-            Self::Full => "1800x940",
+            Self::Half => PlotSize::Standard.dimensions(),
+            Self::Full => PlotSize::Large.dimensions(),
         }
     }
 }
 
-fn spectrum(size: SpectrogramSize) -> String {
-    format!(
-        "showspectrumpic=s={}:mode=combined:legend=1:color=intensity:scale=log:gain=3",
-        size.dimensions()
-    )
+/// Monochrome palette selected in the native menu.
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum SpectrogramColor {
+    /// Shared green default in FlacCompagnon and Aède.
+    #[default]
+    Green,
+    /// Blue levels.
+    Blue,
+    /// Amber levels.
+    Amber,
+    /// Violet levels.
+    Violet,
 }
 
-/// Locate a working `ffmpeg` executable, or `None` if none is found.
-pub fn resolve_ffmpeg() -> Option<String> {
-    resolve_with(std::env::var(FFMPEG_ENV).ok(), ffmpeg_works)
-}
-
-/// Environment variable that overrides the search entirely.
-const FFMPEG_ENV: &str = "FLACCOMPAGNON_FFMPEG";
-
-/// The resolution itself, with the environment and the "does it run?" probe
-/// passed in so the precedence rule can be tested without a real ffmpeg or a
-/// process-global `set_var` (which would make the test suite order-dependent).
-///
-/// An `explicit` path that is set but *doesn't* work falls through to the
-/// normal search rather than failing: a stale variable in someone's shell
-/// profile shouldn't disable the feature outright.
-fn resolve_with(explicit: Option<String>, works: impl Fn(&str) -> bool) -> Option<String> {
-    if let Some(p) = explicit.filter(|p| !p.is_empty()) {
-        if works(&p) {
-            return Some(p);
+impl SpectrogramColor {
+    fn palette(self) -> Palette {
+        match self {
+            Self::Green => Palette::green(),
+            Self::Blue => Palette::blue(),
+            Self::Amber => Palette::amber(),
+            Self::Violet => Palette::violet(),
         }
     }
-    candidates().into_iter().find(|c| works(c))
 }
 
-fn candidates() -> Vec<String> {
-    let mut v = vec!["ffmpeg".to_string()];
-    #[cfg(target_os = "macos")]
-    v.extend(
-        [
-            "/opt/homebrew/bin/ffmpeg",
-            "/usr/local/bin/ffmpeg",
-            "/usr/bin/ffmpeg",
-            "/opt/local/bin/ffmpeg",
-        ]
-        .map(String::from),
-    );
-    #[cfg(target_os = "linux")]
-    v.extend(
-        [
-            "/usr/bin/ffmpeg",
-            "/usr/local/bin/ffmpeg",
-            "/snap/bin/ffmpeg",
-            "/var/lib/flatpak/exports/bin/ffmpeg",
-        ]
-        .map(String::from),
-    );
-    #[cfg(target_os = "windows")]
-    v.extend(
-        [
-            "ffmpeg.exe",
-            "C:\\ffmpeg\\bin\\ffmpeg.exe",
-            "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe",
-        ]
-        .map(String::from),
-    );
-    v
-}
-
-fn ffmpeg_works(path: &str) -> bool {
-    Command::new(path)
-        .arg("-version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-}
-
-/// Human-readable caption drawn on the spectrogram.
-///
-/// The result is embedded in an ffmpeg `drawtext` filter expression, and the
-/// format label is derived from the *file extension* (untrusted input), so the
-/// whole caption is restricted to a safe character set — no quotes, colons,
-/// commas or backslashes can reach the filter graph.
-fn caption(info: &BasicInfo) -> String {
-    let bits = info
-        .bits
-        .map(|b| format!("{b}-bit"))
-        .unwrap_or_else(|| "float".to_string());
-    let nyquist = info.sample_rate / 2;
-    let raw = format!(
-        "{} Hz | {} | {} ch | {} | Nyquist {} Hz",
-        info.sample_rate, bits, info.channels, info.format, nyquist
-    );
-    raw.chars()
-        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, ' ' | '|' | '-' | '/' | '.'))
-        .collect()
-}
-
-/// Render a spectrogram PNG for `input` into `output` using `ffmpeg`.
+/// Render and atomically publish a lossless PNG, leaving failed/cancelled output intact.
 pub fn render(
-    ffmpeg: &str,
     input: &Path,
     output: &Path,
-    info: Option<&BasicInfo>,
     size: SpectrogramSize,
+    color: SpectrogramColor,
+    cancelled: &dyn Fn() -> bool,
 ) -> Result<(), String> {
     if !output
         .extension()
-        .is_some_and(|e| e.eq_ignore_ascii_case("png"))
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("png"))
     {
-        return Err("Spectrogram destination must use a .png extension.".to_string());
+        return Err("Spectrogram destination must use a .png extension.".into());
     }
     flaccompagnon_core::report::validate_destination(output).map_err(|e| e.to_string())?;
-    let input_s = input.to_string_lossy().to_string();
-    let output_s = output.to_string_lossy().to_string();
-
-    let base = spectrum(size);
-    let filter_with_text = match info {
-        Some(i) => format!(
-            "{base},drawtext=text='{}':fontcolor=white:fontsize=24:x=14:y=12:box=1:boxcolor=black@0.55",
-            caption(i)
-        ),
-        None => base.clone(),
+    let (width, height) = size.dimensions();
+    let options = AnalysisOptions {
+        width,
+        height,
+        ..Default::default()
     };
-
-    // Preferred: spectrum + caption. Fall back to spectrum-only if drawtext
-    // fails (e.g. no usable font); the legend still shows frequency to Nyquist.
-    if run(ffmpeg, &input_s, &filter_with_text, &output_s).is_ok() {
-        return Ok(());
-    }
-    run(ffmpeg, &input_s, &base, &output_s)
-}
-
-fn run(ffmpeg: &str, input: &str, filter: &str, output: &str) -> Result<(), String> {
-    let out = flaccompagnon_core::decode::local_ffmpeg_command(ffmpeg)
-        .args([
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-i",
-            input,
-            "-lavfi",
-            filter,
-            "-frames:v",
-            "1",
-            "-f",
-            "image2pipe",
-            "-c:v",
-            "png",
-            "pipe:1",
-        ])
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|e| format!("failed to run ffmpeg: {e}"))?;
-
-    if out.status.success() {
-        // ffmpeg never opens the destination: an existing link cannot point
-        // it at an audio file, and failed renders keep the previous PNG intact.
-        flaccompagnon_core::report::write_atomic_bytes(Path::new(output), &out.stdout)
-            .map_err(|e| e.to_string())
-    } else {
-        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
-    }
+    let dsd = flaccompagnon_core::spectrogram::requires_dsd_decoder(input);
+    let decoder = dsd.then(crate::ffmpeg::resolve_ffmpeg).flatten();
+    let style = RenderOptions {
+        palette: color.palette(),
+        ..Default::default()
+    };
+    let bytes = flaccompagnon_services::spectrogram::render_png(
+        input,
+        &options,
+        &style,
+        "FlacCompagnon",
+        decoder.as_deref(),
+        cancelled,
+    )?;
+    flaccompagnon_core::report::write_atomic_bytes(output, &bytes).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

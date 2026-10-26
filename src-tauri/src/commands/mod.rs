@@ -11,7 +11,7 @@
 //! * [`convert`] — re-encode the conversion panel's imported tracks to
 //!   another format, optionally copying everything else in their folders
 //!   alongside. The other command here (besides [`tags`]) that writes files.
-//! * [`spectrograms`] — render a PNG per track through ffmpeg.
+//! * [`spectrograms`] — render a lossless PNG per track through the shared Rust crate.
 //! * [`report`] — write CSV/JSON reports and M3U playlists, and read a report
 //!   back in.
 //! * [`tags`] — read/write tags and cover art. The only commands here that

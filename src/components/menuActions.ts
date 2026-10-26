@@ -1,7 +1,7 @@
 // Native menu events use the same availability gate as the toolbar. The OS
 // menu can still emit an action while the corresponding webview control is disabled.
 
-import type { SpectrogramSize } from "../types";
+import type { SpectrogramSize, SpectrogramColor } from "../types";
 
 export interface MenuActions {
   exportM3u: () => void;
@@ -10,6 +10,7 @@ export interface MenuActions {
   exportJson: () => void;
   reset: () => void;
   setSpectrogramSize: (size: SpectrogramSize) => void;
+  setSpectrogramColor: (color: SpectrogramColor) => void;
 }
 
 export function dispatchMenuAction(action: string, actions: MenuActions, enabled: boolean): void {
@@ -29,6 +30,12 @@ export function dispatchMenuAction(action: string, actions: MenuActions, enabled
       break;
     case "reset":
       actions.reset();
+      break;
+    case "spectrogram_color_green":
+    case "spectrogram_color_blue":
+    case "spectrogram_color_amber":
+    case "spectrogram_color_violet":
+      actions.setSpectrogramColor(action.slice("spectrogram_color_".length) as SpectrogramColor);
       break;
     case "spectrogram_size_small":
       actions.setSpectrogramSize("half");
