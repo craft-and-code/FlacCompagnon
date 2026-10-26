@@ -332,16 +332,15 @@ function drawConv(c, p, ts) {
   );
 }
 
-/* ---- realistic streaming spectrogram (inferno colormap) ---- */
-const INFERNO = [
-  [4, 4, 18], [22, 20, 74], [58, 30, 120], [120, 34, 120],
-  [186, 44, 92], [226, 66, 54], [244, 120, 30], [250, 188, 52],
-  [252, 255, 190],
+/* ---- realistic streaming spectrogram (violet / turquoise / lime) ---- */
+const SPECTROGRAM_COLORS = [
+  [17, 18, 19], [64, 41, 109], [25, 127, 142],
+  [169, 199, 68], [241, 240, 235],
 ];
-function inferno(t) {
+function spectrogramColor(t) {
   t = t < 0 ? 0 : t > 1 ? 1 : t;
-  const seg = t * (INFERNO.length - 1), i = Math.floor(seg), fr = seg - i;
-  const a = INFERNO[i], b = INFERNO[Math.min(i + 1, INFERNO.length - 1)];
+  const seg = t * (SPECTROGRAM_COLORS.length - 1), i = Math.floor(seg), fr = seg - i;
+  const a = SPECTROGRAM_COLORS[i], b = SPECTROGRAM_COLORS[Math.min(i + 1, SPECTROGRAM_COLORS.length - 1)];
   return [a[0] + (b[0] - a[0]) * fr, a[1] + (b[1] - a[1]) * fr, a[2] + (b[2] - a[2]) * fr];
 }
 function hsh(x, y) { const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return v - Math.floor(v); }
@@ -378,7 +377,7 @@ function specColumn(px, gx) {
   for (let py = 0; py < SPEC_H; py++) {
     const f = (SPEC_H - 1 - py) / (SPEC_H - 1);
     const e = specField(gx, f);
-    const col = inferno(Math.pow(e < 0 ? 0 : e > 1 ? 1 : e, 0.60));
+    const col = spectrogramColor(Math.pow(e < 0 ? 0 : e > 1 ? 1 : e, 0.60));
     const idx = (py * SPEC_W + px) * 4;
     d[idx] = col[0]; d[idx + 1] = col[1]; d[idx + 2] = col[2]; d[idx + 3] = 255;
   }
@@ -404,9 +403,9 @@ function specScroll(step) {
   specBctx.putImageData(specImg, 0, 0);
 }
 
-// Animated, realistic spectrogram: an inferno-mapped energy field that streams
-// left over time (like a live analyzer). Bright yellows at the bottom (low freq),
-// fading to red/purple/black going up, with note onsets as vertical streaks and a
+// Animated, realistic spectrogram: an energy field that streams left over time
+// (like a live analyzer). Bright lime at the bottom (low freq), fading through
+// turquoise/violet to charcoal going up, with note onsets as vertical streaks and a
 // sharp cut-off wall at 22.05 kHz - the visual tell of an upsampled file.
 function drawSpec(c, ts) {
   const ctx = c.getContext("2d"), w = c.width, h = c.height, s = w / c.clientWidth;
