@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["decode_and_analyze_dsd"]};
+window.SIDEBAR_ITEMS = {"fn":["decode_and_analyze_dsd","visit_dsd_pcm"]};

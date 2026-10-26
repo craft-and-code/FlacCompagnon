@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["local_ffmpeg_command"],"mod":["container","dsd","flac","flac_md5","playback","probe","stream"],"struct":["DecodeOutcome"]};
+window.SIDEBAR_ITEMS = {"fn":["local_ffmpeg_command"],"mod":["container","dsd","flac","flac_md5","pcm","playback","probe","stream"],"struct":["DecodeOutcome"]};
